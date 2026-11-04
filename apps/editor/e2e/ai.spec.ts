@@ -7,7 +7,10 @@ import { expect, test, type Page, type Route } from '@playwright/test';
 
 const KEY = 'AIzaSyTestKey_0123456789abcdefghijk';
 const PASS = 'a calm morning';
-const preview = (page: Page) => page.frameLocator('iframe[title="Preview of your site"]');
+const preview = (page: Page) =>
+  page
+    .frameLocator('iframe[title="Preview of your site"]')
+    .frameLocator('iframe[title="Your site"]');
 const panel = (page: Page) => page.getByRole('region', { name: 'AI helper' });
 
 async function waitForSave(page: Page) {
@@ -71,6 +74,8 @@ test('add a key, ask AI to rewrite a section, unlock after reload, see the quota
   // After a reload the key is locked; a wrong passphrase is refused.
   await waitForSave(page);
   await page.reload();
+  // Wait until the editor has settled (the preview shows the page) before clicking.
+  await expect(preview(page).locator('h1')).toBeVisible();
   await page.getByRole('button', { name: 'Ask AI about Big intro' }).click();
   await panel(page).getByLabel('Passphrase to unlock your key').fill('not the one');
   await panel(page).getByRole('button', { name: 'Unlock' }).click();

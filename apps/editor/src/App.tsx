@@ -1,10 +1,15 @@
 import type { Project } from '@klinth/core';
-import { Component, useEffect, useState, type ReactNode } from 'react';
-import { Editor } from './Editor.tsx';
-import { StartScreen } from './StartScreen.tsx';
+import { Component, Suspense, lazy, useEffect, useState, type ReactNode } from 'react';
 import { downloadProjectFile, missingFilesNote, type ImportedProject } from './lib/files.ts';
 import { loadProject, saveAsset, saveProject } from './lib/storage.ts';
 import { useEditor } from './state/store.ts';
+
+// Split so a first visit downloads only the start screen, and a return visit only the editor.
+const loadEditor = () => import('./Editor.tsx');
+const Editor = lazy(() => loadEditor().then((m) => ({ default: m.Editor })));
+const StartScreen = lazy(() =>
+  import('./StartScreen.tsx').then((m) => ({ default: m.StartScreen })),
+);
 
 const LAST_KEY = 'klinth:last-project';
 
@@ -52,6 +57,14 @@ export function App() {
     if (note) useEditor.getState().notify(note);
   };
 
+  // While the start screen is open, fetch the editor in the background so opening
+  // a project is instant and still works if the connection drops meanwhile.
+  useEffect(() => {
+    if (screen !== 'start') return;
+    const timer = setTimeout(() => void loadEditor().catch(() => undefined), 1500);
+    return () => clearTimeout(timer);
+  }, [screen]);
+
   // Returning visitors go straight back to what they were working on.
   useEffect(() => {
     const id = lastProjectId();
@@ -74,23 +87,35 @@ export function App() {
     <>
       <SmallScreenNotice />
       {screen === 'loading' ? (
-        <p role="status" className="grid h-full place-items-center text-sm text-ink-soft">
-          Opening your project…
-        </p>
+        <Opening />
       ) : screen === 'editor' ? (
         <ErrorBoundary>
-          <Editor
-            onExit={() => {
-              close();
-              remember(null);
-              setScreen('start');
-            }}
-          />
+          <Suspense fallback={<Opening />}>
+            <Editor
+              onExit={() => {
+                close();
+                remember(null);
+                setScreen('start');
+              }}
+            />
+          </Suspense>
         </ErrorBoundary>
       ) : (
-        <StartScreen onCreate={create} onOpen={openSaved} />
+        <ErrorBoundary>
+          <Suspense fallback={<Opening />}>
+            <StartScreen onCreate={create} onOpen={openSaved} />
+          </Suspense>
+        </ErrorBoundary>
       )}
     </>
+  );
+}
+
+function Opening() {
+  return (
+    <p role="status" className="grid h-full place-items-center text-sm text-ink-soft">
+      Opening your project…
+    </p>
   );
 }
 
@@ -114,18 +139,52 @@ function SmallScreenNotice() {
 
 interface BoundaryState {
   failed: boolean;
+  /** A part of Klinth could not be downloaded (offline, or Klinth was just updated). */
+  loadFailed: boolean;
+}
+
+/** True for the error a browser throws when a lazily loaded file cannot be fetched. */
+export function isLoadError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /dynamically imported module|Importing a module script failed|error loading dynamically/i.test(
+    message,
+  );
 }
 
 /** If the editor crashes, the user can still download their work. */
 class ErrorBoundary extends Component<{ children: ReactNode }, BoundaryState> {
-  override state: BoundaryState = { failed: false };
+  override state: BoundaryState = { failed: false, loadFailed: false };
 
-  static getDerivedStateFromError(): BoundaryState {
-    return { failed: true };
+  static getDerivedStateFromError(error: unknown): BoundaryState {
+    return { failed: true, loadFailed: isLoadError(error) };
+  }
+
+  override componentDidCatch(error: unknown): void {
+    // Only the error's name and message: never the project or anything the user typed.
+    const name = error instanceof Error ? error.name : 'Error';
+    const message = error instanceof Error ? error.message : '';
+    console.error('Klinth crashed:', name, message.slice(0, 200));
   }
 
   override render() {
     if (!this.state.failed) return this.props.children;
+    if (this.state.loadFailed) {
+      return (
+        <div role="alert" className="mx-auto max-w-lg px-6 py-24">
+          <h1 className="font-display text-3xl">Klinth could not finish loading.</h1>
+          <p className="mt-3 leading-relaxed text-ink-soft">
+            Check your internet connection, then reload. Your saved work is safe in this browser.
+          </p>
+          <button
+            type="button"
+            className="btn btn-primary mt-6"
+            onClick={() => window.location.reload()}
+          >
+            Reload
+          </button>
+        </div>
+      );
+    }
     const { project } = useEditor.getState();
     return (
       <div role="alert" className="mx-auto max-w-lg px-6 py-24">

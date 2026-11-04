@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { allowedOrigins, json, type Headers } from './http.ts';
+import { allowedOrigins, json, readCappedText, type Headers } from './http.ts';
 
 /**
  * GitHub sign-in. The Worker only swaps the one-time `code` for a token, because
@@ -79,9 +79,8 @@ function validRedirect(uri: string, env: GitHubEnv): boolean {
 }
 
 async function readBody(request: Request): Promise<unknown> {
-  if (Number(request.headers.get('content-length') ?? '0') > MAX_BODY_BYTES) return undefined;
-  const text = await request.text();
-  if (text.length > MAX_BODY_BYTES) return undefined;
+  const text = await readCappedText(request, MAX_BODY_BYTES);
+  if (text === null) return undefined;
   try {
     return JSON.parse(text);
   } catch {

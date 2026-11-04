@@ -77,7 +77,7 @@ describe('preview document', () => {
     );
     expect(doc).not.toContain('allow-same-origin');
     // The bridge accepts only a height from code frames, and only from frames in the page.
-    expect(doc).toContain("e.data.source === 'klinth-code' && e.source !== window.parent");
+    expect(doc).toContain("e.data.source === 'klinth-code' && e.source !== window.top");
     expect(doc).toContain('Math.min(Math.max(Math.round(h), 80), 1600)');
     expect(doc).toContain('item.blob instanceof Blob');
   });

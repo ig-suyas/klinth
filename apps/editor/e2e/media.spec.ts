@@ -4,7 +4,10 @@ import { dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { strFromU8, unzipSync } from 'fflate';
 
-const preview = (page: Page) => page.frameLocator('iframe[title="Preview of your site"]');
+const preview = (page: Page) =>
+  page
+    .frameLocator('iframe[title="Preview of your site"]')
+    .frameLocator('iframe[title="Your site"]');
 const settings = (page: Page) => page.getByRole('complementary', { name: 'Settings' });
 const MP4_HEAD = [0, 0, 0, 24, ...Array.from('ftypisom', (c) => c.charCodeAt(0)), 0, 0, 2, 0];
 
@@ -155,8 +158,8 @@ test('custom code runs in a sandbox that cannot reach the editor', async ({ page
   await expect(settings(page)).toContainText('Only paste code you trust.');
   const attack = `<p id="out">waiting</p><script>
 var r = [];
-try { parent.parent.document.title = 'HACKED'; r.push('editor:open'); } catch (e) { r.push('editor:blocked'); }
-try { parent.document.body.innerHTML = 'HACKED'; r.push('preview:open'); } catch (e) { r.push('preview:blocked'); }
+try { top.document.title = 'HACKED'; r.push('editor:open'); } catch (e) { r.push('editor:blocked'); }
+try { parent.document.body.innerHTML = 'HACKED'; parent.parent.document.body.innerHTML = 'HACKED'; r.push('preview:open'); } catch (e) { r.push('preview:blocked'); }
 try { localStorage.setItem('k', '1'); r.push('storage:open'); } catch (e) { r.push('storage:blocked'); }
 try { document.cookie = 'k=1'; r.push(document.cookie ? 'cookie:open' : 'cookie:blocked'); } catch (e) { r.push('cookie:blocked'); }
 top.postMessage({ source: 'klinth-preview', type: 'edit', id: 'intro', field: 'heading', value: 'HACKED' }, '*');

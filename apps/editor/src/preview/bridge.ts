@@ -1,7 +1,8 @@
 /**
  * The small script that runs inside the sandboxed preview frame. It has no
- * access to the editor: it only talks to the parent through `postMessage`.
- * Sent to the parent: `ready`, `select`, `edit`, `scroll`. Received: `select`,
+ * access to the editor: it only talks to the editor (`window.top`; its direct
+ * parent is the preview.html shell) through `postMessage`.
+ * Sent to the editor: `ready`, `select`, `edit`, `scroll`. Received: `select`,
  * and `assets` (uploaded files as Blobs, shown through this frame's own blob: addresses).
  * Custom code frames inside the page may only report their height.
  *
@@ -17,7 +18,7 @@ export const BRIDGE_JS = `(function () {
 
   function send(message) {
     message.source = 'klinth-preview';
-    window.parent.postMessage(message, cfg.origin);
+    window.top.postMessage(message, cfg.origin);
   }
   function sectionOf(el) {
     return el && el.closest ? el.closest('[data-k-section]') : null;
@@ -139,8 +140,8 @@ export const BRIDGE_JS = `(function () {
 
   window.addEventListener('message', function (e) {
     if (!e.data) return;
-    if (e.data.source === 'klinth-code' && e.source !== window.parent) { fitCodeFrame(e); return; }
-    if (e.source !== window.parent || e.data.source !== 'klinth-editor') return;
+    if (e.data.source === 'klinth-code' && e.source !== window.top) { fitCodeFrame(e); return; }
+    if (e.source !== window.top || e.data.source !== 'klinth-editor') return;
     if (e.data.type === 'select') mark(e.data.id, true);
     else if (e.data.type === 'assets') showAssets(e.data.items);
   });

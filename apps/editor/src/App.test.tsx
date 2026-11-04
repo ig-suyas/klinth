@@ -1,7 +1,7 @@
 import 'fake-indexeddb/auto';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
-import { App } from './App.tsx';
+import { App, isLoadError } from './App.tsx';
 import { closeStorage, listProjects } from './lib/storage.ts';
 import { useEditor } from './state/store.ts';
 
@@ -16,7 +16,7 @@ describe('App', () => {
   it('starts with the template picker and an empty project list', async () => {
     render(<App />);
     expect(
-      screen.getByRole('heading', { name: 'Make a website you are proud of.' }),
+      await screen.findByRole('heading', { name: 'Make a website you are proud of.' }),
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Personal portfolio/ })).toBeInTheDocument();
     expect(await screen.findByText(/Nothing saved yet/)).toBeInTheDocument();
@@ -24,7 +24,7 @@ describe('App', () => {
 
   it('opens a template in the editor and saves it to the browser', async () => {
     render(<App />);
-    fireEvent.click(screen.getByRole('button', { name: /Small business/ }));
+    fireEvent.click(await screen.findByRole('button', { name: /Small business/ }));
     const sections = await screen.findByRole('navigation', { name: 'Sections' });
     expect(within(sections).getAllByRole('listitem').length).toBeGreaterThan(3);
     expect(screen.getByTitle('Preview of your site')).toHaveAttribute('sandbox', 'allow-scripts');
@@ -33,7 +33,7 @@ describe('App', () => {
 
   it('edits a section from the inspector and can undo it', async () => {
     render(<App />);
-    fireEvent.click(screen.getByRole('button', { name: /Personal portfolio/ }));
+    fireEvent.click(await screen.findByRole('button', { name: /Personal portfolio/ }));
     const sections = await screen.findByRole('navigation', { name: 'Sections' });
     fireEvent.click(
       within(sections).getAllByRole('button', { name: /Big intro/ })[1] as HTMLElement,
@@ -50,7 +50,7 @@ describe('App', () => {
 
   it('shows a plain message when a link is not valid yet', async () => {
     render(<App />);
-    fireEvent.click(screen.getByRole('button', { name: /Personal portfolio/ }));
+    fireEvent.click(await screen.findByRole('button', { name: /Personal portfolio/ }));
     const sections = await screen.findByRole('navigation', { name: 'Sections' });
     fireEvent.click(within(sections).getAllByRole('button', { name: /Contact/ })[1] as HTMLElement);
     const settings = screen.getByRole('complementary', { name: 'Settings' });
@@ -58,5 +58,16 @@ describe('App', () => {
     fireEvent.change(address, { target: { value: 'javascript:alert(1)' } });
     expect(within(settings).getByRole('alert')).toHaveTextContent('Start with https://');
     expect(JSON.stringify(useEditor.getState().project)).not.toContain('javascript:');
+  });
+});
+
+describe('isLoadError', () => {
+  it('spots failed downloads of lazily loaded parts in Chrome, Firefox and Safari', () => {
+    expect(isLoadError(new TypeError('Failed to fetch dynamically imported module: /a.js'))).toBe(
+      true,
+    );
+    expect(isLoadError(new TypeError('error loading dynamically imported module'))).toBe(true);
+    expect(isLoadError(new TypeError('Importing a module script failed.'))).toBe(true);
+    expect(isLoadError(new Error('Cannot read properties of undefined'))).toBe(false);
   });
 });

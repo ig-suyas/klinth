@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { downloadProjectFile, downloadSiteZip } from '../lib/files.ts';
 import { useAi } from '../ai/store.ts';
 import { useGitHub } from '../github/oauth.ts';
+import { markBackedUp } from '../lib/safety.ts';
 import { loadAssets } from '../lib/storage.ts';
 import { useLibrary } from '../media/files.ts';
 import { useEditor, type Device } from '../state/store.ts';
@@ -200,11 +201,15 @@ function ExportMenu() {
       const { projectId, project } = useEditor.getState();
       if (!projectId || !project) return;
       await downloadSiteZip(project, await loadAssets(projectId));
+      // The ZIP holds the project file too, so it counts as a backup.
+      markBackedUp(projectId);
     });
   const downloadProject = () =>
     run(() => {
-      const { project } = useEditor.getState();
-      if (project) downloadProjectFile(project);
+      const { projectId, project } = useEditor.getState();
+      if (!projectId || !project) return;
+      downloadProjectFile(project);
+      markBackedUp(projectId);
     });
 
   return (

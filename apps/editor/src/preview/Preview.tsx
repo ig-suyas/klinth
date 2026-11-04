@@ -4,6 +4,7 @@ import { useFontUrls } from '../lib/fonts.ts';
 import { assetBlobs } from '../media/files.ts';
 import { setSectionProps, type Props } from '../state/sections.ts';
 import { useEditor, type Device } from '../state/store.ts';
+import { PREVIEW_PATH } from '../security/headers.ts';
 import { buildPreviewDocument, previewMessageSchema } from './document.ts';
 
 /** Frame widths per device, in CSS pixels of the previewed site. */
@@ -17,10 +18,19 @@ export const DEVICE_WIDTH: Record<Device, number> = {
 /** How long the preview waits after a change before it redraws. */
 const PREVIEW_DELAY_MS = 120;
 
+/** The window of the shown page: the inner frame of the preview.html shell. */
+function siteWindow(el: HTMLIFrameElement | null): Window | null {
+  // `frames[0]` may be read across origins; it is null until the shell has loaded.
+  return el?.contentWindow?.frames[0] ?? null;
+}
+
 /**
  * The live preview: the real rendered page in a sandboxed frame. The frame
  * gets `allow-scripts` only (no same-origin), so it cannot read the editor,
  * its storage or the saved key. It talks to the editor through postMessage.
+ * It loads the `preview.html` shell once (its own, looser security policy, so
+ * pasted custom code can run) and then gets each redraw by message, which needs
+ * no network. The shown page lives in the shell's inner frame.
  */
 export function Preview() {
   const project = useEditor((s) => s.project);
@@ -29,10 +39,21 @@ export function Preview() {
   const frame = useRef<HTMLIFrameElement>(null);
   const scrollY = useRef(0);
   const loads = useRef(0);
+  /** The latest page to show; handed over when the preview page says it is ready. */
+  const pending = useRef('');
+  /** The shell has loaded and listens for pages. */
+  const hostReady = useRef(false);
   const shownPage = useRef(pageIndex);
   const area = useRef<HTMLDivElement>(null);
   const [space, setSpace] = useState({ width: 0, height: 0 });
   const fontUrls = useFontUrls(project?.theme);
+
+  /** Hands the latest page to the shell, which shows it in a fresh inner frame. */
+  const sendPage = (el: HTMLIFrameElement) =>
+    el.contentWindow?.postMessage(
+      { source: 'klinth-editor', type: 'render', html: pending.current },
+      '*',
+    );
 
   useLayoutEffect(() => {
     const el = area.current;
@@ -52,7 +73,7 @@ export function Preview() {
       if (shownPage.current !== pageIndex) scrollY.current = 0;
       shownPage.current = pageIndex;
       loads.current += 1;
-      frame.current.srcdoc = buildPreviewDocument(project, pageIndex, {
+      pending.current = buildPreviewDocument(project, pageIndex, {
         origin: window.location.origin,
         interactive: true,
         calm: loads.current > 1,
@@ -60,6 +81,8 @@ export function Preview() {
         selectedId: useEditor.getState().selectedId,
         fontUrls,
       });
+      if (hostReady.current) sendPage(frame.current);
+      else if (!frame.current.getAttribute('src')) frame.current.setAttribute('src', PREVIEW_PATH);
     }, PREVIEW_DELAY_MS);
     return () => clearTimeout(timer);
   }, [project, pageIndex, fontUrls]);
@@ -67,23 +90,31 @@ export function Preview() {
   // Messages from the frame. Checked by source and by schema; anything else is ignored.
   useEffect(() => {
     const onMessage = (event: MessageEvent) => {
-      if (!frame.current || event.source !== frame.current.contentWindow) return;
+      if (!frame.current || !event.source) return;
+      const fromShell = event.source === frame.current.contentWindow;
+      if (!fromShell && event.source !== siteWindow(frame.current)) return;
       const parsed = previewMessageSchema.safeParse(event.data);
       if (!parsed.success) return;
       const message = parsed.data;
+      // The shell only says it is ready; everything else must come from the page.
+      if (fromShell !== (message.type === 'host')) return;
       const state = useEditor.getState();
       switch (message.type) {
+        case 'host':
+          hostReady.current = true;
+          if (pending.current) sendPage(frame.current);
+          break;
         case 'ready': {
           // Hand the page its pictures and videos; the frame cannot read browser storage.
           const { projectId, project: current, pageIndex: index } = state;
           const page = current?.pages[index];
           if (!projectId || !current || !page) break;
-          const target = frame.current.contentWindow;
+          const target = siteWindow(frame.current);
           const ids = sectionAssetIds(page.sections);
           void assetBlobs(projectId, ids).then(
             (items) => {
-              if (items.length && frame.current?.contentWindow === target) {
-                target?.postMessage({ source: 'klinth-editor', type: 'assets', items }, '*');
+              if (items.length && target && siteWindow(frame.current) === target) {
+                target.postMessage({ source: 'klinth-editor', type: 'assets', items }, '*');
               }
             },
             () => state.notify('Some pictures could not be loaded from browser storage.'),
@@ -122,7 +153,7 @@ export function Preview() {
     () =>
       useEditor.subscribe((state, previous) => {
         if (state.selectedId === previous.selectedId) return;
-        frame.current?.contentWindow?.postMessage(
+        siteWindow(frame.current)?.postMessage(
           { source: 'klinth-editor', type: 'select', id: state.selectedId },
           '*',
         );

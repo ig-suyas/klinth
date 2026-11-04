@@ -45,10 +45,14 @@ flowchart LR
   (enforced: its tsconfig `lib` excludes `DOM`), so it can run in the Worker and in tests.
 - **Preview bridge.** The editor calls `renderSite(project, { editable: true })`, which only adds
   `data-k-section` / `data-k-field` attributes (tested: removing them gives the export byte for
-  byte). `apps/editor/src/preview/document.ts` inlines the CSS and JS into one `srcdoc` and adds a
-  small bridge script. The frame is `sandbox="allow-scripts"` (opaque origin). It posts `select`,
-  `edit` and `scroll` messages to the editor origin only; the editor accepts them only from that
-  frame's window and validates them with Zod. Text is read with `innerText` and never written as HTML.
+  byte). `apps/editor/src/preview/document.ts` inlines the CSS and JS into one HTML document and
+  adds a small bridge script. The preview frame (`sandbox="allow-scripts"`, opaque origin) loads
+  the `public/preview.html` shell once; the editor posts each redraw to it and the shell shows it
+  in a fresh inner `srcdoc` frame (its own opaque origin). The shell exists so the preview gets its
+  own, looser CSP: a `srcdoc` in the editor would inherit the editor's strict CSP and block the
+  site's scripts and custom code. Redraws need no network, so the preview works offline. The page
+  posts `select`, `edit` and `scroll` messages to `window.top` (the editor origin only); the editor
+  accepts `host` only from the shell and everything else only from the inner frame, validated with Zod. Text is read with `innerText` and never written as HTML.
 - **Editor state.** One Zustand store (`apps/editor/src/state/store.ts`). Every edit goes through
   `change()`, which validates the whole project with the schema and refuses invalid results, so
   nothing broken is saved. Undo history keeps 100 steps; quick edits with the same key within 1 s
@@ -138,7 +142,11 @@ GitHub access uses the user's own OAuth token (default scope `public_repo`), hel
   strict patterns (`youtube-nocookie.com`, Vimeo); raw iframe HTML rejected.
 - Key vault: PBKDF2-SHA-256 (≥600k iterations, random salt) → AES-GCM; only ciphertext, salt, IV in
   localStorage; passphrase never stored. Honest UI copy about its limits.
-- Editor CSP and security headers via Cloudflare Pages `_headers` (Phase 7). No `eval`, no
+- Editor CSP and security headers: `apps/editor/src/security/headers.ts` is the one source; the
+  Vite build writes it to `dist/_headers` (Cloudflare Pages) and `vite preview` sends it, so the
+  Playwright suite runs under the shipped policy. Editor: `script-src 'self'`, `connect-src` only
+  self + Worker + `api.github.com`, `frame-ancestors 'none'`. `/preview.html` detaches it (`!`) and
+  sets a looser policy (user code may load https resources), `frame-ancestors 'self'`. No `eval`, no
   `innerHTML` with user data (ESLint `no-eval`, `no-implied-eval`). `npm audit` in CI.
 
 ## Failure modes

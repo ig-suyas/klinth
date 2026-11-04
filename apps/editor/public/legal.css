@@ -1,0 +1,87 @@
+:root {
+  color-scheme: light dark;
+  --bg: #f6f3ee;
+  --ink: #1d1b18;
+  --soft: #5a554d;
+  --line: #ddd6ca;
+  --accent: #1d5f7a;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #171614;
+    --ink: #f1ede6;
+    --soft: #b9b2a6;
+    --line: #34312c;
+    --accent: #7cc0dc;
+  }
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font:
+    17px/1.65 ui-sans-serif,
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    sans-serif;
+}
+main {
+  max-width: 42rem;
+  margin: 0 auto;
+  padding: 4rem 1.25rem 5rem;
+}
+h1,
+h2 {
+  font-family: ui-serif, Georgia, 'Times New Roman', serif;
+  font-weight: 600;
+  line-height: 1.2;
+}
+h1 {
+  font-size: 2.4rem;
+  margin: 0.5rem 0 0.25rem;
+}
+h2 {
+  font-size: 1.35rem;
+  margin: 2.5rem 0 0.5rem;
+}
+p,
+li {
+  color: var(--ink);
+}
+.meta {
+  color: var(--soft);
+  font-size: 0.95rem;
+}
+.summary {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 1rem 1.25rem;
+  margin: 2rem 0;
+}
+.summary ul {
+  margin: 0.25rem 0 0;
+  padding-left: 1.2rem;
+}
+a {
+  color: var(--accent);
+  text-underline-offset: 3px;
+}
+a:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 3px;
+}
+.back {
+  font-size: 0.95rem;
+}
+footer {
+  border-top: 1px solid var(--line);
+  margin-top: 3rem;
+  padding-top: 1rem;
+  color: var(--soft);
+  font-size: 0.95rem;
+}

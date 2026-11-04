@@ -18,7 +18,7 @@ import {
   type GeminiConfig,
 } from './gemini.ts';
 import { echoesSkill, isExtractionAttempt } from './guard.ts';
-import { fail, json, type Headers } from './http.ts';
+import { fail, json, readCappedText, type Headers } from './http.ts';
 import { buildPrompt } from './prompt.ts';
 
 export interface AiEnv {
@@ -70,10 +70,8 @@ function readKey(request: Request): string | null {
 }
 
 async function readBody(request: Request): Promise<unknown> {
-  const declared = Number(request.headers.get('content-length') ?? '0');
-  if (declared > MAX_AI_BODY_BYTES) return TOO_BIG;
-  const text = await request.text();
-  if (new TextEncoder().encode(text).length > MAX_AI_BODY_BYTES) return TOO_BIG;
+  const text = await readCappedText(request, MAX_AI_BODY_BYTES);
+  if (text === null) return TOO_BIG;
   try {
     return JSON.parse(text) as unknown;
   } catch {

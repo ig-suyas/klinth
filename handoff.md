@@ -12,10 +12,30 @@
 | 5 AI Worker, key vault, AI   | done (owner to review the skill text) |
 | 5.5 Blank start, multi-page  | done                                  |
 | 6 GitHub connect, export     | done (live push needs owner's app)    |
-| 7 Hardening                  | not started                           |
+| 7 Hardening                  | done                                  |
 | 8 Deploy, launch, push       | not started                           |
 
 ## 1. Current state
+
+**Phase 7 (hardening):** Report in `security-report.md` (0 open high/critical). Editor CSP and
+headers from `apps/editor/src/security/headers.ts` → `dist/_headers` on build and sent by
+`vite preview`; Playwright now runs on the production build (port 4173) under that policy.
+Preview redesign forced by CSP: `srcdoc` inherits the parent's CSP, so the preview frame loads
+`public/preview.html` once (own looser CSP, `frame-ancestors 'self'`) and the editor posts each
+redraw; the shell shows it in a fresh inner `srcdoc` frame (title "Your site"), so redraws need
+no network (works offline). Bridge talks to `window.top`; editor accepts `host` only from the
+shell, the rest only from the inner frame. Worker bodies read with a streaming cap
+(`readCappedText`). Bundle: Editor and StartScreen lazy (`React.lazy`), editor prefetched from the
+start screen; first visit ~180 kB gzip JS (was 212), main 126 kB (react-dom + zod + core + fflate).
+Error boundary also around the start screen, plain "could not finish loading" for chunk errors,
+logs only error name/message. Data loss: `lib/safety.ts` (`navigator.storage.persist()`,
+backup timestamp per project set by project-file/ZIP download and GitHub publish, reminder after
+15 edits with no backup or one older than 7 days, 28 when storage is kept), "You are offline"
+banner, `beforeunload` also on a failed save (`ui/SafetyBanners.tsx`). Legal: `public/terms.html`,
+`privacy.html`, `legal.css`, linked from the start screen footer and the AI helper window
+(drafts, lawyer review needed). Accessibility: axe (`@axe-core/playwright`) on start screen, both
+templates in the editor and legal pages: 0 serious/critical (WCAG 2.1 AA tags). Tests: 566 unit
+(core 360, templates 27, editor 123, api 56) and 16 e2e (new `security`, `a11y`, `offline`).
 
 **Phase 6 (GitHub, export polish):** Export menu has "Publish to GitHub". Dialog: repo name
 (suggested from the title, remembered per project in localStorage, name only), New / "One I
@@ -96,7 +116,7 @@ them. **Owner should review it.** Local KV: `npm run skill:local -w @klinth/api`
 
 ## 2. Goal
 
-Next: Phase 7 (hardening). Before it, optionally the owner's live GitHub push test (section 6). Overall: free, no-login site builder exporting plain HTML
+Next: Phase 8 (deploy, launch checks, push). Before it, optionally the owner's live GitHub push test (section 6). Overall: free, no-login site builder exporting plain HTML
 repos at ₹0.
 
 ## 3. Files
@@ -133,8 +153,17 @@ repos at ₹0.
 - `apps/editor/src/panels/PagesPanel.tsx` : page list UI; `e2e/pages.spec.ts`
 - `.claude/launch.json` (untracked) : now also `api` (wrangler dev on 8787)
 
+- `apps/editor/src/security/headers.ts` (+ test) : CSP/headers, `_headers` text; `vite.config.ts` plugin
+- `apps/editor/public/preview.html` : preview shell (own CSP, inner srcdoc frame)
+- `apps/editor/src/lib/safety.ts` (+ test), `src/ui/SafetyBanners.tsx` : backup reminder, offline
+- `apps/editor/public/terms.html`, `privacy.html`, `legal.css` : legal pages
+- `apps/editor/e2e/security.spec.ts`, `a11y.spec.ts`, `offline.spec.ts`; `security-report.md`
+
 ## 4. What worked
 
+- Cloudflare Pages `_headers`: rules matching one path combine; `! Header` detaches an earlier one.
+- `frames[0]` and `location`/`postMessage` work across opaque origins, so the editor can reach the
+  inner preview window without same-origin.
 - Verified 2026-11-04 (docs.github.com, GitHub changelog 2025-07-14): OAuth apps support PKCE,
   S256 only, not required. `POST /repos/{o}/{r}/pages` needs the `repo` scope for OAuth tokens.
   API version header `2022-11-28` (2026-03-10 also exists; ours is still supported). GitHub asks
@@ -174,6 +203,15 @@ repos at ₹0.
   names. `getByLabel('Heading')` also matches "Text under the heading"; use `exact: true`.
 - jsdom has no `crypto.subtle`; vault tests run with `// @vitest-environment node`.
 
+- A `srcdoc` (and blob:/data:) frame inherits the embedder's CSP, even when sandboxed; that is
+  why the preview needed its own served page.
+- Reloading `preview.html` per redraw (location.replace) broke offline (HTML is not cached);
+  `document.write` reuse would leak blob URLs and globals. A persistent shell + inner srcdoc works.
+- Playwright `page.evaluate(new Function)` is not blocked by CSP; test with an injected `<script>`.
+- axe flagged contrast on the start screen mid-entrance animation; test with reduced motion.
+- A click within ~300 ms of reloading the editor can be lost (AI e2e now waits for the preview).
+  Not reproduced by hand; watch for it.
+
 ## 6. What is still left to do
 
 1. **Owner:** review `workers/api/skill/skill.md` (or send your own text). It is never committed.
@@ -183,12 +221,14 @@ repos at ₹0.
    `workers/api/.dev.vars` (copy `.dev.vars.example`), run `npm run dev:api` and `npm run dev`,
    then Export → Publish to GitHub with a throwaway name. Delete the test repo afterwards.
    Production needs a second app (or updated URLs) with the Pages address in Phase 8.
-3. Phase 7: editor CSP must allow `connect-src` to the Worker and `https://api.github.com`, `font-src 'self' data:` (preview
-   fonts are data: URLs) plus the srcdoc/blob needs; bundle is 633 kB (201 kB gzip), split Motion/Zod or lazy-load the AI panel; consider Turnstile if abuse
-   appears. `wrangler tail` still shows headers to the owner (owner-only, short-lived). Lighthouse
-   re-run on both templates. Inspector exit animation window (see Phase 4 note: `inert`).
+3. Phase 7 leftovers (low): Lighthouse re-run on both templates (templates unchanged in Phase 7);
+   Turnstile only if abuse appears; `wrangler tail` shows headers to the owner; Inspector exit
+   animation `inert` window; zod v4 is ~360 KB source in the main chunk (zod/mini would cut it).
+   **Owner/lawyer:** review Terms and Privacy; contact link points to `github.com/ig-suyas/klinth/issues`,
+   change it if the public repo differs. Turn on 2FA for GitHub and Cloudflare.
 4. Phase 8: create the KV namespace and replace the placeholder id in `wrangler.jsonc`; set
-   `ALLOWED_ORIGINS` to the Pages URL; put the skill with `--remote`; set `VITE_API_BASE_URL` to the
+   `ALLOWED_ORIGINS` to the Pages URL; put the skill with `--remote`; set `VITE_API_BASE_URL` (also
+   feeds `connect-src` in the generated `_headers`, so set it at build time) to the
    Worker's https URL. Re-check the Gemini model is still stable and free.
 5. Item-level inline editing is inspector-only. Props changed without version bumps (no users yet).
    `stash@{0}` (old Phase 2 WIP) can be dropped.

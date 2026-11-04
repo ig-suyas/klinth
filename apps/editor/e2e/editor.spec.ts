@@ -6,7 +6,10 @@ const sectionsList = (page: Page) =>
   page.getByRole('navigation', { name: 'Sections' }).getByRole('listitem');
 /** The Undo button in the top bar (the delete notice has its own). */
 const toolbarUndo = (page: Page) => page.getByRole('banner').getByRole('button', { name: 'Undo' });
-const preview = (page: Page) => page.frameLocator('iframe[title="Preview of your site"]');
+const preview = (page: Page) =>
+  page
+    .frameLocator('iframe[title="Preview of your site"]')
+    .frameLocator('iframe[title="Your site"]');
 
 async function waitForSave(page: Page) {
   await expect(page.locator('[data-save-status]')).toHaveAttribute('data-save-status', 'saved');
@@ -110,16 +113,18 @@ test('a non-coder picks a template, edits it and exports a site', async ({ page 
   expect(strFromU8(files['fonts/LICENSE.txt'] ?? new Uint8Array())).toContain('Open Font License');
 
   // The preview frame renders with the bundled heading font, not a fallback.
-  const frame = page.frames().find((f) => f.url() === 'about:srcdoc');
   await expect
     .poll(
       () =>
-        frame?.evaluate(async () => {
-          await document.fonts.ready;
-          return [...document.fonts].some(
-            (f) => f.family.replace(/"/g, '') === 'Fraunces' && f.status === 'loaded',
-          );
-        }) ?? false,
+        page
+          .frames()
+          .find((f) => f.parentFrame()?.url().endsWith('/preview.html'))
+          ?.evaluate(async () => {
+            await document.fonts.ready;
+            return [...document.fonts].some(
+              (f) => f.family.replace(/"/g, '') === 'Fraunces' && f.status === 'loaded',
+            );
+          }) ?? false,
     )
     .toBe(true);
 });

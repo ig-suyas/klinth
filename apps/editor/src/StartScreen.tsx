@@ -160,6 +160,15 @@ export function StartScreen({ onCreate, onOpen }: StartScreenProps) {
           )}
         </section>
       </div>
+      <footer className="mx-auto -mt-8 flex max-w-[62rem] px-6 pb-10 flex flex-wrap gap-x-5 gap-y-1 text-sm text-ink-soft">
+        <span>Free, no account, no badge on your site. Your work stays in this browser.</span>
+        <a className="underline underline-offset-4 hover:text-ink" href="/privacy.html">
+          Privacy
+        </a>
+        <a className="underline underline-offset-4 hover:text-ink" href="/terms.html">
+          Terms
+        </a>
+      </footer>
     </main>
   );
 }

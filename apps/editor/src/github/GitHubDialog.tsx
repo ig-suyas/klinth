@@ -1,6 +1,7 @@
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
 import { exportFiles } from '../lib/files.ts';
+import { markBackedUp } from '../lib/safety.ts';
 import { loadAssets } from '../lib/storage.ts';
 import { useEditor } from '../state/store.ts';
 import { Icon } from '../ui/Icon.tsx';
@@ -151,6 +152,8 @@ function PublishDialog() {
         });
         if (controller.signal.aborted) return;
         rememberRepo(projectId, name);
+        // The repository holds the project file, so it counts as a backup.
+        markBackedUp(projectId);
         setResult(published);
         setPhase('done');
       } catch (caught) {

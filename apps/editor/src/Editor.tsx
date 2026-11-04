@@ -12,6 +12,7 @@ import { pruneAssets } from './lib/storage.ts';
 import { useEditor } from './state/store.ts';
 import { useAutosave } from './state/useAutosave.ts';
 import { NoticeBar } from './ui/Notice.tsx';
+import { SafetyBanners } from './ui/SafetyBanners.tsx';
 import { Tour } from './ui/Tour.tsx';
 
 /** Fields keep their own undo for typing, so the editor shortcuts skip them. */
@@ -61,6 +62,7 @@ export function Editor({ onExit }: { onExit: () => void }) {
       </div>
       <main className="flex min-h-0 min-w-0 flex-col" aria-label="Preview">
         <QuotaBanner />
+        <SafetyBanners />
         <Preview />
       </main>
       <Inspector />

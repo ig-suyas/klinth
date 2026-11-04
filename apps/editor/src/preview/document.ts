@@ -86,6 +86,8 @@ export function buildPreviewDocument(
 
 /** Messages the preview frame may send. Anything else is ignored. */
 export const previewMessageSchema = z.discriminatedUnion('type', [
+  /** The empty preview page has loaded and waits for the page to show. */
+  z.object({ source: z.literal('klinth-preview'), type: z.literal('host') }),
   z.object({ source: z.literal('klinth-preview'), type: z.literal('ready') }),
   z.object({
     source: z.literal('klinth-preview'),

@@ -62,7 +62,15 @@ function SettingsDialog() {
               AI helper
             </h2>
             <p className="help">
-              Ask AI to write or restyle any section. Use the sparkle button next to a section.
+              Ask AI to write or restyle any section. Use the sparkle button next to a section.{' '}
+              <a
+                href="/privacy.html#ai"
+                target="_blank"
+                rel="noopener"
+                className="underline underline-offset-4"
+              >
+                What is sent where
+              </a>
             </p>
           </div>
           <button type="button" className="icon-btn" aria-label="Close" onClick={close}>

@@ -1,6 +1,8 @@
 import { defineConfig, devices } from '@playwright/test';
 
-const PORT = 5173;
+// The production build under `vite preview`, so every flow runs under the real
+// security headers (the dev server cannot send them).
+const PORT = 4173;
 
 export default defineConfig({
   testDir: './e2e',
@@ -30,7 +32,7 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'npm run dev',
+    command: 'npx vite build && npx vite preview',
     port: PORT,
     reuseExistingServer: !process.env.CI,
     timeout: 60_000,

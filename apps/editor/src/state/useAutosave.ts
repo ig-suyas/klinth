@@ -68,7 +68,8 @@ export function useAutosave(): void {
 
     const warn = (event: BeforeUnloadEvent) => {
       const { status } = useEditor.getState().save;
-      if (status === 'unsaved' || status === 'saving') event.preventDefault();
+      // `error`: the last change could not be stored, so leaving would lose it.
+      if (status === 'unsaved' || status === 'saving' || status === 'error') event.preventDefault();
     };
     window.addEventListener('beforeunload', warn);
 

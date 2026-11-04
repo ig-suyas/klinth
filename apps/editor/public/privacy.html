@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="How Klinth handles your data, in plain language." />
+    <title>Privacy · Klinth</title>
+    <link rel="stylesheet" href="/legal.css" />
+  </head>
+  <body>
+    <main>
+      <a class="back" href="/">← Back to Klinth</a>
+      <h1>Privacy</h1>
+      <p class="meta">Last updated 4 November 2026</p>
+
+      <div class="summary">
+        <strong>The short version</strong>
+        <ul>
+          <li>There are no accounts. We do not know who you are.</li>
+          <li>Your projects, pictures and videos stay in your own browser.</li>
+          <li>We do not use cookies, ads, analytics or tracking of any kind.</li>
+          <li>Your Gemini key and GitHub sign-in pass through our server and are never stored.</li>
+        </ul>
+      </div>
+
+      <h2>What stays on your device</h2>
+      <p>
+        Klinth saves your work in your browser's own storage on your computer: your projects, the
+        pictures and videos you upload, and a few small settings (which project you opened last, the
+        name of the GitHub repository you published to, and when you last downloaded a backup). None
+        of this is sent to us. Clearing your browser data deletes it, so keep a backup by
+        downloading your project file.
+      </p>
+      <p>
+        If you choose to remember your Gemini key, it is stored in your browser encrypted with a
+        passphrase that only you know. We never see or store the passphrase. This protects the key
+        from casual access to your computer. It cannot protect it from harmful software or browser
+        extensions running while the key is unlocked.
+      </p>
+
+      <h2 id="ai">When you use the AI helper</h2>
+      <p>
+        When you ask the AI helper for a change, your browser sends your request, the content of
+        that one section and your Gemini key to Klinth's server. The server adds its own writing
+        instructions and passes everything to Google's Gemini service, using your key, then sends
+        the answer back to you. Our server does not store your key, your request or the answer, and
+        does not write them to any log.
+      </p>
+      <p>
+        Google receives this content under your own Gemini account, and its terms and privacy policy
+        apply to it. On Google's free tier, Google may use what you send to improve its products, so
+        do not put private information into AI requests.
+      </p>
+
+      <h2>When you publish to GitHub</h2>
+      <p>
+        When you connect GitHub, our server only swaps the one-time code from GitHub for a sign-in
+        token and hands it straight to your browser. The token is not stored or logged on our side,
+        and your browser keeps it only in memory: it is gone when you close or reload the tab. Your
+        browser then sends your site files directly to GitHub. GitHub's terms and privacy policy
+        apply to your repository and any GitHub Pages site.
+      </p>
+
+      <h2>What our server sees</h2>
+      <p>
+        Klinth's website and server run on Cloudflare. Like any website, they receive your IP
+        address and basic browser details when you connect. To stop abuse of the AI helper, the
+        server counts AI requests per IP address. That count is deleted automatically once your
+        limit has refilled, within about an hour. Cloudflare may process connection data to keep the
+        service secure, under its own privacy policy. We keep no other records about you.
+      </p>
+
+      <h2>Sites you make</h2>
+      <p>
+        Sites you export carry no Klinth badge, tracking or link back to us. If you add custom code,
+        videos from YouTube or Vimeo, or a contact form service, those services may collect data
+        from your visitors. You are responsible for your own site's privacy notice.
+      </p>
+
+      <h2>Children</h2>
+      <p>
+        Klinth is not aimed at children. If you are under the age where your country requires a
+        parent's permission to use online services, ask a parent or guardian first.
+      </p>
+
+      <h2>Your choices</h2>
+      <ul>
+        <li>Delete a project from the start screen, or clear Klinth's data in your browser.</li>
+        <li>Use "Forget my key" in the AI helper to remove a saved Gemini key.</li>
+        <li>Use "Disconnect" in the publish window, or revoke Klinth in your GitHub settings.</li>
+      </ul>
+      <p>
+        Because we keep no data about you, there is nothing for us to export or delete on request.
+        If this policy changes, we will update the date at the top of this page.
+      </p>
+
+      <h2>Questions</h2>
+      <p>
+        Ask on
+        <a href="https://github.com/ig-suyas/klinth/issues" rel="noopener">Klinth's GitHub page</a>.
+      </p>
+
+      <footer><a href="/terms.html">Terms</a> · <a href="/">Klinth</a></footer>
+    </main>
+  </body>
+</html>
