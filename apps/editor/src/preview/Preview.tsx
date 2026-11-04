@@ -1,4 +1,6 @@
+import { sectionAssetIds } from '@klinth/core';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { assetBlobs } from '../media/files.ts';
 import { setSectionProps, type Props } from '../state/sections.ts';
 import { useEditor, type Device } from '../state/store.ts';
 import { buildPreviewDocument, previewMessageSchema } from './document.ts';
@@ -68,8 +70,23 @@ export function Preview() {
       const message = parsed.data;
       const state = useEditor.getState();
       switch (message.type) {
-        case 'ready':
+        case 'ready': {
+          // Hand the page its pictures and videos; the frame cannot read browser storage.
+          const { projectId, project: current, pageIndex: index } = state;
+          const page = current?.pages[index];
+          if (!projectId || !current || !page) break;
+          const target = frame.current.contentWindow;
+          const ids = sectionAssetIds(page.sections);
+          void assetBlobs(projectId, ids).then(
+            (items) => {
+              if (items.length && frame.current?.contentWindow === target) {
+                target?.postMessage({ source: 'klinth-editor', type: 'assets', items }, '*');
+              }
+            },
+            () => state.notify('Some pictures could not be loaded from browser storage.'),
+          );
           break;
+        }
         case 'scroll':
           scrollY.current = message.y;
           break;

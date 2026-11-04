@@ -1,6 +1,6 @@
 import { pagePath, renderSite, type Project } from '@klinth/core';
 import { z } from 'zod';
-import { BRIDGE_CSS, BRIDGE_JS, CALM_CSS } from './bridge.ts';
+import { BRIDGE_CSS, BRIDGE_JS, CALM_CSS, PREVIEW_CSS } from './bridge.ts';
 
 export interface PreviewOptions {
   /** The editor's origin; the frame only posts messages to it. */
@@ -42,10 +42,12 @@ export function buildPreviewDocument(
 ): string {
   const page = project.pages[pageIndex] ?? project.pages[0];
   if (!page) return '';
-  const files = renderSite(project, { editable: options.interactive });
+  // `preview`: files are filled in by the bridge, custom code runs in a nested sandbox.
+  const files = renderSite(project, { editable: options.interactive, preview: true });
   const css = fileText(files, 'css/site.css');
   const js = fileText(files, 'js/site.js');
-  const extraCss = (options.interactive ? BRIDGE_CSS : '') + (options.calm ? CALM_CSS : '');
+  const extraCss =
+    PREVIEW_CSS + (options.interactive ? BRIDGE_CSS : '') + (options.calm ? CALM_CSS : '');
   const config = {
     origin: options.origin,
     scrollY: options.scrollY ?? 0,

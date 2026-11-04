@@ -1,5 +1,23 @@
 (function () {
   'use strict';
+  // Videos: the YouTube or Vimeo player loads only after the visitor presses play.
+  var PLAYERS = ['https://www.youtube-nocookie.com/embed/', 'https://player.vimeo.com/video/'];
+  document.addEventListener('click', function (e) {
+    if (e.defaultPrevented || !e.target.closest) return;
+    var facade = e.target.closest('a.video-facade');
+    var src = facade && facade.getAttribute('data-embed');
+    if (!src || !PLAYERS.some(function (p) { return src.indexOf(p) === 0; })) return;
+    e.preventDefault();
+    var frame = document.createElement('iframe');
+    frame.src = src;
+    frame.title = facade.getAttribute('data-title') || 'Video';
+    frame.allow = 'autoplay; fullscreen; picture-in-picture; encrypted-media';
+    frame.allowFullscreen = true;
+    frame.referrerPolicy = 'strict-origin-when-cross-origin';
+    facade.parentNode.replaceChild(frame, facade);
+    frame.focus();
+  });
+
   // Menu: close after picking a link or pressing Escape.
   document.querySelectorAll('.menu').forEach(function (menu) {
     menu.addEventListener('click', function (e) {
@@ -17,7 +35,7 @@
   var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   if (reduce || !('IntersectionObserver' in window)) return;
   var groups = '.cards > li, .index > li, .quotes > figure, .gallery > li, .linklist > li, .facts > div';
-  var singles = '.head, .prose, .about-media, .split-media, .contact-details, .form';
+  var singles = '.head, .prose, .about-media, .split-media, .contact-details, .form, .video-frame, .video-file';
   var io = new IntersectionObserver(function (entries) {
     entries.forEach(function (e) {
       if (e.isIntersecting) { e.target.classList.add('is-visible'); io.unobserve(e.target); }

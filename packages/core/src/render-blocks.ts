@@ -1,4 +1,5 @@
 import type { BlockProps, LinkProps } from './blocks.ts';
+import { PROVIDER_NAME, embedPageUrl, embedPlayerUrl, parseVideoUrl } from './embed.ts';
 import { escapeHtml as esc, safeUrl } from './html.ts';
 import type { Asset, Section } from './schema.ts';
 
@@ -11,6 +12,11 @@ export interface BlockCtx {
   first: boolean;
   /** Editor preview only: mark text the user can edit in place. Never set for exports. */
   editable?: boolean | undefined;
+  /**
+   * Editor preview only: files get no address (the editor hands them to the
+   * frame) and custom code runs in a nested sandboxed frame. Never set for exports.
+   */
+  preview?: boolean | undefined;
 }
 
 /** In the editor preview, names the prop an element shows so it can be edited in place. */
@@ -71,13 +77,19 @@ interface ImageRef {
   imageAlt?: string | undefined;
 }
 
+/** Where a file is loaded from: its export path, or (in the preview) a marker the editor fills. */
+function source(asset: Asset, ctx: BlockCtx): string {
+  return ctx.preview ? ` data-k-asset="${esc(asset.id)}"` : ` src="${esc(assetPath(asset))}"`;
+}
+
+const sizeAttrs = (asset: Asset): string =>
+  asset.width && asset.height ? ` width="${asset.width}" height="${asset.height}"` : '';
+
 function img(ref: ImageRef, ctx: BlockCtx): string {
   const asset = ref.image ? ctx.assets.get(ref.image) : undefined;
   if (!asset || asset.kind !== 'image') return '';
-  const size =
-    asset.width && asset.height ? ` width="${asset.width}" height="${asset.height}"` : '';
   const loading = ctx.first ? ' fetchpriority="high"' : ' loading="lazy"';
-  return `<img src="${esc(assetPath(asset))}" alt="${esc(ref.imageAlt ?? '')}"${size}${loading} decoding="async">`;
+  return `<img${source(asset, ctx)} alt="${esc(ref.imageAlt ?? '')}"${sizeAttrs(asset)}${loading} decoding="async">`;
 }
 
 interface HeadProps {
@@ -151,9 +163,53 @@ function gallery(p: BlockProps<'gallery'>, ctx: BlockCtx): string {
   return `${head(p, ctx)}${items ? `<ul class="gallery" role="list">${items}</ul>` : ''}`;
 }
 
+/**
+ * A YouTube or Vimeo video as a "click to load" facade: nothing loads from the
+ * video site until the visitor presses play. Without scripts it is a plain link.
+ * Every address is rebuilt from the parsed id, never copied from user input.
+ */
+function videoEmbed(url: string, title: string): string {
+  const embed = parseVideoUrl(url);
+  if (!embed) return '';
+  const provider = PROVIDER_NAME[embed.provider];
+  const label = `Play video${title ? `: ${title}` : ''} (loads the ${provider} player)`;
+  return `<div class="video-frame"><a class="video-facade" href="${esc(embedPageUrl(embed))}" data-embed="${esc(embedPlayerUrl(embed))}" data-title="${esc(title || 'Video')}" aria-label="${esc(label)}" rel="noopener noreferrer"><span class="play" aria-hidden="true"></span><span class="video-note" aria-hidden="true">${provider} · loads when you press play</span></a></div>`;
+}
+
+function videoFile(id: string | undefined, title: string, ctx: BlockCtx): string {
+  const asset = id ? ctx.assets.get(id) : undefined;
+  if (!asset || asset.kind !== 'video') return '';
+  return `<div class="video-file"><video${source(asset, ctx)} controls playsinline preload="metadata"${sizeAttrs(asset)} aria-label="${esc(title || 'Video')}"></video></div>`;
+}
+
 function video(p: BlockProps<'video'>, ctx: BlockCtx): string {
-  // Uploads and YouTube/Vimeo embeds arrive in Phase 4; until then show the text only.
-  return `${head(p, ctx)}${paras(p.caption, 'intro', field(ctx, 'caption'))}`;
+  const title = (p.heading ?? '').replace(/\s+/g, ' ').trim();
+  const media = (p.embedUrl ? videoEmbed(p.embedUrl, title) : '') || videoFile(p.video, title, ctx);
+  return `${head(p, ctx)}${media}${paras(p.caption, 'caption', field(ctx, 'caption'))}`;
+}
+
+/**
+ * Reports the code's height to the preview so the frame fits it. It runs
+ * inside the same sandbox as the user's code and can only send a number.
+ */
+const CODE_FRAME_SCRIPT =
+  "<script>(function(){function h(){parent.postMessage({source:'klinth-code',height:Math.ceil(document.body?document.body.scrollHeight:0)},'*')}addEventListener('load',h);if(window.ResizeObserver)new ResizeObserver(h).observe(document.documentElement)})()</script>";
+
+/**
+ * Custom code. The published site runs it as pasted (the user is told to paste
+ * only code they trust). The editor preview never does: it gets a nested frame
+ * with `allow-scripts` only, so the code cannot reach the editor or its storage.
+ */
+function customCode(p: BlockProps<'customCode'>, ctx: BlockCtx): string {
+  const code = p.code ?? '';
+  if (!code.trim()) {
+    return ctx.preview
+      ? '<p class="code-empty">Custom code: paste your code in the settings panel.</p>'
+      : '';
+  }
+  if (!ctx.preview) return `<div class="custom-code">${code}</div>`;
+  const doc = `<!doctype html><html><head><meta charset="utf-8"><style>html,body{margin:0}</style></head><body>${code}${CODE_FRAME_SCRIPT}</body></html>`;
+  return `<p class="code-note">Custom code preview. It runs for real on your published site.</p><iframe class="code-frame" sandbox="allow-scripts" title="Custom code preview" srcdoc="${esc(doc)}"></iframe>`;
 }
 
 const pad = (n: number): string => String(n).padStart(2, '0');
@@ -261,8 +317,8 @@ export function renderBlock(section: Section, ctx: BlockCtx): string {
       return contact(section.props, ctx);
     case 'spacer':
       return spacer(section.props);
-    // Custom code is rendered in Phase 4 together with its sandboxed preview.
     case 'customCode':
+      return customCode(section.props, ctx);
     case 'footer':
       return '';
   }

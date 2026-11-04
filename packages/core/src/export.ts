@@ -4,6 +4,12 @@ import { assetPath, renderSite, type SiteFile } from './render.ts';
 import type { Project } from './schema.ts';
 import { ProjectError } from './migrations.ts';
 
+function hasCustomCode(project: Project): boolean {
+  return project.pages.some((page) =>
+    page.sections.some((s) => s.type === 'customCode' && (s.props.code ?? '').trim() !== ''),
+  );
+}
+
 function exportReadme(project: Project): string {
   return `# ${project.meta.title}
 
@@ -22,7 +28,16 @@ This folder is a complete website. It is plain HTML, CSS and JavaScript, so any 
 2. Choose Create, then Pages, then "Upload assets".
 3. Drag this folder in and deploy. No build settings are needed.
 
-## Keep editing
+${
+  hasCustomCode(project)
+    ? `## About your custom code
+
+This site contains code you pasted into a Custom code section. It runs exactly as pasted, so
+only keep code you trust. Because of it, the site does not set a strict Content-Security-Policy.
+
+`
+    : ''
+}## Keep editing
 
 The file \`.klinth/project.json\` holds your project. Import it into Klinth on any device to keep editing.
 `;

@@ -18,6 +18,7 @@ const PATHS = {
   file: 'M14 3H6v18h12V7zM14 3v4h4',
   warn: 'M12 3 2 20h20zM12 10v4M12 17h.01',
   upload: 'M12 20V9M7 14l5-5 5 5M5 4h14',
+  image: 'M4 5h16v14H4zM4 16l5-5 4 4 2-2 5 5M15 9.5h.01',
 } as const;
 
 export type IconName = keyof typeof PATHS;

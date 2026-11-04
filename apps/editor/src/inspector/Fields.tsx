@@ -1,27 +1,32 @@
-import { safeUrl, type BlockType } from '@klinth/core';
+import { safeUrl, type Asset, type BlockType } from '@klinth/core';
 import { useId, useState } from 'react';
 import { z } from 'zod';
 import { Icon } from '../ui/Icon.tsx';
 import { maxItems, maxLength, propSchema, type FieldSpec } from './fields.ts';
+import { CodeField, ImageField, VideoField } from './MediaFields.tsx';
 
 type Value = unknown;
-type Item = Record<string, unknown>;
+export type Item = Record<string, unknown>;
 
-interface FieldProps {
+export interface FieldProps {
   spec: FieldSpec;
   blockType: BlockType;
   /** Path of this field from the block's props, for reading its limits. */
   path: readonly string[];
   value: Value;
   onChange: (value: Value) => void;
+  /** The props (or list item) holding this field, for fields that edit several props. */
+  item: Item;
+  /** Changes several props at once, optionally adding a just-uploaded file in the same step. */
+  onPatch: (patch: Item, newAsset?: Asset) => void;
 }
 
-const asText = (v: Value): string => (typeof v === 'string' ? v : '');
+export const asText = (v: Value): string => (typeof v === 'string' ? v : '');
 const asItem = (v: Value): Item =>
   typeof v === 'object' && v !== null && !Array.isArray(v) ? (v as Item) : {};
 const asList = (v: Value): Item[] => (Array.isArray(v) ? v.map(asItem) : []);
 
-function Help({ id, text }: { id: string; text: string | undefined }) {
+export function Help({ id, text }: { id: string; text: string | undefined }) {
   return text ? (
     <p id={id} className="help">
       {text}
@@ -53,6 +58,12 @@ export function Field(props: FieldProps) {
       );
     case 'list':
       return <ListField {...props} spec={spec} />;
+    case 'image':
+      return <ImageField {...props} spec={spec} />;
+    case 'video':
+      return <VideoField {...props} spec={spec} />;
+    case 'code':
+      return <CodeField {...props} spec={spec} />;
   }
 }
 
@@ -239,6 +250,7 @@ function ListField({
   path,
   value,
   onChange,
+  onPatch,
 }: FieldProps & { spec: Extract<FieldSpec, { kind: 'list' }> }) {
   const items = asList(value);
   const limit = maxItems(propSchema(blockType, path));
@@ -250,12 +262,14 @@ function ListField({
     set(next);
   };
   const noun = spec.itemLabel.toLowerCase();
+  // Items are named by their first text field (a picture's id means nothing to people).
+  const nameKey = spec.fields.find((f) => f.kind === 'line' || f.kind === 'text')?.key ?? '';
   return (
     <fieldset>
       <legend className="label">{spec.label}</legend>
       <ol className="space-y-2">
         {items.map((item, index) => {
-          const name = asText(item[spec.fields[0]?.key ?? '']) || `${spec.itemLabel} ${index + 1}`;
+          const name = asText(item[nameKey]) || `${spec.itemLabel} ${index + 1}`;
           return (
             <li key={index} className="rounded-lg border border-line bg-panel">
               <details open={items.length <= 2}>
@@ -307,8 +321,19 @@ function ListField({
                       blockType={blockType}
                       path={[...path, child.key]}
                       value={item[child.key]}
+                      item={item}
                       onChange={(v) =>
                         set(items.map((it, i) => (i === index ? { ...it, [child.key]: v } : it)))
+                      }
+                      onPatch={(patch, newAsset) =>
+                        onPatch(
+                          {
+                            [spec.key]: items.map((it, i) =>
+                              i === index ? { ...it, ...patch } : it,
+                            ),
+                          },
+                          newAsset,
+                        )
                       }
                     />
                   ))}

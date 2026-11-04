@@ -132,6 +132,18 @@ h2.display{font-size:clamp(2.4rem,1.4rem + 4.6vw,6rem)}
 .gallery img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:var(--radius)}
 .gallery figcaption{font-size:.9375rem;color:var(--muted)}
 
+/* ---- Video ---- */
+.block-video .head{margin-bottom:clamp(calc(var(--space)*4),5vw,calc(var(--space)*7))}
+.video-frame{position:relative;aspect-ratio:16/9;overflow:hidden;border-radius:var(--radius);background:var(--card)}
+.video-frame iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+.video-facade{position:absolute;inset:0;display:grid;place-items:center;color:var(--fg);text-decoration:none;background:radial-gradient(70% 90% at 80% 10%,color-mix(in srgb,var(--color-accent) 55%,var(--card)),transparent 70%),radial-gradient(60% 80% at 10% 100%,color-mix(in srgb,var(--color-text) 16%,var(--card)),transparent 70%),var(--card)}
+.play{display:grid;place-items:center;width:clamp(4.5rem,9vw,6.5rem);aspect-ratio:1;border-radius:50%;background:var(--btn-bg);box-shadow:0 18px 40px -16px color-mix(in srgb,var(--btn-bg) 80%,transparent);transition:transform .35s cubic-bezier(.2,.7,.2,1)}
+.play::before{content:"";width:0;height:0;margin-left:12%;border-style:solid;border-width:.85rem 0 .85rem 1.4rem;border-color:transparent transparent transparent var(--btn-fg)}
+.video-facade:hover .play{transform:scale(1.06)}
+.video-note{position:absolute;left:1.25rem;bottom:1rem;font-size:.8125rem;letter-spacing:.06em;color:var(--muted)}
+.video-file video{display:block;width:100%;height:auto;border-radius:var(--radius);background:#000}
+.caption{margin-top:1rem;font-size:.9375rem;color:var(--muted);max-width:40rem}
+
 /* ---- Testimonials ---- */
 .quotes{display:grid;gap:clamp(1.25rem,3vw,2rem);grid-template-columns:repeat(auto-fit,minmax(min(100%,19rem),1fr))}
 .quote{margin:0;display:flex;flex-direction:column;justify-content:space-between;gap:2rem;padding:clamp(1.75rem,3vw,2.5rem);background:var(--card);border-radius:var(--radius)}
@@ -189,6 +201,24 @@ a.linkbtn:hover .arrow{transform:translateX(4px)}
 
 export const SITE_JS = `(function () {
   'use strict';
+  // Videos: the YouTube or Vimeo player loads only after the visitor presses play.
+  var PLAYERS = ['https://www.youtube-nocookie.com/embed/', 'https://player.vimeo.com/video/'];
+  document.addEventListener('click', function (e) {
+    if (e.defaultPrevented || !e.target.closest) return;
+    var facade = e.target.closest('a.video-facade');
+    var src = facade && facade.getAttribute('data-embed');
+    if (!src || !PLAYERS.some(function (p) { return src.indexOf(p) === 0; })) return;
+    e.preventDefault();
+    var frame = document.createElement('iframe');
+    frame.src = src;
+    frame.title = facade.getAttribute('data-title') || 'Video';
+    frame.allow = 'autoplay; fullscreen; picture-in-picture; encrypted-media';
+    frame.allowFullscreen = true;
+    frame.referrerPolicy = 'strict-origin-when-cross-origin';
+    facade.parentNode.replaceChild(frame, facade);
+    frame.focus();
+  });
+
   // Menu: close after picking a link or pressing Escape.
   document.querySelectorAll('.menu').forEach(function (menu) {
     menu.addEventListener('click', function (e) {
@@ -206,7 +236,7 @@ export const SITE_JS = `(function () {
   var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   if (reduce || !('IntersectionObserver' in window)) return;
   var groups = '.cards > li, .index > li, .quotes > figure, .gallery > li, .linklist > li, .facts > div';
-  var singles = '.head, .prose, .about-media, .split-media, .contact-details, .form';
+  var singles = '.head, .prose, .about-media, .split-media, .contact-details, .form, .video-frame, .video-file';
   var io = new IntersectionObserver(function (entries) {
     entries.forEach(function (e) {
       if (e.isIntersecting) { e.target.classList.add('is-visible'); io.unobserve(e.target); }

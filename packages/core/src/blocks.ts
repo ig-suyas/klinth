@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { MAX_EMBED_URL_LENGTH, looksLikeEmbedCode, parseVideoUrl } from './embed.ts';
 import { hasControlChar, safeUrl } from './html.ts';
 
 /**
@@ -29,6 +30,13 @@ const href = z
   .max(2048)
   .refine((v) => v === '' || safeUrl(v) !== null, 'Use a link starting with https://');
 
+/** A YouTube or Vimeo link. Embed code (`<iframe ...>`) is refused with its own message. */
+const embedUrl = z
+  .string()
+  .max(MAX_EMBED_URL_LENGTH)
+  .refine((v) => !looksLikeEmbedCode(v), 'Paste the video link, not the embed code')
+  .refine((v) => looksLikeEmbedCode(v) || parseVideoUrl(v) !== null, 'Use a YouTube or Vimeo link');
+
 const linkSchema = z.object({ label: singleLine(80), href }).strict();
 
 const imageFields = {
@@ -51,6 +59,9 @@ const headFields = {
   /** When set, the section is listed in the site menu under this name. */
   navLabel: optLine(30),
 };
+
+/** Longest custom code, in characters (about 200 KB). */
+export const MAX_CUSTOM_CODE = 200_000;
 
 export const blockPropSchemas = {
   hero: z
@@ -93,8 +104,16 @@ export const blockPropSchemas = {
         .optional(),
     })
     .strict(),
-  // Video sources (upload or YouTube/Vimeo link) arrive in Phase 4.
-  video: z.object({ ...headFields, caption: optText(600) }).strict(),
+  video: z
+    .object({
+      ...headFields,
+      caption: optText(600),
+      /** Asset id of an uploaded video. */
+      video: id.optional(),
+      /** A YouTube or Vimeo page link. Wins over an uploaded video when both are set. */
+      embedUrl: embedUrl.optional(),
+    })
+    .strict(),
   projects: z
     .object({
       ...headFields,
@@ -148,8 +167,8 @@ export const blockPropSchemas = {
       links: z.array(linkSchema).max(8).optional(),
     })
     .strict(),
-  // Rendered with its sandboxed preview in Phase 4.
-  customCode: z.object({ code: text(200_000).optional() }).strict(),
+  /** Code the user pasted. Runs on the published site; the editor shows it in a sandbox. */
+  customCode: z.object({ code: text(MAX_CUSTOM_CODE).optional() }).strict(),
   spacer: z.object({ size: z.enum(['small', 'medium', 'large']).optional() }).strict(),
 } as const;
 

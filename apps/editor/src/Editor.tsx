@@ -1,8 +1,10 @@
 import { useEffect } from 'react';
 import { Inspector } from './inspector/Inspector.tsx';
+import { MediaLibrary } from './media/MediaLibrary.tsx';
 import { SectionsPanel } from './panels/SectionsPanel.tsx';
 import { TopBar } from './panels/TopBar.tsx';
 import { Preview } from './preview/Preview.tsx';
+import { pruneAssets } from './lib/storage.ts';
 import { useEditor } from './state/store.ts';
 import { useAutosave } from './state/useAutosave.ts';
 import { NoticeBar } from './ui/Notice.tsx';
@@ -19,6 +21,14 @@ function isTyping(target: EventTarget | null): boolean {
 /** The editor: top bar, sections on the left, live preview, settings on the right. */
 export function Editor({ onExit }: { onExit: () => void }) {
   useAutosave();
+  const projectId = useEditor((s) => s.projectId);
+
+  // Files that were deleted or whose upload was undone are cleaned up when a project opens.
+  useEffect(() => {
+    const { project } = useEditor.getState();
+    if (!projectId || !project) return;
+    pruneAssets(projectId, new Set(project.assets.map((a) => a.id))).catch(() => undefined);
+  }, [projectId]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -46,6 +56,7 @@ export function Editor({ onExit }: { onExit: () => void }) {
       </main>
       <Inspector />
       <Tour />
+      <MediaLibrary />
       <NoticeBar />
     </div>
   );

@@ -82,14 +82,20 @@ export interface RenderOptions {
    * attributes. Exports never set it, so exported files stay editor-free.
    */
   editable?: boolean;
+  /**
+   * Editor preview only: files are marked with `data-k-asset` instead of an
+   * address, and custom code runs in a nested sandboxed frame. Exports never set it.
+   */
+  preview?: boolean;
 }
 
 function renderPage(
   project: Project,
   page: Page,
   assets: ReadonlyMap<string, Asset>,
-  editable: boolean,
+  options: RenderOptions,
 ): string {
+  const editable = options.editable === true;
   const { meta } = project;
   const title = page.slug === '' ? meta.title : `${page.title} | ${meta.title}`;
   const favicon = faviconAsset(project, assets);
@@ -104,7 +110,13 @@ function renderPage(
   const h1 = main.findIndex((s) => sectionHeading(s) !== '');
   const body = main
     .map((section, i) => {
-      const ctx: BlockCtx = { assets, level: i === h1 ? 1 : 2, first: i === 0, editable };
+      const ctx: BlockCtx = {
+        assets,
+        level: i === h1 ? 1 : 2,
+        first: i === 0,
+        editable,
+        preview: options.preview === true,
+      };
       const bg = sectionBackground(section);
       const marker = editable ? ` data-k-section="${esc(section.id)}"` : '';
       return `<section id="${esc(section.id)}" class="block block-${section.type} bg-${bg}"${marker}><div class="wrap">${renderBlock(section, ctx)}</div></section>`;
@@ -146,7 +158,7 @@ export function renderSite(project: Project, options: RenderOptions = {}): SiteF
   return [
     ...project.pages.map((page) => ({
       path: pagePath(page),
-      content: renderPage(project, page, assets, options.editable === true),
+      content: renderPage(project, page, assets, options),
     })),
     { path: 'css/site.css', content: themeToCss(project.theme) + SITE_CSS },
     { path: 'js/site.js', content: SITE_JS },

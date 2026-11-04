@@ -7,6 +7,7 @@
 export * from './schema.ts';
 export {
   BACKGROUNDS,
+  MAX_CUSTOM_CODE,
   blockPropSchemas,
   type Background,
   type BlockPropSchemas,
@@ -40,4 +41,23 @@ export {
 } from './project-file.ts';
 export { assetPath, pagePath, renderSite, type RenderOptions, type SiteFile } from './render.ts';
 export { buildExport, buildZip } from './export.ts';
+export {
+  MAX_EMBED_URL_LENGTH,
+  PROVIDER_NAME,
+  embedPageUrl,
+  embedPlayerUrl,
+  looksLikeEmbedCode,
+  parseVideoUrl,
+  type VideoEmbed,
+  type VideoProvider,
+} from './embed.ts';
+export {
+  MAX_VIDEO_BYTES,
+  REPO_WARN_BYTES,
+  assetBytes,
+  assetUsage,
+  formatBytes,
+  removeAsset,
+  sectionAssetIds,
+} from './media.ts';
 export { sampleProject } from './sample.ts';

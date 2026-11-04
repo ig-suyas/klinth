@@ -4,11 +4,11 @@ import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import {
   blockFields,
-  LATER_PROPS,
   maxItems,
   maxLength,
   propSchema,
   UNUSED_PROPS,
+  specKeys,
 } from '../inspector/fields.ts';
 import { buildPreviewDocument, previewMessageSchema } from './document.ts';
 
@@ -46,6 +46,40 @@ describe('preview document', () => {
     const doc = buildPreviewDocument(project(), 0, { origin: '', interactive: false });
     expect(doc).not.toContain('<script');
     expect(doc).not.toContain('data-k-');
+  });
+
+  it('keeps custom code in a nested sandbox and lets the frame fill in files', () => {
+    const base = project();
+    const home = base.pages[0];
+    if (!home) throw new Error('no page');
+    const code = '<script>parent.parent.postMessage("x","*");localStorage.k=1</script>';
+    const withCode = {
+      ...base,
+      pages: [
+        {
+          ...home,
+          sections: [
+            { id: 'code', type: 'customCode' as const, props: { code } },
+            ...home.sections,
+          ],
+        },
+        ...base.pages.slice(1),
+      ],
+    };
+    const doc = buildPreviewDocument(withCode, 0, {
+      origin: 'http://localhost',
+      interactive: true,
+    });
+    // The pasted code is never live in the preview page, only inside the nested frame.
+    expect(doc).not.toContain(code);
+    expect(doc).toMatch(
+      /<iframe class="code-frame" sandbox="allow-scripts" title="Custom code preview" srcdoc="[^"]*parent\.parent/,
+    );
+    expect(doc).not.toContain('allow-same-origin');
+    // The bridge accepts only a height from code frames, and only from frames in the page.
+    expect(doc).toContain("e.data.source === 'klinth-code' && e.source !== window.parent");
+    expect(doc).toContain('Math.min(Math.max(Math.round(h), 80), 1600)');
+    expect(doc).toContain('item.blob instanceof Blob');
   });
 
   it('turns the scroll reveal off on reloads', () => {
@@ -91,13 +125,13 @@ describe('preview messages', () => {
 });
 
 describe('inspector fields', () => {
-  it('cover every block prop, except the ones arriving in Phase 4', () => {
+  it('cover every block prop', () => {
     for (const type of BLOCK_TYPES) {
       const shape = blockPropSchemas[type].shape;
-      const shown = blockFields[type].map((f) => f.key);
+      const shown = blockFields[type].flatMap(specKeys);
       for (const key of shown) expect(Object.keys(shape), `${type}.${key}`).toContain(key);
       for (const key of Object.keys(shape)) {
-        if (LATER_PROPS.has(key) || UNUSED_PROPS[type]?.includes(key)) continue;
+        if (UNUSED_PROPS[type]?.includes(key)) continue;
         expect(shown, `${type}.${key}`).toContain(key);
       }
     }

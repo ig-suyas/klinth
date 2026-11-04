@@ -1,6 +1,7 @@
-import type { Section } from '@klinth/core';
+import type { Asset, Section } from '@klinth/core';
 import { blockDefinitions } from '@klinth/templates';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
+import { withAsset } from '../media/files.ts';
 import { setSectionProps, type Props } from '../state/sections.ts';
 import { currentPage, useEditor } from '../state/store.ts';
 import { useSectionActions } from '../state/useSectionActions.ts';
@@ -8,12 +9,6 @@ import { Icon } from '../ui/Icon.tsx';
 import { Field } from './Fields.tsx';
 import { blockFields } from './fields.ts';
 import { ThemePanel } from './ThemePanel.tsx';
-
-const LATER_NOTES: Partial<Record<Section['type'], string>> = {
-  gallery: 'Adding pictures is coming soon. For now you can change the heading and text.',
-  video: 'Adding videos and YouTube or Vimeo links is coming soon.',
-  customCode: 'Custom code is coming soon.',
-};
 
 /** The right panel: the selected section's settings, or the site style. */
 export function Inspector() {
@@ -93,7 +88,13 @@ function SectionSettings({ section }: { section: Section }) {
   const { duplicate, remove } = useSectionActions();
   const definition = blockDefinitions[section.type];
   const props: Props = section.props;
-  const note = LATER_NOTES[section.type];
+  const save = (next: Props, key: string, newAsset?: Asset) => {
+    const problem = change(
+      (p) => setSectionProps(withAsset(p, newAsset), pageIndex, section.id, next),
+      key,
+    );
+    if (problem) notify(`That change could not be made: ${problem}`);
+  };
 
   return (
     <div className="space-y-5 p-4">
@@ -105,9 +106,6 @@ function SectionSettings({ section }: { section: Section }) {
       <p className="rounded-lg bg-sunk px-3 py-2 text-xs leading-relaxed text-ink-soft">
         Tip: click any text in the preview to change it right there.
       </p>
-      {note ? (
-        <p className="rounded-lg border border-line px-3 py-2 text-xs leading-relaxed">{note}</p>
-      ) : null}
       {blockFields[section.type].map((spec) => (
         <Field
           key={spec.key}
@@ -115,13 +113,11 @@ function SectionSettings({ section }: { section: Section }) {
           blockType={section.type}
           path={[spec.key]}
           value={props[spec.key]}
-          onChange={(value) => {
-            const problem = change(
-              (p) => setSectionProps(p, pageIndex, section.id, { ...props, [spec.key]: value }),
-              `${section.id}.${spec.key}`,
-            );
-            if (problem) notify(`That change could not be made: ${problem}`);
-          }}
+          item={props}
+          onChange={(value) => save({ ...props, [spec.key]: value }, `${section.id}.${spec.key}`)}
+          onPatch={(patch, newAsset) =>
+            save({ ...props, ...patch }, `${section.id}.${spec.key}`, newAsset)
+          }
         />
       ))}
       <div className="flex gap-2 border-t border-line pt-4">

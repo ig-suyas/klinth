@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { blockPropSchemas, singleLine, type BlockType } from './blocks.ts';
+import { MAX_VIDEO_BYTES } from './media.ts';
 import { themeSchema } from './tokens.ts';
 
 export const SCHEMA_VERSION = 1;
@@ -62,11 +63,7 @@ export const assetSchema = z
     id: assetId,
     kind: z.enum(['image', 'video']),
     name: singleLine(200, 1),
-    size: z
-      .number()
-      .int()
-      .min(0)
-      .max(25 * 1024 * 1024),
+    size: z.number().int().min(0).max(MAX_VIDEO_BYTES),
     /** Pixel size of images, used to reserve space and avoid layout jumps. */
     width: z.number().int().min(1).max(10_000).optional(),
     height: z.number().int().min(1).max(10_000).optional(),

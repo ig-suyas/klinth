@@ -12,6 +12,8 @@ export default tseslint.config(
       '**/.wrangler/**',
       '**/coverage/**',
       '**/__snapshots__/**',
+      '**/test-results/**',
+      '**/playwright-report/**',
     ],
   },
   js.configs.recommended,

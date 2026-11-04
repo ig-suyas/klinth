@@ -2,6 +2,7 @@ import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
 import { downloadProjectFile, downloadSiteZip } from '../lib/files.ts';
 import { loadAssets } from '../lib/storage.ts';
+import { useLibrary } from '../media/files.ts';
 import { useEditor, type Device } from '../state/store.ts';
 import { flushSave } from '../state/useAutosave.ts';
 import { Icon, type IconName } from '../ui/Icon.tsx';
@@ -25,6 +26,7 @@ export function TopBar({ onExit }: { onExit: () => void }) {
   const canRedo = useEditor((s) => s.future.length > 0);
   const undo = useEditor((s) => s.undo);
   const redo = useEditor((s) => s.redo);
+  const openLibrary = useLibrary((s) => s.open);
   if (!project) return null;
 
   return (
@@ -92,6 +94,15 @@ export function TopBar({ onExit }: { onExit: () => void }) {
         </button>
       </div>
       <SaveIndicator />
+      <button
+        type="button"
+        className="btn btn-quiet"
+        title="Pictures and videos"
+        onClick={() => openLibrary({ mode: 'manage' })}
+      >
+        <Icon name="image" />
+        <span className="max-xl:sr-only">Pictures and videos</span>
+      </button>
       <ExportMenu />
     </header>
   );

@@ -19,6 +19,11 @@ export type FieldSpec =
       fallback?: string;
     }
   | { kind: 'link'; key: string; label: string; help?: string }
+  /** An uploaded picture and its description (`altKey`), set together. */
+  | { kind: 'image'; key: string; altKey: string; label: string }
+  /** An uploaded video (`key`) or a YouTube/Vimeo link (`linkKey`). */
+  | { kind: 'video'; key: string; linkKey: string; label: string }
+  | { kind: 'code'; key: string; label: string }
   | {
       kind: 'list';
       key: string;
@@ -58,6 +63,12 @@ const body: FieldSpec = {
   help: 'Leave an empty line to start a new paragraph.',
 };
 const head = [eyebrow, heading, intro];
+const picture = (label = 'Picture'): FieldSpec => ({
+  kind: 'image',
+  key: 'image',
+  altKey: 'imageAlt',
+  label,
+});
 const look = [background, navLabel];
 
 // An empty address is allowed: the link shows as text until the user adds one.
@@ -80,6 +91,7 @@ export const blockFields: { readonly [T in BlockType]: readonly FieldSpec[] } = 
     eyebrow,
     heading,
     { kind: 'text', key: 'subheading', label: 'Text under the heading', rows: 3 },
+    picture(),
     {
       kind: 'list',
       key: 'buttons',
@@ -96,6 +108,7 @@ export const blockFields: { readonly [T in BlockType]: readonly FieldSpec[] } = 
   about: [
     ...head,
     body,
+    picture('Photo'),
     {
       kind: 'list',
       key: 'facts',
@@ -112,6 +125,7 @@ export const blockFields: { readonly [T in BlockType]: readonly FieldSpec[] } = 
   textImage: [
     ...head,
     body,
+    picture(),
     {
       kind: 'choice',
       key: 'imageSide',
@@ -121,8 +135,24 @@ export const blockFields: { readonly [T in BlockType]: readonly FieldSpec[] } = 
     { kind: 'link', key: 'button', label: 'Button' },
     ...look,
   ],
-  gallery: [...head, ...look],
-  video: [...head, { kind: 'text', key: 'caption', label: 'Caption', rows: 2 }, ...look],
+  gallery: [
+    ...head,
+    {
+      kind: 'list',
+      key: 'images',
+      label: 'Pictures',
+      itemLabel: 'Picture',
+      fields: [picture(), { kind: 'line', key: 'caption', label: 'Caption' }],
+      newItem: () => ({}),
+    },
+    ...look,
+  ],
+  video: [
+    ...head,
+    { kind: 'video', key: 'video', linkKey: 'embedUrl', label: 'Video' },
+    { kind: 'text', key: 'caption', label: 'Caption', rows: 2 },
+    ...look,
+  ],
   projects: [
     ...head,
     {
@@ -141,6 +171,7 @@ export const blockFields: { readonly [T in BlockType]: readonly FieldSpec[] } = 
         { kind: 'line', key: 'tag', label: 'Tag', help: 'For example "Branding".' },
         { kind: 'line', key: 'year', label: 'Year' },
         { kind: 'text', key: 'description', label: 'Description', rows: 3 },
+        picture('Cover picture'),
         { kind: 'link', key: 'link', label: 'Link' },
       ],
       newItem: () => ({ title: 'New project', description: 'One sentence about it.' }),
@@ -165,6 +196,7 @@ export const blockFields: { readonly [T in BlockType]: readonly FieldSpec[] } = 
   ],
   links: [
     ...head,
+    picture('Profile photo'),
     {
       kind: 'list',
       key: 'items',
@@ -205,7 +237,7 @@ export const blockFields: { readonly [T in BlockType]: readonly FieldSpec[] } = 
       newItem: linkItem,
     },
   ],
-  customCode: [],
+  customCode: [{ kind: 'code', key: 'code', label: 'Your code' }],
   spacer: [
     {
       kind: 'choice',
@@ -217,8 +249,12 @@ export const blockFields: { readonly [T in BlockType]: readonly FieldSpec[] } = 
   ],
 };
 
-/** Props the inspector does not show yet (pictures, videos and code arrive in Phase 4). */
-export const LATER_PROPS = new Set(['image', 'imageAlt', 'images', 'code']);
+/** Every prop a field edits (pictures and videos edit two). */
+export function specKeys(spec: FieldSpec): string[] {
+  if (spec.kind === 'image') return [spec.key, spec.altKey];
+  if (spec.kind === 'video') return [spec.key, spec.linkKey];
+  return [spec.key];
+}
 
 /** Props a block accepts but its renderer does not show, so the inspector hides them. */
 export const UNUSED_PROPS: Partial<Record<BlockType, readonly string[]>> = {
@@ -226,15 +262,18 @@ export const UNUSED_PROPS: Partial<Record<BlockType, readonly string[]>> = {
   hero: ['intro'],
 };
 
-/** Block types offered in "Add a section". Media and code blocks join in Phase 4. */
+/** Block types offered in "Add a section", in the order shown. */
 export const ADDABLE_BLOCKS: readonly BlockType[] = [
   'hero',
   'about',
   'textImage',
+  'gallery',
+  'video',
   'projects',
   'testimonials',
   'links',
   'contact',
+  'customCode',
   'footer',
   'spacer',
 ];

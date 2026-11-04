@@ -15,11 +15,19 @@ interface ProjectRecord {
   project: Project;
 }
 
+interface AssetRecord {
+  projectId: string;
+  assetId: string;
+  data: Uint8Array;
+  /** When the file was stored. Older records may not have it. */
+  savedAt?: number;
+}
+
 interface KlinthDB extends DBSchema {
   projects: { key: string; value: ProjectRecord };
   assets: {
     key: [string, string];
-    value: { projectId: string; assetId: string; data: Uint8Array };
+    value: AssetRecord;
   };
 }
 
@@ -241,8 +249,55 @@ export async function saveAsset(
   projectId: string,
   assetId: string,
   data: Uint8Array,
+  now = Date.now(),
 ): Promise<void> {
-  await run((database) => database.put('assets', { projectId, assetId, data }));
+  await run((database) => database.put('assets', { projectId, assetId, data, savedAt: now }));
+}
+
+const asBytes = (data: unknown): Uint8Array | undefined =>
+  // `ArrayBuffer.isView` works across realms, unlike `instanceof Uint8Array`.
+  ArrayBuffer.isView(data)
+    ? new Uint8Array(data.buffer, data.byteOffset, data.byteLength)
+    : undefined;
+
+/** One file's bytes, or undefined if it is not stored (or damaged). */
+export async function loadAsset(
+  projectId: string,
+  assetId: string,
+): Promise<Uint8Array | undefined> {
+  const row = await run((database) => database.get('assets', [projectId, assetId]));
+  return row ? asBytes(row.data) : undefined;
+}
+
+/** Files are kept this long after upload even when unused, so another open tab cannot lose them. */
+export const PRUNE_AFTER_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Deletes stored files the project no longer lists (deleted, or uploads that
+ * were undone). Recent uploads are kept for a day in case another tab still
+ * needs them. Returns how many were deleted.
+ */
+export async function pruneAssets(
+  projectId: string,
+  keep: ReadonlySet<string>,
+  now = Date.now(),
+): Promise<number> {
+  return run(async (database) => {
+    const tx = database.transaction('assets', 'readwrite');
+    let removed = 0;
+    let cursor = await tx.store.openCursor(projectRange(projectId));
+    while (cursor) {
+      const { assetId, savedAt } = cursor.value;
+      const old = typeof savedAt !== 'number' || now - savedAt > PRUNE_AFTER_MS;
+      if (!keep.has(assetId) && old) {
+        await cursor.delete();
+        removed += 1;
+      }
+      cursor = await cursor.continue();
+    }
+    await tx.done;
+    return removed;
+  });
 }
 
 /** Returns every asset binary of a project, ready for `buildExport`. Skips damaged records. */
@@ -250,10 +305,8 @@ export async function loadAssets(projectId: string): Promise<Map<string, Uint8Ar
   const rows = await run((database) => database.getAll('assets', projectRange(projectId)));
   const assets = new Map<string, Uint8Array>();
   for (const { assetId, data } of rows) {
-    // `ArrayBuffer.isView` works across realms, unlike `instanceof Uint8Array`.
-    if (ArrayBuffer.isView(data)) {
-      assets.set(assetId, new Uint8Array(data.buffer, data.byteOffset, data.byteLength));
-    }
+    const bytes = asBytes(data);
+    if (bytes) assets.set(assetId, bytes);
   }
   return assets;
 }

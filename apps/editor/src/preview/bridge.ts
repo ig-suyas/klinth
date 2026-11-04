@@ -1,7 +1,9 @@
 /**
  * The small script that runs inside the sandboxed preview frame. It has no
  * access to the editor: it only talks to the parent through `postMessage`.
- * Sent to the parent: `ready`, `select`, `edit`, `scroll`. Received: `select`.
+ * Sent to the parent: `ready`, `select`, `edit`, `scroll`. Received: `select`,
+ * and `assets` (uploaded files as Blobs, shown through this frame's own blob: addresses).
+ * Custom code frames inside the page may only report their height.
  *
  * Written as plain ES5 in a string because it is injected into `srcdoc`.
  * Text is only ever read with `innerText` and written with `textContent`.
@@ -65,6 +67,8 @@ export const BRIDGE_JS = `(function () {
     el.focus();
   }
 
+  // Capture phase: runs before the site script, which then sees defaultPrevented
+  // and leaves video players unloaded in the preview.
   document.addEventListener('click', function (e) {
     var target = e.target;
     // Links and buttons never navigate away from the preview.
@@ -81,7 +85,7 @@ export const BRIDGE_JS = `(function () {
     }
     mark(id, false);
     send({ type: 'select', id: id });
-  });
+  }, true);
 
   document.addEventListener('dblclick', function (e) {
     var fieldEl = e.target.closest('[data-k-field]');
@@ -110,9 +114,35 @@ export const BRIDGE_JS = `(function () {
     scrollTimer = setTimeout(function () { send({ type: 'scroll', y: Math.round(window.scrollY) }); }, 100);
   }, { passive: true });
 
+  function showAssets(items) {
+    if (!items || !items.length) return;
+    for (var i = 0; i < items.length; i++) {
+      var item = items[i];
+      if (!item || typeof item.id !== 'string' || !(item.blob instanceof Blob)) continue;
+      var url = URL.createObjectURL(item.blob);
+      var els = document.querySelectorAll('[data-k-asset]');
+      for (var j = 0; j < els.length; j++) {
+        if (els[j].getAttribute('data-k-asset') === item.id) els[j].src = url;
+      }
+    }
+  }
+
+  function fitCodeFrame(e) {
+    var frames = document.querySelectorAll('iframe.code-frame');
+    for (var i = 0; i < frames.length; i++) {
+      if (frames[i].contentWindow === e.source) {
+        var h = Number(e.data.height);
+        if (h > 0) frames[i].style.height = Math.min(Math.max(Math.round(h), 80), 1600) + 'px';
+      }
+    }
+  }
+
   window.addEventListener('message', function (e) {
-    if (e.source !== window.parent || !e.data || e.data.source !== 'klinth-editor') return;
+    if (!e.data) return;
+    if (e.data.source === 'klinth-code' && e.source !== window.parent) { fitCodeFrame(e); return; }
+    if (e.source !== window.parent || e.data.source !== 'klinth-editor') return;
     if (e.data.type === 'select') mark(e.data.id, true);
+    else if (e.data.type === 'assets') showAssets(e.data.items);
   });
 
   if (cfg.scrollY) window.scrollTo(0, cfg.scrollY);
@@ -129,6 +159,13 @@ export const BRIDGE_CSS = `
 .k-selected [data-k-field] { cursor: text; }
 .k-selected [data-k-field]:hover { box-shadow: 0 0 0 2px rgba(194, 65, 12, 0.35); border-radius: 2px; }
 .k-editing { outline: 2px solid #c2410c; outline-offset: 4px; border-radius: 2px; cursor: text; }
+`;
+
+/** Preview-only pieces of the page (custom code box). Thumbnails get it too. */
+export const PREVIEW_CSS = `
+.code-note { margin: 0 0 .75rem; font: 600 12px/1.4 system-ui, sans-serif; letter-spacing: .02em; color: var(--muted); }
+.code-frame { display: block; width: 100%; height: 320px; border: 1px dashed var(--line); border-radius: min(var(--radius), 12px); background: transparent; }
+.code-empty { padding: 2.5rem 1rem; text-align: center; border: 1px dashed var(--line); border-radius: min(var(--radius), 12px); font: 500 14px/1.4 system-ui, sans-serif; color: var(--muted); }
 `;
 
 /** After the first load, reloads skip the scroll reveal so edits do not flicker. */

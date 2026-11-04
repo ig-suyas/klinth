@@ -614,6 +614,10 @@ describe('9. offline export', () => {
     const css = html(files, 'css/site.css');
     const js = html(files, 'js/site.js');
     expect(css).not.toMatch(/@import|url\(/);
-    expect(js).not.toMatch(/fetch\(|XMLHttpRequest|https?:|import\(/);
+    const players = js.replace(
+      /'https:\/\/(www\.youtube-nocookie\.com\/embed|player\.vimeo\.com\/video)\/'/g,
+      '',
+    );
+    expect(players).not.toMatch(/fetch\(|XMLHttpRequest|https?:|import\(/);
   });
 });
