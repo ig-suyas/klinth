@@ -4,14 +4,11 @@
  * (enforced by tsconfig `lib` without "DOM").
  */
 
-export const SCHEMA_VERSION = 1;
-
-/** Escapes text for safe use in HTML text and attribute values. */
-export function escapeHtml(value: string): string {
-  return value
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#39;');
-}
+export * from './schema.ts';
+export * from './tokens.ts';
+export { escapeHtml, safeUrl } from './html.ts';
+export { MIGRATIONS, ProjectError, migrateProject, runMigrations } from './migrations.ts';
+export { containsSecret, parseProjectFile, serializeProject } from './project-file.ts';
+export { assetPath, pagePath, renderSite, type SiteFile } from './render.ts';
+export { buildExport, buildZip } from './export.ts';
+export { sampleProject } from './sample.ts';

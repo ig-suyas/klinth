@@ -5,7 +5,7 @@
 | Phase                        | Status      |
 | ---------------------------- | ----------- |
 | 0 Scaffold and architecture  | done        |
-| 1 Core engine                | not started |
+| 1 Core engine                | done        |
 | 2 Blocks and templates       | not started |
 | 3 Editor UI                  | not started |
 | 4 Media, embeds, custom code | not started |
@@ -16,54 +16,50 @@
 
 ## 1. Current state
 
-Phase 0 done. npm-workspaces monorepo. Editor placeholder page runs (`npm run dev`, :5173). Worker
-runs in Wrangler local mode (`npm run dev:api`, :8787) with `/health`, CORS allow-list and 501
-placeholders for `/ai/generate` and `/github/oauth`. Lint, format, types, tests (6 tests, 4 packages)
-and build all pass. CI workflow exists (not yet run on GitHub; repo not pushed).
+Phase 1 done. `packages/core` has the versioned Zod schema, migrations hook, tokens, `renderSite()`,
+exporter, ZIP builder and project-file import/export with a secret guard. Editor has IndexedDB
+persistence and download/import helpers (no UI yet). `npm run check` green: 43 tests total
+(core 36, editor 4, templates 1, api 2). Sample project exports to a static site that opens offline
+(all relative paths, no remote CSS/JS/fonts).
 
 ## 2. Goal
 
-Next: Phase 1, core engine (Zod schema + migrations hook, tokens, `renderSite()`, exporter file list,
-ZIP, IndexedDB persistence, project file import/export, security tests). Overall: free, no-login
-visual site builder exporting plain HTML repos at ₹0 running cost.
+Next: Phase 2, the v1 blocks with real props and the 2 premium templates (Lighthouse 95+, visual
+snapshot tests). Overall: free, no-login visual site builder exporting plain HTML repos at ₹0.
 
 ## 3. Files
 
-- `package.json` : workspaces + root scripts (`dev`, `dev:api`, `check`, `build`), `allowScripts`
-- `tsconfig.base.json` : strict TS shared by all packages
-- `eslint.config.js`, `.prettierrc.json`, `.prettierignore` : lint/format
-- `.github/workflows/ci.yml` : lint, format, typecheck, test, build, `npm audit --audit-level=high`
-- `.gitignore`, `.env.example` : secrets and private skill excluded; env var names only
-- `packages/core/src/index.ts` : `SCHEMA_VERSION`, `escapeHtml` (tsconfig lib has no DOM on purpose)
-- `packages/templates/src/index.ts` : template metadata stub (2 templates)
-- `apps/editor/` : Vite 8 + React 19 + Tailwind 4 (`@tailwindcss/vite`) + Motion 14, jsdom tests
-- `workers/api/src/index.ts` : Worker skeleton, exported `handle()` for tests
-- `workers/api/wrangler.jsonc` : `klinth-api`, `ALLOWED_ORIGINS` var, no bindings yet
-- `workers/api/skill/skill.example.md` : test-only skill stand-in (real skill: KV only)
-- `docs/ARCHITECTURE.md` : design, diagrams, failure modes, cost, decision records DR-1..DR-7
+- `packages/core/src/schema.ts` : Project/Page/Section/Asset Zod schemas, `BLOCK_TYPES`, `SCHEMA_VERSION`
+- `packages/core/src/migrations.ts` : `runMigrations` (pure steps), `migrateProject`, `ProjectError`
+- `packages/core/src/tokens.ts` : theme schema (hex colors, closed font-stack list), `themeToCss`
+- `packages/core/src/html.ts` : `escapeHtml`, `safeUrl` (https/mailto/tel/#anchor only)
+- `packages/core/src/render.ts` : `renderSite`, block renderers (basic markup), base CSS, site JS
+- `packages/core/src/export.ts` : `buildExport` (3.6 layout + README) and `buildZip` (fflate, deterministic)
+- `packages/core/src/project-file.ts` : `serializeProject`/`parseProjectFile`, `containsSecret`
+- `packages/core/src/sample.ts` : hard-coded 2-page sample project (fixture)
+- `apps/editor/src/lib/storage.ts` : idb stores `projects` and `assets` ([projectId, assetId] → Uint8Array)
+- `apps/editor/src/lib/files.ts` : download project file / site ZIP, import project file
 
 ## 4. What worked
 
-- Versions installed (2026-11-04): Node 24.19, npm 11.17, TS 6.0, ESLint 10.14, typescript-eslint
-  8.72, Vitest 5.1, Vite 8.3, React 19.3, Tailwind 4.3, Motion 14.9, Wrangler 4.157, jsdom 30.
-- Packages are consumed as TS source (`exports: ./src/index.ts`), no inter-package build.
-- Worker tests run in plain Vitest (Node has `Request`/`Response`) by calling `handle()` directly.
-- Full check: `npm run check` (~10 s). Editor build ~0.25 s, JS 113 kB gzip (placeholder).
-- Free-tier limits: **not yet verified** (not needed in Phase 0). Verify before Phase 5.
+- Deps: zod 4.6.7, fflate 0.8.3, idb 8.0.4, fake-indexeddb (dev, editor tests).
+- Core has no DOM/Node types, so `safeUrl` uses explicit regexes instead of `URL`.
+- Schema is `.strict()` everywhere: unknown fields (e.g. `geminiKey`) are rejected; ids, colors, slugs
+  are regex-checked so nothing can break out of HTML attributes or CSS.
+- Pages export as `index.html` / `<slug>.html` at root so relative links work over `file://`.
+- ZIP uses a fixed mtime, so the same project gives byte-identical ZIPs (useful for Phase 6 parity).
 
 ## 5. What didn't work
 
-- `npm run dev:api -- --port 8787` from PowerShell: `--` got eaten, Wrangler took `8787` as the entry
-  file. Fixed by putting `--port 8787` in the Worker's `dev` script.
-- npm 11 blocks install scripts by default. `esbuild` and `workerd` approved via
-  `npm approve-scripts` (pinned by version in `allowScripts`); re-approve after upgrading them.
+- Storing `Blob` in fake-indexeddb under jsdom loses `arrayBuffer()`; assets are stored as `Uint8Array`.
+- ESLint `no-control-regex` blocks `\u0000` ranges; control chars are checked with `charCodeAt`.
+- sed with backslashes from Bash on Windows is unreliable; use the Edit tool for regex-heavy edits.
 
 ## 6. What is still left to do
 
-1. Phase 1 (see prompt section 9). Add `zod`, `idb`, `fflate` when needed.
-2. Before Phase 5: verify Cloudflare free limits (Workers, KV, Durable Objects) and a current
-   free-tier Gemini model; consider `@cloudflare/vitest-pool-workers` for Durable Object tests.
-3. Playwright not installed yet (Phase 3 adds it).
-4. Editor CSP via `apps/editor/public/_headers` is Phase 7.
-5. Known: `npm audit` shows a moderate minimatch advisory inside ESLint (dev only); recheck later.
-6. The prompt file is `klinth-prompt.md` (layout in the prompt says `prompt.md`).
+1. Phase 2: give each block a typed props schema (props are generic JSON now, read defensively).
+2. `video` and `customCode` render placeholders only (Phase 4). Exported-site CSP meta not added yet
+   (check `'self'` behaviour over `file://` before adding; prompt 5.5).
+3. `containsSecret` flags any prop named `token`/`secret`/`password`; block props must avoid those names.
+4. Before Phase 5: verify Cloudflare free limits and a current free-tier Gemini model.
+5. Playwright arrives in Phase 3. `npm audit`: moderate minimatch advisory in ESLint (dev only).
