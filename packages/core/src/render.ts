@@ -76,7 +76,20 @@ function monogram(project: Project): string {
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="${radius}" fill="${accent}"/><text x="32" y="34" dominant-baseline="central" text-anchor="middle" font-family="system-ui, sans-serif" font-size="36" font-weight="700" fill="${accentText}">${esc(letter)}</text></svg>\n`;
 }
 
-function renderPage(project: Project, page: Page, assets: ReadonlyMap<string, Asset>): string {
+export interface RenderOptions {
+  /**
+   * Editor preview only: marks sections and editable text with `data-k-*`
+   * attributes. Exports never set it, so exported files stay editor-free.
+   */
+  editable?: boolean;
+}
+
+function renderPage(
+  project: Project,
+  page: Page,
+  assets: ReadonlyMap<string, Asset>,
+  editable: boolean,
+): string {
   const { meta } = project;
   const title = page.slug === '' ? meta.title : `${page.title} | ${meta.title}`;
   const favicon = faviconAsset(project, assets);
@@ -91,12 +104,15 @@ function renderPage(project: Project, page: Page, assets: ReadonlyMap<string, As
   const h1 = main.findIndex((s) => sectionHeading(s) !== '');
   const body = main
     .map((section, i) => {
-      const ctx: BlockCtx = { assets, level: i === h1 ? 1 : 2, first: i === 0 };
+      const ctx: BlockCtx = { assets, level: i === h1 ? 1 : 2, first: i === 0, editable };
       const bg = sectionBackground(section);
-      return `<section id="${esc(section.id)}" class="block block-${section.type} bg-${bg}"><div class="wrap">${renderBlock(section, ctx)}</div></section>`;
+      const marker = editable ? ` data-k-section="${esc(section.id)}"` : '';
+      return `<section id="${esc(section.id)}" class="block block-${section.type} bg-${bg}"${marker}><div class="wrap">${renderBlock(section, ctx)}</div></section>`;
     })
     .join('\n');
-  const footer = footers.map((s) => (s.type === 'footer' ? renderFooter(s.props) : '')).join('');
+  const footer = footers
+    .map((s) => (s.type === 'footer' ? renderFooter(s.props, editable ? s.id : undefined) : ''))
+    .join('');
 
   return `<!doctype html>
 <html lang="${esc(meta.language)}">
@@ -125,12 +141,12 @@ ${footer ? `<footer class="site-footer">${footer}</footer>\n` : ''}</body>
  * exporter, so what users see is exactly what they export. Asset binaries are
  * added by the exporter.
  */
-export function renderSite(project: Project): SiteFile[] {
+export function renderSite(project: Project, options: RenderOptions = {}): SiteFile[] {
   const assets = new Map(project.assets.map((a) => [a.id, a]));
   return [
     ...project.pages.map((page) => ({
       path: pagePath(page),
-      content: renderPage(project, page, assets),
+      content: renderPage(project, page, assets, options.editable === true),
     })),
     { path: 'css/site.css', content: themeToCss(project.theme) + SITE_CSS },
     { path: 'js/site.js', content: SITE_JS },

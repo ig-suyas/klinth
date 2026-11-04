@@ -9,6 +9,13 @@ export interface BlockCtx {
   level: 1 | 2;
   /** True for the first section: its images load straight away (they are likely on screen). */
   first: boolean;
+  /** Editor preview only: mark text the user can edit in place. Never set for exports. */
+  editable?: boolean | undefined;
+}
+
+/** In the editor preview, names the prop an element shows so it can be edited in place. */
+function field(ctx: { editable?: boolean | undefined }, name: string): string {
+  return ctx.editable ? ` data-k-field="${name}"` : '';
 }
 
 const EXT: Record<Asset['mime'], string> = {
@@ -33,8 +40,8 @@ function lines(text: string): string {
 }
 
 /** Paragraphs split on blank lines. */
-function paras(text: string | undefined, className = ''): string {
-  const cls = className ? ` class="${className}"` : '';
+function paras(text: string | undefined, className = '', attrs = ''): string {
+  const cls = (className ? ` class="${className}"` : '') + attrs;
   return (text ?? '')
     .split(/\r?\n\s*\r?\n/)
     .map((p) => p.trim())
@@ -43,9 +50,9 @@ function paras(text: string | undefined, className = ''): string {
     .join('');
 }
 
-function heading(text: string | undefined, level: number, className: string): string {
+function heading(text: string | undefined, level: number, className: string, attrs = ''): string {
   if (!text?.trim()) return '';
-  return `<h${level} class="${className}">${lines(text)}</h${level}>`;
+  return `<h${level} class="${className}"${attrs}>${lines(text)}</h${level}>`;
 }
 
 function link(item: LinkProps | undefined, className: string, inner?: string): string {
@@ -82,9 +89,9 @@ interface HeadProps {
 /** Eyebrow, title and intro shared by most blocks. */
 function head(p: HeadProps, ctx: BlockCtx, className = 'head'): string {
   const parts =
-    (p.eyebrow ? `<p class="eyebrow">${esc(p.eyebrow)}</p>` : '') +
-    heading(p.heading, ctx.level, 'title') +
-    paras(p.intro, 'intro');
+    (p.eyebrow ? `<p class="eyebrow"${field(ctx, 'eyebrow')}>${esc(p.eyebrow)}</p>` : '') +
+    heading(p.heading, ctx.level, 'title', field(ctx, 'heading')) +
+    paras(p.intro, 'intro', field(ctx, 'intro'));
   return parts ? `<div class="${className}">${parts}</div>` : '';
 }
 
@@ -102,9 +109,9 @@ function hero(p: BlockProps<'hero'>, ctx: BlockCtx): string {
     (p.status
       ? `<p class="status"><span class="dot" aria-hidden="true"></span>${esc(p.status)}</p>`
       : '') +
-    (p.eyebrow ? `<p class="eyebrow">${esc(p.eyebrow)}</p>` : '') +
-    heading(p.heading, ctx.level, 'display') +
-    paras(p.subheading, 'lede') +
+    (p.eyebrow ? `<p class="eyebrow"${field(ctx, 'eyebrow')}>${esc(p.eyebrow)}</p>` : '') +
+    heading(p.heading, ctx.level, 'display', field(ctx, 'heading')) +
+    paras(p.subheading, 'lede', field(ctx, 'subheading')) +
     (actions ? `<div class="actions">${actions}</div>` : '');
   return `<div class="hero hero-${layout}${has(media, 'has-media')}"><div class="hero-text">${text}</div>${
     media ? `<div class="hero-media">${media}</div>` : ''
@@ -118,7 +125,7 @@ function about(p: BlockProps<'about'>, ctx: BlockCtx): string {
     .join('');
   return `<div class="about${has(media, 'has-media')}">${
     media ? `<div class="about-media">${media}</div>` : ''
-  }<div class="about-text">${head(p, ctx)}<div class="prose">${paras(p.body)}</div>${
+  }<div class="about-text">${head(p, ctx)}<div class="prose">${paras(p.body, '', field(ctx, 'body'))}</div>${
     facts ? `<dl class="facts">${facts}</dl>` : ''
   }</div></div>`;
 }
@@ -127,7 +134,7 @@ function textImage(p: BlockProps<'textImage'>, ctx: BlockCtx): string {
   const media = img(p, ctx);
   const side = p.imageSide ?? 'right';
   const button = link(p.button, 'button');
-  return `<div class="split split-${side}${media ? '' : ' no-media'}"><div class="split-text">${head(p, ctx)}<div class="prose">${paras(p.body)}${
+  return `<div class="split split-${side}${media ? '' : ' no-media'}"><div class="split-text">${head(p, ctx)}<div class="prose">${paras(p.body, '', field(ctx, 'body'))}${
     button ? `<p>${button}</p>` : ''
   }</div></div>${media ? `<div class="split-media">${media}</div>` : ''}</div>`;
 }
@@ -146,7 +153,7 @@ function gallery(p: BlockProps<'gallery'>, ctx: BlockCtx): string {
 
 function video(p: BlockProps<'video'>, ctx: BlockCtx): string {
   // Uploads and YouTube/Vimeo embeds arrive in Phase 4; until then show the text only.
-  return `${head(p, ctx)}${paras(p.caption, 'intro')}`;
+  return `${head(p, ctx)}${paras(p.caption, 'intro', field(ctx, 'caption'))}`;
 }
 
 const pad = (n: number): string => String(n).padStart(2, '0');
@@ -262,13 +269,15 @@ export function renderBlock(section: Section, ctx: BlockCtx): string {
 }
 
 /** The site footer: text, links and a way back to the top. */
-export function renderFooter(p: BlockProps<'footer'>): string {
+export function renderFooter(p: BlockProps<'footer'>, editSectionId?: string): string {
   const items = (p.links ?? [])
     .map((l) => link(l, 'foot-link'))
     .filter(Boolean)
     .map((a) => `<li>${a}</li>`)
     .join('');
-  return `<div class="wrap foot">${p.text ? `<p class="foot-text">${esc(p.text)}</p>` : ''}${
+  const edit = editSectionId === undefined ? {} : { editable: true };
+  const marker = editSectionId === undefined ? '' : ` data-k-section="${esc(editSectionId)}"`;
+  return `<div class="wrap foot"${marker}>${p.text ? `<p class="foot-text"${field(edit, 'text')}>${esc(p.text)}</p>` : ''}${
     items ? `<ul class="foot-links" role="list">${items}</ul>` : ''
   }<a class="totop" href="#top">Back to top <span aria-hidden="true">↑</span></a></div>`;
 }

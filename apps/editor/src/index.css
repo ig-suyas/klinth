@@ -1,5 +1,160 @@
 @import 'tailwindcss';
 
+/*
+ * Klinth editor tokens. Warm paper workspace, ink text, one burnt-orange
+ * accent for the main action and the current selection. System fonts only.
+ */
+@theme {
+  --color-canvas: #e8e4dc;
+  --color-panel: #fbfaf7;
+  --color-sunk: #f2efe9;
+  --color-ink: #1d1b18;
+  --color-ink-soft: #57524a;
+  --color-line: #dcd6cb;
+  --color-line-strong: #c4bcae;
+  --color-accent: #c2410c;
+  --color-accent-strong: #9a3412;
+  --color-accent-wash: #fbebe1;
+  --color-danger: #b42318;
+  --color-ok: #2f6b45;
+
+  --font-ui: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-display:
+    'Iowan Old Style', 'Palatino Linotype', 'URW Palladio L', P052, Charter, Georgia, serif;
+
+  --ease-out-soft: cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  body {
+    background: var(--color-canvas);
+    color: var(--color-ink);
+    font-family: var(--font-ui);
+    -webkit-font-smoothing: antialiased;
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+  ::selection {
+    background: var(--color-accent-wash);
+  }
+}
+
+@layer components {
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    min-height: 2.25rem;
+    padding: 0 0.875rem;
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 550;
+    white-space: nowrap;
+    transition:
+      background-color 160ms var(--ease-out-soft),
+      color 160ms var(--ease-out-soft),
+      transform 120ms var(--ease-out-soft);
+  }
+  .btn:active:not(:disabled) {
+    transform: translateY(1px);
+  }
+  .btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+  .btn-primary {
+    background: var(--color-ink);
+    color: var(--color-panel);
+  }
+  .btn-primary:hover:not(:disabled) {
+    background: var(--color-accent-strong);
+  }
+  .btn-quiet {
+    color: var(--color-ink);
+  }
+  .btn-quiet:hover:not(:disabled) {
+    background: var(--color-sunk);
+  }
+  .btn-line {
+    border: 1px solid var(--color-line-strong);
+    background: var(--color-panel);
+  }
+  .btn-line:hover:not(:disabled) {
+    border-color: var(--color-ink);
+  }
+  .icon-btn {
+    display: inline-grid;
+    place-items: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 0.5rem;
+    color: var(--color-ink-soft);
+    transition: background-color 160ms var(--ease-out-soft);
+  }
+  .icon-btn:hover:not(:disabled) {
+    background: var(--color-sunk);
+    color: var(--color-ink);
+  }
+  .icon-btn:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+  }
+  .label {
+    display: block;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    margin-bottom: 0.375rem;
+  }
+  .help {
+    font-size: 0.75rem;
+    line-height: 1.45;
+    color: var(--color-ink-soft);
+    margin-top: 0.375rem;
+  }
+  .input {
+    width: 100%;
+    min-height: 2.25rem;
+    padding: 0.4375rem 0.625rem;
+    border: 1px solid var(--color-line-strong);
+    border-radius: 0.5rem;
+    background: #fff;
+    font-size: 0.875rem;
+    line-height: 1.45;
+    transition: border-color 160ms var(--ease-out-soft);
+  }
+  .input:hover {
+    border-color: var(--color-ink-soft);
+  }
+  .input:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 0;
+    border-color: transparent;
+  }
+  .input[aria-invalid='true'] {
+    border-color: var(--color-danger);
+  }
+  .error-text {
+    font-size: 0.75rem;
+    color: var(--color-danger);
+    margin-top: 0.375rem;
+  }
+  .eyebrow {
+    font-size: 0.6875rem;
+    font-weight: 650;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-ink-soft);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

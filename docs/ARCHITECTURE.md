@@ -43,6 +43,17 @@ flowchart LR
 - **One renderer.** `packages/core` exposes `renderSite(project) → { path, content }[]`. Preview and
   export call the same function, so what users see is what they ship. Core has no DOM dependency
   (enforced: its tsconfig `lib` excludes `DOM`), so it can run in the Worker and in tests.
+- **Preview bridge.** The editor calls `renderSite(project, { editable: true })`, which only adds
+  `data-k-section` / `data-k-field` attributes (tested: removing them gives the export byte for
+  byte). `apps/editor/src/preview/document.ts` inlines the CSS and JS into one `srcdoc` and adds a
+  small bridge script. The frame is `sandbox="allow-scripts"` (opaque origin). It posts `select`,
+  `edit` and `scroll` messages to the editor origin only; the editor accepts them only from that
+  frame's window and validates them with Zod. Text is read with `innerText` and never written as HTML.
+- **Editor state.** One Zustand store (`apps/editor/src/state/store.ts`). Every edit goes through
+  `change()`, which validates the whole project with the schema and refuses invalid results, so
+  nothing broken is saved. Undo history keeps 100 steps; quick edits with the same key within 1 s
+  merge into one step. Autosave runs 700 ms after the last change, one save at a time, and tells
+  other tabs through `BroadcastChannel`.
 
 ## Repo layout
 

@@ -7,7 +7,7 @@
 | 0 Scaffold and architecture  | done                      |
 | 1 Core engine                | done (reviewed, hardened) |
 | 2 Blocks and templates       | done                      |
-| 3 Editor UI                  | not started               |
+| 3 Editor UI                  | done                      |
 | 4 Media, embeds, custom code | not started               |
 | 5 AI Worker, key vault, AI   | not started               |
 | 6 GitHub connect, export     | not started               |
@@ -16,72 +16,75 @@
 
 ## 1. Current state
 
-Phase 2 done. Every v1 block has strict typed props (Zod discriminated union). The renderer writes
-a premium, responsive, accessible site: sticky header with menu, skip link, hero layouts, numbered
-project covers, index list, facts, quotes, link page, contact (mailto, tel, optional form), footer
-outside `<main>`, monogram favicon, staggered scroll reveal. Two templates: **portfolio** (light
-paper, didone serif, sharp) and **landing** (dark green and saffron, grotesk, rounded, link page).
-`npm run check` and `npm run build` green: 307 tests (core 259, templates 27, editor 19, api 2).
-`stash@{0}` (old Phase 2 WIP) is now merged by hand and can be dropped.
+Phase 3 done. The editor works end to end: start screen (template cards with live thumbnails,
+saved projects, open a project file), editor with top bar (all projects, page picker, computer /
+tablet / phone preview, undo/redo with Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y, save status, Export menu:
+ZIP or project file), left sections list (drag reorder with Motion `Reorder`, up/down, duplicate,
+delete with an Undo notice, "Add a section"), center sandboxed preview (click to select, click the
+text again to type in place, Enter saves, Escape cancels), right inspector (section fields from
+the block schemas, or "Site style": name, description, 4 ready-made palettes, 6 colors with
+contrast warnings, fonts, roundness, spacing). Autosave, first-run tour, phone notice, error
+boundary. `npm run check` and `npm run build` green: 336 unit tests (core 261, templates 27,
+editor 46, api 2). `npm run e2e`: 3 Playwright tests green (full flow incl. ZIP contents, Escape,
+drag).
 
 **Remote:** `origin` = `github.com/ig-suyas/klinth`. Only Phase 0 is pushed; later commits are local.
 
 ## 2. Goal
 
-Next: Phase 3, the editor UI (panels, sandboxed preview with click-to-select, inspector, undo/redo,
-autosave, template picker, tour, Playwright flow). Overall: free, no-login site builder exporting
-plain HTML repos at ₹0.
+Next: Phase 4 (image upload and compression, 25 MB videos, asset manager, repo-size warning,
+YouTube/Vimeo facade, Custom code block with sandboxed preview and trust notice). Overall: free,
+no-login site builder exporting plain HTML repos at ₹0.
 
 ## 3. Files
 
-- `packages/core/src/blocks.ts` : strict prop schemas per block, `singleLine`, `BlockProps<T>`
-- `packages/core/src/schema.ts` : `sectionSchema` is a discriminated union; asset `width`/`height`
-- `packages/core/src/render.ts` : page shell, header/menu, h1 rule, footer, monogram favicon
-- `packages/core/src/render-blocks.ts` : one renderer per block (`renderBlock` switch)
-- `packages/core/src/site-assets.ts` : exported `site.css` and `site.js`
-- `packages/core/src/contrast.ts` : `contrastRatio`, `mixSrgb`, `themeContrastIssues` (for editor warnings)
-- `packages/core/src/tokens.ts` : 9 font stacks; heading weight/tracking derived from the font
-- `packages/core/src/blocks.test.ts` : schema, structure, block and contrast tests
-- `packages/templates/src/{portfolio,landing}.ts` : the two templates (`create()` returns a fresh copy)
-- `packages/templates/src/blocks.ts` : `blockDefinitions` (plain labels, descriptions, starting props)
-- `packages/templates/src/__snapshots__/` : rendered HTML/CSS/JS/favicon snapshots per template
+- `packages/core/src/render.ts`, `render-blocks.ts` : `renderSite(project, { editable })` adds
+  preview-only `data-k-section` / `data-k-field` (exports unchanged; snapshots untouched)
+- `apps/editor/src/state/store.ts` : Zustand store, validated `change()`, undo/redo, notices
+- `apps/editor/src/state/sections.ts` : pure section ops (add, duplicate, delete, move, reorder)
+- `apps/editor/src/state/useAutosave.ts` : queued autosave, `flushSave()`, BroadcastChannel conflicts
+- `apps/editor/src/preview/{document,bridge,Preview}.ts(x)` : srcdoc builder, frame script, frame
+- `apps/editor/src/inspector/fields.ts` : plain-language field specs; limits read from schemas
+- `apps/editor/src/inspector/{Inspector,Fields,ThemePanel}.tsx` : right panel controls
+- `apps/editor/src/panels/{TopBar,SectionsPanel}.tsx`, `StartScreen.tsx`, `Editor.tsx`, `App.tsx`
+- `apps/editor/src/ui/{Icon,Tour,Notice}.tsx` : own SVG icon set, tour, notice bar
+- `apps/editor/e2e/editor.spec.ts`, `playwright.config.ts` : Playwright flow (`npm run e2e`)
+- `.claude/launch.json` (untracked) : dev server entry for the Claude browser pane
 
 ## 4. What worked
 
-- **Lighthouse 12, mobile, both templates: Performance 100, Accessibility 100, Best Practices 100,
-  SEO 100.** LCP 0.9 s, CLS 0, TBT 0 ms. Run against the exported files on a local node server with
-  Chrome, screenshot audits skipped. The scripts are not in the repo (scratchpad only).
-- Headless Chrome (puppeteer-core) at 375 and 1280 px: no horizontal overflow, no console errors,
-  every revealed element ends visible; with reduced motion no reveal classes are added at all.
-- System font stacks only (no font host, no font files): fast, offline, Lighthouse-friendly.
-- First section is never hidden by the reveal (keeps LCP fast); only `.status` and `.actions` get
-  a short CSS rise. Menu is a `<details>` (works without JS, no layout jump); JS only closes it.
-- Bold-section soft text and card mixes are shared constants (`BOLD_MUTED_MIX` 0.9,
-  `BOLD_CARD_MIX` 0.08) used by both the CSS and the contrast check. The default accent moved to
-  `#b13a0b` to pass AA there.
-- Secrets are now checked **before** schema validation (core `serializeProject` and editor
-  `saveProject`), so a key-like prop gets the clear "key or token" message.
-- Snapshot folders are ignored by ESLint and Prettier (Prettier would otherwise rewrite them).
+- Playwright uses the installed Chrome locally (`channel: 'chrome'`, no browser download); CI runs
+  `npx playwright install --with-deps chromium` then `npm run e2e`.
+- Desktop preview renders at 1280 px and is scaled down to fit (1440 px window: scale 0.59).
+- Preview reloads `srcdoc` 120 ms after a change, restores scroll, and turns off the scroll reveal
+  after the first load so edits do not flicker.
+- Field specs are checked against schemas by tests (every prop shown or listed as later/unused,
+  choices equal enum options, new list items valid). The tests caught hero `intro` (not rendered,
+  now hidden) and new links defaulting to an invalid `https://` (now empty).
+- Links keep an invalid draft locally and only save valid addresses (`javascript:` never saved).
 
 ## 5. What didn't work
 
-- "Visual snapshot tests" are **text snapshots** of the rendered files (`toMatchFileSnapshot`), not
-  pixel screenshots: the owner's global rule forbids generating screenshots unless asked. Add
-  Playwright `toHaveScreenshot` only if the owner asks for it.
-- The Claude browser pane runs hidden, which stops IntersectionObserver; use headless Chrome for
-  motion checks.
-- Writing TS source through `node -e` from Bash breaks on template literals and `'`; use Edit.
-- Lighthouse warns "no text compression" on the local server only; real hosts compress.
+- Playwright does not map clicks through CSS transforms on iframes, so clicks in the scaled preview
+  miss. E2E runs at a 2000 px wide viewport (no scaling). Real users are not affected.
+- Clicking inside the preview from the Claude browser pane needs coordinate clicks, which need a
+  screenshot (owner rule: none). Use Playwright for anything inside the frame.
+- Writing ` `-style escapes through the Write/Edit tools turns them into raw characters; use
+  `String.fromCharCode` instead (see `scriptJson` in `preview/document.ts`).
+- Python edits on Windows write CRLF; run Prettier after them.
 
 ## 6. What is still left to do
 
-1. Phase 3: use `templates[].create()`, `blockDefinitions` and `themeContrastIssues` (warn when a
-   color pick is hard to read). The preview needs CSS/JS inlined into `srcdoc` (pages link
-   `css/site.css` and `js/site.js`). Real-browser storage checks from the Phase 1 list still apply
-   (quota, eviction, private mode, multi-tab, `BroadcastChannel`, reload on `conflict`).
-2. Props changed from loose JSON to strict schemas without a version bump (no users yet). After
-   launch, any prop change needs a migration.
-3. `video` and `customCode` still render placeholders (Phase 4). Decide on SVG uploads in Phase 4.
-4. Images have no `srcset` yet; Phase 4 compression should write sizes (`width`/`height` exist).
-5. CSP still deferred to Phase 7 (exported-site meta and editor `_headers`).
-6. Before Phase 5: verify Cloudflare free limits and a current free-tier Gemini model.
+1. Phase 4: "Add a section" hides gallery, video and custom code (`ADDABLE_BLOCKS` in
+   `inspector/fields.ts`), and the inspector hides `image`, `imageAlt`, `images`, `code`
+   (`LATER_PROPS`). Turn them on with the media work. The preview frame cannot load blob URLs of the
+   editor origin reliably; inline images as data URLs or pass bytes via postMessage.
+2. Phase 7: editor CSP must allow inline `<style>`/`<script>` inside the `srcdoc` frame (it inherits
+   the editor CSP); consider a hash or a separate preview origin. Bundle is 571 kB (182 kB gzip);
+   split Motion/Zod or lazy-load the editor. Storage checks still to do in a real browser: quota,
+   eviction, private mode.
+3. Item-level inline editing (project titles, quotes) is inspector-only; top-level text fields are
+   editable in place. Add more `data-k-field` paths later if users want it.
+4. Props changed to strict schemas without a version bump (no users yet). After launch, any prop
+   change needs a migration. `stash@{0}` (old Phase 2 WIP) can be dropped.
+5. Before Phase 5: verify Cloudflare free limits and a current free-tier Gemini model.

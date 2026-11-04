@@ -38,6 +38,6 @@ export {
   parseProjectFile,
   serializeProject,
 } from './project-file.ts';
-export { assetPath, pagePath, renderSite, type SiteFile } from './render.ts';
+export { assetPath, pagePath, renderSite, type RenderOptions, type SiteFile } from './render.ts';
 export { buildExport, buildZip } from './export.ts';
 export { sampleProject } from './sample.ts';

@@ -1,0 +1,52 @@
+import { useEffect } from 'react';
+import { Inspector } from './inspector/Inspector.tsx';
+import { SectionsPanel } from './panels/SectionsPanel.tsx';
+import { TopBar } from './panels/TopBar.tsx';
+import { Preview } from './preview/Preview.tsx';
+import { useEditor } from './state/store.ts';
+import { useAutosave } from './state/useAutosave.ts';
+import { NoticeBar } from './ui/Notice.tsx';
+import { Tour } from './ui/Tour.tsx';
+
+/** Fields keep their own undo for typing, so the editor shortcuts skip them. */
+function isTyping(target: EventTarget | null): boolean {
+  return (
+    target instanceof HTMLElement &&
+    (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))
+  );
+}
+
+/** The editor: top bar, sections on the left, live preview, settings on the right. */
+export function Editor({ onExit }: { onExit: () => void }) {
+  useAutosave();
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || isTyping(e.target)) return;
+      const key = e.key.toLowerCase();
+      const { undo, redo } = useEditor.getState();
+      if (key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        undo();
+      } else if ((key === 'z' && e.shiftKey) || key === 'y') {
+        e.preventDefault();
+        redo();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  return (
+    <div className="grid h-full grid-cols-[17rem_minmax(0,1fr)_20rem] grid-rows-[auto_minmax(0,1fr)] xl:grid-cols-[18rem_minmax(0,1fr)_22rem]">
+      <TopBar onExit={onExit} />
+      <SectionsPanel />
+      <main className="flex min-h-0 min-w-0 flex-col" aria-label="Preview">
+        <Preview />
+      </main>
+      <Inspector />
+      <Tour />
+      <NoticeBar />
+    </div>
+  );
+}

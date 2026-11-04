@@ -213,3 +213,22 @@ describe('export', () => {
     expect(buildZip(files)).toEqual(buildZip(buildExport(clone(), assetData)));
   });
 });
+
+describe('editor preview markers', () => {
+  const html = (editable: boolean) =>
+    String(renderSite(sampleProject, { editable }).find((f) => f.path === 'index.html')?.content);
+
+  it('mark sections and editable text only when asked', () => {
+    const marked = html(true);
+    for (const section of sampleProject.pages[0]?.sections ?? []) {
+      expect(marked).toContain(`data-k-section="${section.id}"`);
+    }
+    expect(marked).toContain('data-k-field="heading"');
+    expect(html(false)).not.toContain('data-k-');
+  });
+
+  it('do not change anything else in the page', () => {
+    const stripped = html(true).replace(/ data-k-(section|field)="[^"]*"/g, '');
+    expect(stripped).toBe(html(false));
+  });
+});
