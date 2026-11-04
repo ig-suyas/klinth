@@ -281,8 +281,8 @@ describe('schema version 3', () => {
     return { ...p, schemaVersion: 2 };
   };
 
-  it('is upgraded past by version 4 (see animation.test.ts)', () => {
-    expect(SCHEMA_VERSION).toBe(4);
+  it('is upgraded past by version 5 (see free.test.ts)', () => {
+    expect(SCHEMA_VERSION).toBe(5);
     expect(Object.keys(MIGRATIONS)).toContain('2');
   });
 

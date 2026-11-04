@@ -44,12 +44,12 @@ export function assetPath(asset: Asset): string {
 // ---- Small helpers. Every piece of user text goes through `esc`. ----
 
 /** Escaped text; single line breaks become `<br>`. */
-function lines(text: string): string {
+export function lines(text: string): string {
   return esc(text.trim()).replace(/\r?\n/g, '<br>');
 }
 
 /** Paragraphs split on blank lines. */
-function paras(text: string | undefined, className = '', attrs = ''): string {
+export function paras(text: string | undefined, className = '', attrs = ''): string {
   const cls = (className ? ` class="${className}"` : '') + attrs;
   return (text ?? '')
     .split(/\r?\n\s*\r?\n/)
@@ -91,11 +91,11 @@ interface ImageRef {
 }
 
 /** Where a file is loaded from: its export path, or (in the preview) a marker the editor fills. */
-function source(asset: Asset, ctx: BlockCtx): string {
+export function source(asset: Asset, ctx: BlockCtx): string {
   return ctx.preview ? ` data-k-asset="${esc(asset.id)}"` : ` src="${esc(assetPath(asset))}"`;
 }
 
-const sizeAttrs = (asset: Asset): string =>
+export const sizeAttrs = (asset: Asset): string =>
   asset.width && asset.height ? ` width="${asset.width}" height="${asset.height}"` : '';
 
 function img(ref: ImageRef, ctx: BlockCtx): string {
@@ -231,7 +231,7 @@ function gallery(p: BlockProps<'gallery'>, ctx: BlockCtx): string {
  * video site until the visitor presses play. Without scripts it is a plain link.
  * Every address is rebuilt from the parsed id, never copied from user input.
  */
-function videoEmbed(url: string, title: string): string {
+export function videoEmbed(url: string, title: string): string {
   const embed = parseVideoUrl(url);
   if (!embed) return '';
   const provider = PROVIDER_NAME[embed.provider];

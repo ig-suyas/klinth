@@ -25,13 +25,13 @@ export const singleLine = (max: number, min = 0) =>
 const optLine = (max: number) => singleLine(max).optional();
 
 /** Empty, or an allowed link (https, mailto, tel or #anchor). */
-const href = z
+export const href = z
   .string()
   .max(2048)
   .refine((v) => v === '' || safeUrl(v) !== null, 'Use a link starting with https://');
 
 /** A YouTube or Vimeo link. Embed code (`<iframe ...>`) is refused with its own message. */
-const embedUrl = z
+export const embedUrl = z
   .string()
   .max(MAX_EMBED_URL_LENGTH)
   .refine((v) => !looksLikeEmbedCode(v), 'Paste the video link, not the embed code')

@@ -121,8 +121,8 @@ describe('schema and migrations', () => {
     };
     expect(runMigrations({ schemaVersion: 1 }, 3, steps)).toEqual({ schemaVersion: 3, a: 1, b: 2 });
     expect(() => runMigrations({ schemaVersion: 1 }, 3, {})).toThrow(/version 1/);
-    // Real steps: 1 -> 2 (styles.test.ts), 2 -> 3 (nav.test.ts), 3 -> 4 (animation.test.ts).
-    expect(Object.keys(MIGRATIONS)).toEqual(['1', '2', '3']);
+    // Real steps: 1 -> 2 (styles.test.ts), 2 -> 3 (nav.test.ts), 3 -> 4 (animation.test.ts), 4 -> 5 (free.test.ts).
+    expect(Object.keys(MIGRATIONS)).toEqual(['1', '2', '3', '4']);
   });
 
   it('requires a home page with unique addresses', () => {

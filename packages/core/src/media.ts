@@ -25,7 +25,12 @@ function visit(value: Json, onRef: (id: string) => void): void {
 export function assetUsage(project: Project): Map<string, number> {
   const counts = new Map<string, number>();
   const add = (id: string) => counts.set(id, (counts.get(id) ?? 0) + 1);
-  for (const page of project.pages) for (const s of page.sections) visit(s.props, add);
+  for (const page of project.pages) {
+    for (const s of page.sections) {
+      visit(s.props, add);
+      if (s.canvas) visit(s.canvas, add);
+    }
+  }
   if (project.meta.favicon) add(project.meta.favicon);
   if (project.meta.header?.logo) add(project.meta.header.logo.image);
   return counts;
@@ -34,7 +39,10 @@ export function assetUsage(project: Project): Map<string, number> {
 /** Ids of the files a list of sections uses (for example one page). */
 export function sectionAssetIds(sections: readonly Section[]): Set<string> {
   const ids = new Set<string>();
-  for (const s of sections) visit(s.props, (id) => ids.add(id));
+  for (const s of sections) {
+    visit(s.props, (id) => ids.add(id));
+    if (s.canvas) visit(s.canvas, (id) => ids.add(id));
+  }
   return ids;
 }
 
@@ -77,6 +85,24 @@ export function removeAsset(project: Project, id: string): Project {
     const images = section.props.images.filter((item) => item.image !== id);
     return { ...section, props: { ...section.props, images } };
   };
+  // A freely placed picture goes with its file (an image item without one is not valid).
+  const dropFreePictures = (section: Section): Section => {
+    if (!section.canvas) return section;
+    const gone = new Set(
+      section.canvas.items.filter((i) => i.type === 'image' && i.image === id).map((i) => i.id),
+    );
+    if (gone.size === 0) return section;
+    const { readingOrder, ...canvas } = section.canvas;
+    const order = readingOrder?.filter((itemId) => !gone.has(itemId));
+    return {
+      ...section,
+      canvas: {
+        ...canvas,
+        ...(order ? { readingOrder: order } : {}),
+        items: canvas.items.filter((i) => !gone.has(i.id)),
+      },
+    };
+  };
   const { favicon, ...rest } = project.meta;
   const meta = favicon === id ? rest : { ...project.meta };
   // A removed logo picture means the header goes back to the site name.
@@ -90,7 +116,9 @@ export function removeAsset(project: Project, id: string): Project {
     meta,
     pages: project.pages.map((page) => ({
       ...page,
-      sections: page.sections.map((s) => strip(dropEmptyPictures(s), id) as Section),
+      sections: page.sections.map(
+        (s) => strip(dropFreePictures(dropEmptyPictures(s)), id) as Section,
+      ),
     })),
     assets: project.assets.filter((a) => a.id !== id),
   };

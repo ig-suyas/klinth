@@ -20,8 +20,63 @@
 | 6D Header links, no header     | done                                  |
 | 6E Animations                  | done                                  |
 | Fix: blank site on first visit | done (owner must fix Pages build)     |
+| 6F Free canvas, Part 1 of 2    | done (model, render, export; no UI)   |
+| 6F Free canvas, Part 2 of 2    | next: editor interaction              |
 
 ## 1. Current state
+
+**6F Part 1 (hidden free canvas: data model, renderer, exporter): schema version 5.** No editor
+UI yet. Concept: free placement is not a menu option; in Part 2 it appears only when the owner
+tries to drag an element freely, after a warning. Flow (the block's own responsive layout) stays
+the default. `MIGRATIONS[4]` changes nothing (older files are all flow); existing projects
+import, render and export byte-identical (no `css/free.css`, no new markup).
+Model (`packages/core/src/free.ts`): every section may carry `layout: 'flow'|'free'` (absent =
+flow) and `canvas`, present exactly when free; only content blocks (not footer, spacer,
+customCode); a free section may only animate as a whole (`animation.section`). Canvas (strict):
+`aspect` (width/height, 0.05-20), optional `phoneAspect`, `items` (max `MAX_FREE_ITEMS` = 100),
+optional `readingOrder` (ids read first; the rest top-then-left). Item: `id`, `x y w h` in % of
+the artboard (start -2..102, size 0.25..104, and x+w / y+h <= 102: `FREE_TOLERANCE` = 2), `z`
+(int 0-9999), optional `phone` box (`hidden?: true`), optional `from` (prop path like
+`heading`, `buttons.0`, `items.2.image`; regex-limited, no `constructor`/`prototype`). Types:
+`text` (`style` title|subtitle|body, `text` <= 4000, `size` in cqw 0.25-25, `align`), `image`
+(asset id, `imageAlt`, `fit`), `video` (YouTube/Vimeo `embedUrl` via the existing schema,
+`title`), `button` (`label`, `href` through the existing allow-list, `size`, `variant`). Unique
+ids, reading-order ids must exist, `phoneAspect` requires a phone box on every item. New import
+limit: `MAX_FREE_SECTIONS` = 20 free sections per page (5 MB, depth 16 unchanged; a canvas nests 9
+deep). `freeWarnings(section)` lists pictures with no description (warn, not block).
+Render/export (`render-free.ts`): a free section is `block block-<type> block-free` (keeps the
+block's padding) with `.wrap > .free-board` (`aspect-ratio`, `container-type:inline-size`).
+Items are real elements in DOM = reading order: first title = the section level (the page's one
+h1, else h2), later titles h2, subtitles level+1, body = `<div><p>...`, `<img>` (lazy unless
+first section), `<a class="button">` (unsafe/empty link = `<span>`), video = the existing
+click-to-load facade. `style` holds only `--x/--y/--w/--h/--z/--fs` (+ `--px/--py/--pw/--ph`,
+board `--ar/--par`) from validated numbers (3 decimals, no exponent). Text size is cqw, so the
+board looks identical at every width >= 37.5rem. `<= 37.49rem`: `.free-stack` turns the board
+into a column in reading order with normal site text sizes; with `phoneAspect`, `.free-phone`
+uses the phone boxes instead. `css/free.css` is written and linked only for pages with a free
+section; the editor preview inlines it like `anim.css`. `data-free="<id>"` on items in exports;
+`data-k-item` only in the editable preview.
+Conversions (pure, no DOM): `flowToFree(section, {width, height, elements:[{from, x, y, width,
+height, fontSize?}]})` (px relative to the section's `.wrap`, stacking order = list order) places
+each element at its measured spot (rounding < 0.02 px), pulls slight overflow back inside the
+tolerance, lists unusable elements in `skipped`, keeps only a whole-section animation.
+`freeToFlow(section)` ("return to optimized layout") drops layout, canvas and positions and
+writes each item's content back to its `from` prop; items added on the canvas, or whose content
+the block cannot hold (checked with the block schema), come back in `dropped`. Unedited flow ->
+free -> flow returns the same section. Media: free pictures count in `assetUsage` /
+`sectionAssetIds` (so export keeps their files); `removeAsset` drops free image items.
+Checked in Chromium on an exported site: items at the exact stored % at 1440/1024/768, stacked in
+reading order at 375, no horizontal overflow. Tests: core `free.test.ts` (33: bounds, 100-item
+cap, malicious values, unsafe links/embeds, bind paths, conversions within 0.5 px, reverse
+conversion, valid markup and heading levels, reading order, phone fallback, escaping, assets,
+migration, round trips, key/token guard). Version-pinned tests (core and 3 e2e) updated to 5 on
+purpose. Totals: 801 unit (core 519, templates 46, editor 180, api 56). Not deployed.
+**Part 2 (next session): editor interaction.** Drag-to-free with the warning, measuring the flow
+layout for `flowToFree`, moving/resizing/z-order, reading-order and phone-box editing, the
+"Return to optimized layout" action showing `dropped`, alt-text warnings in the panel. Also
+decide: AI helper on free sections (the Worker returns props only, canvas would go stale; keep
+canvas and write props, or block AI there) and a readable-size warning (body text at 1.5 cqw is
+about 10.6 px on a 768 px tablet).
 
 **Fix: live site blank for new visitors (2026-11-05).** Symptom: blank white page, empty
 templates, stuck "add section", no touch, for everyone except the owner's own Chrome.
@@ -376,6 +431,9 @@ All phases done; only the push to `github.com/ig-suyas/klinth` (public) waits fo
 repos at ₹0.
 
 ## 3. Files
+
+- `packages/core/src/free.ts` (+ `free.test.ts`) : free canvas schema, reading order, warnings,
+  `flowToFree` / `freeToFlow`; `render-free.ts` : `FREE_CSS`, `renderFreeBoard`, `pageHasFree`
 
 - `wrangler.toml` (root) : Pages output dir for Git builds; `e2e/fresh-start.spec.ts` : first visit
 - `apps/editor/src/lib/storage.ts` : in-memory fallback, `resetLocalData`; `lib/zod-config.ts`

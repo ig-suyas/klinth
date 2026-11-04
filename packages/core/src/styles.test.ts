@@ -118,8 +118,8 @@ describe('schema version 2', () => {
     return { ...p, schemaVersion: 1 };
   };
 
-  it('has an upgrade step (version 4 is now current, see animation.test.ts)', () => {
-    expect(SCHEMA_VERSION).toBe(4);
+  it('has an upgrade step (version 5 is now current, see free.test.ts)', () => {
+    expect(SCHEMA_VERSION).toBe(5);
     expect(Object.keys(MIGRATIONS)).toContain('1');
   });
 

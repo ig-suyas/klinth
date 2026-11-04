@@ -20,6 +20,9 @@ export const MIGRATIONS: Readonly<Record<number, Migration>> = {
   // 3 -> 4: sections can carry animation settings (optional). Older files have none, so
   // nothing changes; the new version stops older editors from dropping the settings.
   3: (data) => ({ ...data }),
+  // 4 -> 5: sections can be laid out freely (`layout: 'free'` + `canvas`). Older files are all
+  // flow, so nothing changes; the new version stops older editors from dropping free sections.
+  4: (data) => ({ ...data }),
 };
 
 export class ProjectError extends Error {

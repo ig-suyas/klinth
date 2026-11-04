@@ -130,10 +130,10 @@ describe('animation settings schema', () => {
   });
 
   it('upgrades a version 3 project and keeps animations through a project file', () => {
-    expect(SCHEMA_VERSION).toBe(4);
-    expect(Object.keys(MIGRATIONS)).toEqual(['1', '2', '3']);
+    expect(SCHEMA_VERSION).toBe(5);
+    expect(Object.keys(MIGRATIONS)).toEqual(['1', '2', '3', '4']);
     const upgraded = migrateProject({ ...clone(), schemaVersion: 3 });
-    expect(upgraded.schemaVersion).toBe(4);
+    expect(upgraded.schemaVersion).toBe(5);
     expect(upgraded.pages).toEqual(clone().pages);
     const back = parseProjectFile(serializeProject(animated()));
     expect(must(must(back.pages[0]).sections[0]).animation).toEqual(
@@ -143,7 +143,7 @@ describe('animation settings schema', () => {
 
   it('refuses an imported file with bad animation settings', () => {
     const bad = withAnimation({ heading: { preset: 'fade', delay: 99999 } }) as Project;
-    expect(() => parseProjectFile(JSON.stringify({ ...bad, schemaVersion: 4 }))).toThrow(/damaged/);
+    expect(() => parseProjectFile(JSON.stringify({ ...bad, schemaVersion: 5 }))).toThrow(/damaged/);
   });
 });
 

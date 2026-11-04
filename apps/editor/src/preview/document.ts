@@ -1,5 +1,6 @@
 import {
   ANIM_CSS_PATH,
+  FREE_CSS_PATH,
   ANIM_JS_PATH,
   CUSTOM_CSS_PATH,
   CUSTOM_JS_PATH,
@@ -134,6 +135,10 @@ export function buildPreviewDocument(
         () => `<style>${fileText(files, ANIM_CSS_PATH)}</style>\n`,
       )
       .replace(animJsTag, () => '')
+      .replace(
+        `<link rel="stylesheet" href="${FREE_CSS_PATH}">\n`,
+        () => `<style>${fileText(files, FREE_CSS_PATH)}</style>\n`,
+      )
       .replace(`<link rel="stylesheet" href="${CUSTOM_CSS_PATH}">\n`, () => custom.css)
       .replace(`<script src="${CUSTOM_JS_PATH}"></script>\n`, () => custom.js)
       .replace('<script src="js/site.js" defer></script>', () => '')

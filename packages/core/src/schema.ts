@@ -11,8 +11,15 @@ import {
   hasAnimation,
   sectionAnimationSchema,
 } from './animation.ts';
+import {
+  LAYOUT_MODES,
+  MAX_FREE_SECTIONS,
+  freeCanvas,
+  freeCanvasSchema,
+  freeSectionProblem,
+} from './free.ts';
 
-export const SCHEMA_VERSION = 4;
+export const SCHEMA_VERSION = 5;
 
 export { HEADER_STYLES, type HeaderStyle } from './header.ts';
 
@@ -69,6 +76,10 @@ const sectionOf = <T extends BlockType>(type: T) =>
       anchor: anchorSchema.optional(),
       /** Animation presets for the section and its parts (checked per block type on the page). */
       animation: sectionAnimationSchema.optional(),
+      /** `flow` (the default when absent): the block's own responsive layout. `free`: `canvas`. */
+      layout: z.enum(LAYOUT_MODES).optional(),
+      /** Freely placed items; present exactly when `layout` is `free` (see free.ts). */
+      canvas: freeCanvasSchema.optional(),
       props: blockPropSchemas[type],
     })
     .strict();
@@ -115,7 +126,15 @@ export const pageSchema = z
         sections.forEach((section, i) => {
           const problem = section.animation && animationProblem(section.type, section.animation);
           if (problem) ctx.addIssue({ code: 'custom', path: [i, 'animation'], message: problem });
+          const layout = freeSectionProblem(section);
+          if (layout) ctx.addIssue({ code: 'custom', path: [i, 'layout'], message: layout });
         });
+        if (sections.filter((s) => freeCanvas(s) !== null).length > MAX_FREE_SECTIONS) {
+          ctx.addIssue({
+            code: 'custom',
+            message: `A page can have up to ${MAX_FREE_SECTIONS} freely placed sections`,
+          });
+        }
         if (sections.filter((s) => hasAnimation(s.animation)).length > MAX_ANIMATED_SECTIONS) {
           ctx.addIssue({
             code: 'custom',
