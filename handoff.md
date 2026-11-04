@@ -21,9 +21,81 @@
 | 6E Animations                  | done                                  |
 | Fix: blank site on first visit | done (owner must fix Pages build)     |
 | 6F Free canvas, Part 1 of 2    | done (model, render, export; no UI)   |
-| 6F Free canvas, Part 2 of 2    | next: editor interaction              |
+| 6F Free canvas, Part 2 of 2    | done (drag to free, warning, editing) |
 
 ## 1. Current state
+
+**6F Part 2 (hidden free canvas: editor interaction).** Schema unchanged (v5); Part 1's
+`free.ts` / `render-free.ts` untouched. No menu item: free layout appears only when the owner
+**double-clicks** an element of a flow section in the preview (a second press within 500 ms and
+10 px of the first) and then **drags it more than 8 px**. Plain clicks, a press-and-drag (text
+selection), two slow clicks, small wobbles, resize handles and the section list never ask (all
+tested). The double-click still starts typing in place as before (so a quick "click to select,
+click to type" keeps working); it also arms move mode (dashed outline), and only a drag after it
+asks. Preview markers: `render-blocks.ts` now adds `data-k-from="<prop path>"` (editable
+preview only; exports byte-identical, the core test strips it like the other markers) to every
+element `flowToFree` can take: head fields, status, buttons.N, image, facts.N.label/value,
+button, images.N.image/caption, embedUrl (the `.video-frame`), video (uploaded file: lands in
+`skipped`), items.N.{image,title,description,link,quote,name,role}, links items.N, email, phone.
+Flow: the bridge measures every marked element relative to the section's `.wrap` content box
+(paragraphs of one field = one box; stacking = page order) **before** anything moves, sends
+`freeIntent {id, from, dx, dy, measure}`, and the element follows the pointer through the CSS
+`translate` property (`--k-drag`; never `transform`, so reveal/animation transforms cannot fight
+it). The editor shows the warning (`ui/FreeLayoutDialog.tsx` on `ui/ConfirmDialog.tsx`: portal
+to `<body>`, `aria-modal`, labelled + described, focus starts on "No", Tab/Shift+Tab trapped, Esc =
+No, focus returns): "Free positioning can hurt your SEO, accessibility and how the page looks on
+phones. Continue?", "Yes, use free layout" / "No, keep the optimized layout", "Don't ask again for
+this section" (localStorage `klinth.freeAsk`, `projectId:sectionId` -> yes|no, max 200; a
+remembered No shows "Free positioning is off for this section. Ask me again" in the section
+settings). **No**: `freeDecision false`, the element slides back, project, history and save
+status untouched. **Yes**: `convertToFree` (editor `state/free.ts`) = Part 1 `flowToFree` with the
+measurement, then the dragged item moves by the final drag (px -> % of the board), clamped; one
+`change()` = one undo step; the dragged item is selected; notice with Undo (and how many parts
+were skipped). While the button is still held the whole dialog is `pointer-events:none`, so the
+drag goes on in the preview under it (the dialog can appear right under the pointer); the bridge
+also reports `freeDrag` positions and the editor treats its own `pointerup` as the drop, and Yes
+pressed while still holding waits for the drop (`state/free-intent.ts`).
+Inside a free section (bridge, `preview/free-bridge.ts`, inserted into `BRIDGE_JS`): click selects
+an item (frame with 8 handles, `freeSelect`), drag moves it with snapping to other items' edges and
+centres, the board's edges and middle (6 px) and a 2.5% grid (only on an axis that moved; Alt =
+off; pink guide lines, faint grid while dragging), handles resize (pictures and videos keep their
+ratio, Shift locks any item), arrow keys nudge 0.5% (Shift 5%), everything clamped inside the
+artboard, double-click or Enter edits text in place (Esc cancels, Enter saves titles, `freeText`),
+Ctrl/Cmd+Z/Y inside the preview go to the editor (`history`), "Free layout" badge on the section
+(and in the sections list). The geometry (`preview/free-geometry.ts`: `clampBox`, `moveBox`,
+`snapBox`, `resizeBox`) is unit-tested and copied into the frame with `fn.toString()` (each
+function is self-contained on purpose). Moves are applied in the frame at once and sent on
+release as `freeChange`; the editor validates (Zod: finite, bounded numbers, id regex, path
+regex), clamps again, saves, and **skips the redraw for that one change** (`live` ref in
+`Preview.tsx`; never when another redraw is pending), so drags and nudges keep focus. Nudges
+within 1 s are one undo step; every drag, resize and panel change is its own. Refused changes
+redraw. Settings panel (`inspector/FreePanel.tsx`) replaces the block fields for a free section:
+explanation, "See it on a phone", things to check (pictures without a description from
+`freeWarnings`, text under 12 px on a 768 px tablet from `readableSizeWarnings`), items in
+reading order, the selected item's text/size/align, picture description/fit, button text/link,
+video title, position and size in %, Bring forward / Send back, and "Return to optimized layout"
+(confirm dialog; `freeToFlow`; notice with Undo, says how many canvas-only items were dropped).
+Decisions: the AI helper is hidden on free sections (it writes block props, which the canvas does
+not show); a free section's Animation panel offers only "Whole section" (positions use left/top,
+the section animation moves the whole `.wrap`, so they never conflict); the sections list title
+uses the canvas title. Phones: the live phone preview shows the stacked reading order; editing a
+custom phone arrangement is wired in the bridge (`--px...` vars, `phone: true`) but there is **no
+UI to create phone boxes yet** (optional item 5, not done).
+Checked: Lighthouse 13.6 on the portfolio export with the intro and about sections converted from
+a real Chrome measurement (`npm run lighthouse:free -w @klinth/editor`, mobile and desktop):
+Accessibility 100 / SEO 100 on both. Tests: core `free-marks.test.ts`; editor
+`preview/free-geometry.test.ts`, `state/free.test.ts` (conversion keeps the drag, clamping, z-order,
+text, readable size, return, undo/redo across conversion and every move),
+`state/free-intent.test.ts` (asks first, No changes nothing, Yes keeps the drag, Yes while held,
+release over the editor, don't ask again), `preview/free-bridge.test.ts` (fresh jsdom per test:
+the threshold, never on clicks/selection/wobbles, No puts it back, select/move/resize without a
+question, nudge and clamp, undo keys), `ui/FreeLayoutDialog.test.tsx` (focus, trap, Esc); e2e
+`free-layout.spec.ts` (double-click, drag, warning, Esc = No, Yes, badge, width from the panel,
+move, nudges to the edge, undo x4 back to flow and redo, export ZIP; don't ask again, inline text
+edit, resize, z-order, phone stacking, return with confirm; reordering the list never asks).
+`App.test.tsx` load budgets raised to 15 s (the lazy screens took 5 s+ only when all 28 files run
+in parallel; 0.4 s alone). Totals: 838 unit (core 522, templates 46, editor 214, api 56), 37 e2e
+(`--workers=1`, all pass).
 
 **6F Part 1 (hidden free canvas: data model, renderer, exporter): schema version 5.** No editor
 UI yet. Concept: free placement is not a menu option; in Part 2 it appears only when the owner
@@ -71,12 +143,8 @@ cap, malicious values, unsafe links/embeds, bind paths, conversions within 0.5 p
 conversion, valid markup and heading levels, reading order, phone fallback, escaping, assets,
 migration, round trips, key/token guard). Version-pinned tests (core and 3 e2e) updated to 5 on
 purpose. Totals: 801 unit (core 519, templates 46, editor 180, api 56). Not deployed.
-**Part 2 (next session): editor interaction.** Drag-to-free with the warning, measuring the flow
-layout for `flowToFree`, moving/resizing/z-order, reading-order and phone-box editing, the
-"Return to optimized layout" action showing `dropped`, alt-text warnings in the panel. Also
-decide: AI helper on free sections (the Worker returns props only, canvas would go stale; keep
-canvas and write props, or block AI there) and a readable-size warning (body text at 1.5 cqw is
-about 10.6 px on a 768 px tablet).
+Part 2 (above) added the editor interaction; still open from this list: manual reading-order
+editing and phone-box editing UI.
 
 **Fix: live site blank for new visitors (2026-11-05).** Symptom: blank white page, empty
 templates, stuck "add section", no touch, for everyone except the owner's own Chrome.
@@ -432,6 +500,13 @@ repos at ₹0.
 
 ## 3. Files
 
+- `apps/editor/src/preview/free-bridge.ts` : free layout gestures inside the preview frame;
+  `free-geometry.ts` : box maths (also copied into the frame); `free-messages.ts` : editor side
+- `apps/editor/src/state/free.ts` : `convertToFree`, `setItemBox`, `nudgeItem`, `restackItem`,
+  `updateFreeItem`, `returnToFlow`, warnings; `state/free-intent.ts` : warning flow, choices
+- `apps/editor/src/ui/FreeLayoutDialog.tsx`, `ui/ConfirmDialog.tsx`, `inspector/FreePanel.tsx`
+- `apps/editor/scripts/lighthouse-free.ts` : Lighthouse on an export with free sections
+- `apps/editor/e2e/free-layout.spec.ts` : the whole flow in Chrome
 - `packages/core/src/free.ts` (+ `free.test.ts`) : free canvas schema, reading order, warnings,
   `flowToFree` / `freeToFlow`; `render-free.ts` : `FREE_CSS`, `renderFreeBoard`, `pageHasFree`
 
@@ -528,6 +603,20 @@ repos at ₹0.
 
 ## 5. What didn't work
 
+- Free layout warning: the dialog opened under the pointer mid-drag, so moves and the release went
+  to the editor, not the preview (the drop was lost and "Yes" waited forever). Fixed with
+  `pointer-events:none` on the whole dialog while the button is held, `freeDrag` updates and the
+  editor's own `pointerup` as a fallback.
+- `spawnSync` for Lighthouse blocked the script's own static server: Lighthouse reported
+  `TARGET_CRASHED`. Async `spawn` works. `--chrome-flags=--headless=new` also crashed here; plain
+  `--headless` works.
+- After the preview script sets a CSS variable, Chrome serialises the style as `--x: 1` (with a
+  space); tests that read the attribute must allow it.
+- A flow heading is measured at its block width (nearly the whole text column), so right after
+  conversion it can only move down; the owner makes it narrower first (handle or Width field).
+- `git worktree add` for a baseline run: the worktree cannot resolve the workspace packages; not
+  useful here.
+
 - `_headers`: a second block for a path that already has one (`/preview` + `Cache-Control`)
   replaced the first on Pages, so `/preview` got the editor CSP (`frame-ancestors 'none'`) and the
   live preview was blocked after deploy e3ab8fd3. One block per path now (unit test checks it).
@@ -568,5 +657,9 @@ repos at ₹0.
    workers.dev subdomain in the dashboard (then update `.env.deploy` and redeploy the editor).
 4. Low: Lighthouse re-run on live exported sites; Turnstile only if abuse appears; zod/mini to trim
    the main chunk; eslint minimatch moderate advisories (dev only) clear with an eslint update;
-   `stash@{0}` can be dropped. Item-level inline editing is inspector-only.
-5. Re-check yearly or when Google announces changes: `GEMINI_MODEL` (`gemini-3.6-flash`) still free.
+   `stash@{0}` can be dropped. Item-level inline editing is inspector-only (flow sections).
+5. Free layout, optional: UI to arrange items for phones (phone boxes; the bridge already edits
+   them), manual reading-order editing, snapping while resizing. Touch: pointer events and
+   `touch-action:none` are in place but the double-tap-and-drag gesture was not tried on a real
+   iPad/iPhone.
+6. Re-check yearly or when Google announces changes: `GEMINI_MODEL` (`gemini-3.6-flash`) still free.

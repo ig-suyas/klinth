@@ -1,4 +1,4 @@
-import type { Section } from '@klinth/core';
+import { freeCanvas, type Section } from '@klinth/core';
 import { blockDefinitions } from '@klinth/templates';
 import { AnimatePresence, Reorder, motion, useDragControls, useReducedMotion } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
@@ -91,6 +91,7 @@ function SectionRow({
   const controls = useDragControls();
   const label = blockDefinitions[section.type].label;
   const title = sectionTitle(section);
+  const free = freeCanvas(section) !== null;
 
   return (
     <Reorder.Item
@@ -118,23 +119,32 @@ function SectionRow({
         onClick={() => select(section.id)}
       >
         <span className="block truncate text-sm font-medium">{title}</span>
-        <span className="block truncate text-xs text-ink-soft">{label}</span>
+        <span className="flex items-center gap-1.5 truncate text-xs text-ink-soft">
+          {label}
+          {free ? (
+            <span className="rounded-full bg-ink px-1.5 py-px text-[0.625rem] font-semibold text-panel">
+              Free layout
+            </span>
+          ) : null}
+        </span>
       </button>
       <span
         className={`flex shrink-0 ${selected ? '' : 'opacity-0 group-focus-within:opacity-100 group-hover:opacity-100'}`}
       >
-        <button
-          type="button"
-          className="icon-btn size-7 text-accent"
-          aria-label={`Ask AI about ${label}`}
-          title="Ask AI to write or restyle this section"
-          onClick={() => {
-            select(section.id);
-            openPanel(section.id);
-          }}
-        >
-          <Icon name="sparkle" className="size-3.5" />
-        </button>
+        {free ? null : (
+          <button
+            type="button"
+            className="icon-btn size-7 text-accent"
+            aria-label={`Ask AI about ${label}`}
+            title="Ask AI to write or restyle this section"
+            onClick={() => {
+              select(section.id);
+              openPanel(section.id);
+            }}
+          >
+            <Icon name="sparkle" className="size-3.5" />
+          </button>
+        )}
         <button
           type="button"
           className="icon-btn size-7"

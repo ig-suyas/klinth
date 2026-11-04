@@ -1,4 +1,11 @@
-import type { BlockType, Page, Project, Section } from '@klinth/core';
+import {
+  freeCanvas,
+  freeTitle,
+  type BlockType,
+  type Page,
+  type Project,
+  type Section,
+} from '@klinth/core';
 import { blockDefinitions } from '@klinth/templates';
 
 /**
@@ -142,6 +149,10 @@ export function reorderSections(
 
 /** The short name shown in the sections list: its heading, or the block's label. */
 export function sectionTitle(section: Section): string {
+  // A free section shows its own title item (the block's props keep the flow text).
+  const canvas = freeCanvas(section);
+  const title = canvas ? freeTitle(canvas).replace(/\s+/g, ' ') : '';
+  if (title) return title;
   const props: Props = section.props;
   const text = [props.heading, props.text, props.eyebrow].find(
     (v): v is string => typeof v === 'string' && v.trim() !== '',

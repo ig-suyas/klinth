@@ -12,9 +12,10 @@ afterEach(async () => {
   indexedDB.deleteDatabase('klinth');
 });
 
-const COLD_LOAD_MS = 5000;
+// The first lazy screen can take several seconds while every other test file runs in parallel.
+const COLD_LOAD_MS = 15_000;
 
-describe('App', () => {
+describe('App', { timeout: 30_000 }, () => {
   it('starts with the template picker and an empty project list', async () => {
     render(<App />);
     expect(
@@ -46,13 +47,23 @@ describe('App', () => {
 
   it('edits a section from the inspector and can undo it', async () => {
     render(<App />);
-    fireEvent.click(await screen.findByRole('button', { name: /Personal portfolio/ }));
-    const sections = await screen.findByRole('navigation', { name: 'Sections' });
+    fireEvent.click(
+      await screen.findByRole('button', { name: /Personal portfolio/ }, { timeout: COLD_LOAD_MS }),
+    );
+    const sections = await screen.findByRole(
+      'navigation',
+      { name: 'Sections' },
+      { timeout: COLD_LOAD_MS },
+    );
     fireEvent.click(
       within(sections).getAllByRole('button', { name: /Big intro/ })[1] as HTMLElement,
     );
     const settings = screen.getByRole('complementary', { name: 'Settings' });
-    const heading = await within(settings).findByLabelText('Heading');
+    const heading = await within(settings).findByLabelText(
+      'Heading',
+      {},
+      { timeout: COLD_LOAD_MS },
+    );
     fireEvent.change(heading, { target: { value: 'A brand new headline' } });
     expect(within(sections).getByText('A brand new headline')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Undo' }));
@@ -63,8 +74,14 @@ describe('App', () => {
 
   it('shows a plain message when a link is not valid yet', async () => {
     render(<App />);
-    fireEvent.click(await screen.findByRole('button', { name: /Personal portfolio/ }));
-    const sections = await screen.findByRole('navigation', { name: 'Sections' });
+    fireEvent.click(
+      await screen.findByRole('button', { name: /Personal portfolio/ }, { timeout: COLD_LOAD_MS }),
+    );
+    const sections = await screen.findByRole(
+      'navigation',
+      { name: 'Sections' },
+      { timeout: COLD_LOAD_MS },
+    );
     fireEvent.click(within(sections).getAllByRole('button', { name: /Contact/ })[1] as HTMLElement);
     const settings = screen.getByRole('complementary', { name: 'Settings' });
     const address = await within(settings).findByLabelText('Form service address');

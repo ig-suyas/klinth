@@ -1,5 +1,9 @@
 import {
   ANIM_CSS_PATH,
+  FREE_BLOCKS,
+  MAX_FREE_ITEMS,
+  bindPathSchema,
+  freeCanvas,
   FREE_CSS_PATH,
   ANIM_JS_PATH,
   CUSTOM_CSS_PATH,
@@ -29,6 +33,8 @@ export interface PreviewOptions {
   scrollTo?: string | null;
   /** `data:` addresses of the bundled fonts by file name (see lib/fonts.ts). */
   fontUrls?: Readonly<Record<string, string>>;
+  /** The selected item of a free section (its frame is drawn after the redraw). */
+  freeItem?: string | null;
 }
 
 /** `@font-face` rules for the fonts that are loaded; the rest use their fallbacks. */
@@ -112,6 +118,12 @@ export function buildPreviewDocument(
     selected: options.selectedId ?? null,
     page: page.slug,
     scrollTo: options.scrollTo ?? null,
+    // Sections whose elements may be dragged out of the optimized layout, and free ones.
+    freeable: page.sections
+      .filter((s) => FREE_BLOCKS.has(s.type) && freeCanvas(s) === null)
+      .map((s) => s.id),
+    free: page.sections.filter((s) => freeCanvas(s) !== null).map((s) => s.id),
+    item: options.freeItem ?? null,
   };
   const bridge = options.interactive
     ? `<script>window.__klinth=${scriptJson(config)};${BRIDGE_JS}</script>\n`
@@ -151,6 +163,12 @@ export function buildPreviewDocument(
   );
 }
 
+const sectionId = z.string().max(64);
+const itemId = z.string().regex(/^[A-Za-z0-9_-]{1,64}$/);
+/** Pixels in the preview: finite and of a sane size. */
+const px = z.number().finite().min(-100_000).max(100_000);
+const percent = z.number().finite().min(-1_000).max(1_000);
+
 /** Messages the preview frame may send. Anything else is ignored. */
 export const previewMessageSchema = z.discriminatedUnion('type', [
   /** The empty preview page has loaded and waits for the page to show. */
@@ -189,6 +207,66 @@ export const previewMessageSchema = z.discriminatedUnion('type', [
     source: z.literal('klinth-preview'),
     type: z.literal('scroll'),
     y: z.number().int().min(0).max(1_000_000),
+  }),
+  /** Ctrl/Cmd+Z, Ctrl/Cmd+Shift+Z or Ctrl/Cmd+Y pressed inside the preview. */
+  z.object({
+    source: z.literal('klinth-preview'),
+    type: z.literal('history'),
+    action: z.enum(['undo', 'redo']),
+  }),
+  /** A double-clicked element was dragged past the threshold: ask before going free. */
+  z.object({
+    source: z.literal('klinth-preview'),
+    type: z.literal('freeIntent'),
+    id: sectionId,
+    from: bindPathSchema,
+    dx: px,
+    dy: px,
+    measure: z.object({
+      width: z.number().finite().positive().max(100_000),
+      height: z.number().finite().positive().max(100_000),
+      elements: z
+        .array(
+          z.object({
+            from: bindPathSchema,
+            x: px,
+            y: px,
+            width: z.number().finite().min(0).max(100_000),
+            height: z.number().finite().min(0).max(100_000),
+            fontSize: z.number().finite().positive().max(1_000).optional(),
+          }),
+        )
+        .max(MAX_FREE_ITEMS),
+    }),
+  }),
+  /** Where the element is while the pointer is still held after a `freeIntent`. */
+  z.object({ source: z.literal('klinth-preview'), type: z.literal('freeDrag'), dx: px, dy: px }),
+  /** The pointer was let go after a `freeIntent`. */
+  z.object({ source: z.literal('klinth-preview'), type: z.literal('freeDrop'), dx: px, dy: px }),
+  /** An item of a free section was selected (or none). */
+  z.object({
+    source: z.literal('klinth-preview'),
+    type: z.literal('freeSelect'),
+    id: sectionId,
+    item: itemId.nullable(),
+  }),
+  /** An item was moved, resized or nudged; the preview already shows it. */
+  z.object({
+    source: z.literal('klinth-preview'),
+    type: z.literal('freeChange'),
+    id: sectionId,
+    item: itemId,
+    box: z.object({ x: percent, y: percent, w: percent, h: percent }),
+    nudge: z.literal(true).optional(),
+    phone: z.literal(true).optional(),
+  }),
+  /** Text of a free item edited in place. */
+  z.object({
+    source: z.literal('klinth-preview'),
+    type: z.literal('freeText'),
+    id: sectionId,
+    item: itemId,
+    text: z.string().min(1).max(10_000),
   }),
 ]);
 

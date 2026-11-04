@@ -1,10 +1,14 @@
+import { FREE_BRIDGE_CSS, FREE_BRIDGE_JS } from './free-bridge.ts';
+
 /**
  * The small script that runs inside the sandboxed preview frame. It has no
  * access to the editor: it only talks to the editor (`window.top`; its direct
  * parent is the preview.html shell) through `postMessage`.
  * Sent to the editor: `ready`, `select`, `edit`, `scroll`, `header` (header clicked),
- * `removeHeader` and `navigate` (a header link to another page). Received: `select`,
- * and `assets` (uploaded files as Blobs, shown through this frame's own blob: addresses).
+ * `removeHeader`, `navigate` (a header link to another page), `history` (undo/redo keys)
+ * and the free layout messages (see free-bridge.ts). Received: `select`, `assets`
+ * (uploaded files as Blobs, shown through this frame's own blob: addresses),
+ * `freeDecision` and `freeItem`.
  * Custom code frames inside the page may only report their height.
  *
  * Written as plain ES5 in a string because it is injected into `srcdoc`.
@@ -146,11 +150,14 @@ export const BRIDGE_JS = `(function () {
     el.focus();
   }
 
+${FREE_BRIDGE_JS}
+
   // Capture phase: runs before the site script, which then sees defaultPrevented
   // and leaves video players unloaded in the preview.
   document.addEventListener('click', function (e) {
     var target = e.target;
     if (toolbar && toolbar.contains(target)) return;
+    if (FREE.click(e)) return;
     var inHeader = header && header.contains(target);
     // The header's Menu button still opens its panel, so its links can be tried.
     if (inHeader && target.closest('summary')) return;
@@ -187,6 +194,8 @@ export const BRIDGE_JS = `(function () {
   document.body.addEventListener('click', function () {});
 
   document.addEventListener('dblclick', function (e) {
+    // In a section that can be placed freely, a double-click starts moving the element.
+    if (FREE.dblclick(e)) return;
     var fieldEl = e.target.closest('[data-k-field]');
     var section = sectionOf(fieldEl);
     if (fieldEl && section && !editing) startEditing(fieldEl, section);
@@ -195,6 +204,7 @@ export const BRIDGE_JS = `(function () {
   document.addEventListener('submit', function (e) { e.preventDefault(); });
 
   document.addEventListener('keydown', function (e) {
+    if (FREE.keydown(e)) return;
     if (!editing) return;
     if (e.key === 'Escape') { e.preventDefault(); stopEditing(false); }
     else if (e.key === 'Enter' && !e.shiftKey && !PARAGRAPH_FIELDS[editing.field]) {
@@ -205,6 +215,7 @@ export const BRIDGE_JS = `(function () {
 
   document.addEventListener('focusout', function (e) {
     if (editing && e.target === editing.el) stopEditing(true);
+    FREE.focusout(e);
   });
 
   var scrollTimer = 0;
@@ -244,17 +255,20 @@ export const BRIDGE_JS = `(function () {
     if (e.source !== window.top || e.data.source !== 'klinth-editor') return;
     if (e.data.type === 'select') mark(e.data.id, true);
     else if (e.data.type === 'assets') showAssets(e.data.items);
+    else if (e.data.type === 'freeDecision') FREE.decided(e.data.accept === true);
+    else if (e.data.type === 'freeItem') FREE.select(typeof e.data.item === 'string' ? e.data.item : null);
   });
 
   if (cfg.scrollTo) scrollToAnchor(cfg.scrollTo, false);
   else if (cfg.scrollY) window.scrollTo(0, cfg.scrollY);
   if (selected) mark(selected, false);
+  FREE.redraw();
   send({ type: 'ready' });
 })();
 `;
 
 /** Highlights for hover, selection and in-place editing. Preview only. */
-export const BRIDGE_CSS = `
+export const BRIDGE_CSS = `${FREE_BRIDGE_CSS}
 [data-k-section] { cursor: pointer; outline-offset: -2px; }
 [data-k-section]:hover { outline: 2px dashed rgba(194, 65, 12, 0.45); }
 [data-k-section].k-selected { outline: 2px solid #c2410c; }

@@ -1,9 +1,12 @@
-import type { Asset, Section } from '@klinth/core';
+import { freeCanvas, type Asset, type Section } from '@klinth/core';
 import { blockDefinitions } from '@klinth/templates';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
+import { useState } from 'react';
 import { AiPanel } from '../ai/AiPanel.tsx';
 import { useAi } from '../ai/store.ts';
 import { withAsset } from '../media/files.ts';
+import { canBeFree } from '../state/free.ts';
+import { freeChoice, rememberFreeChoice } from '../state/free-intent.ts';
 import { setSectionProps, type Props } from '../state/sections.ts';
 import { currentPage, useEditor } from '../state/store.ts';
 import { useSectionActions } from '../state/useSectionActions.ts';
@@ -11,6 +14,7 @@ import { Icon } from '../ui/Icon.tsx';
 import { AnimationPanel } from './AnimationPanel.tsx';
 import { Field } from './Fields.tsx';
 import { blockFields } from './fields.ts';
+import { FreePanel } from './FreePanel.tsx';
 import { ThemePanel } from './ThemePanel.tsx';
 
 /** The right panel: the selected section's settings, or the site style. */
@@ -93,6 +97,8 @@ function SectionSettings({ section }: { section: Section }) {
   const openPanel = useAi((s) => s.openPanel);
   const definition = blockDefinitions[section.type];
   const props: Props = section.props;
+  // The AI helper writes the block's own fields, which a free layout does not show.
+  const free = freeCanvas(section) !== null;
   const save = (next: Props, key: string, newAsset?: Asset) => {
     const problem = change(
       (p) => setSectionProps(withAsset(p, newAsset), pageIndex, section.id, next),
@@ -109,34 +115,45 @@ function SectionSettings({ section }: { section: Section }) {
           <h2 className="mt-1 font-display text-xl">{definition.label}</h2>
           <p className="help">{definition.description}</p>
         </div>
-        <button
-          type="button"
-          className={`btn shrink-0 px-2.5 ${aiOpen ? 'btn-primary' : 'btn-line'}`}
-          aria-expanded={aiOpen}
-          onClick={() => openPanel(aiOpen ? null : section.id)}
-        >
-          <Icon name="sparkle" className={`size-4 ${aiOpen ? '' : 'text-accent'}`} />
-          Ask AI
-        </button>
+        {free ? null : (
+          <button
+            type="button"
+            className={`btn shrink-0 px-2.5 ${aiOpen ? 'btn-primary' : 'btn-line'}`}
+            aria-expanded={aiOpen}
+            onClick={() => openPanel(aiOpen ? null : section.id)}
+          >
+            <Icon name="sparkle" className={`size-4 ${aiOpen ? '' : 'text-accent'}`} />
+            Ask AI
+          </button>
+        )}
       </header>
-      {aiOpen ? <AiPanel section={section} /> : null}
-      <p className="rounded-lg bg-sunk px-3 py-2 text-xs leading-relaxed text-ink-soft">
-        Tip: click any text in the preview to change it right there.
-      </p>
-      {blockFields[section.type].map((spec) => (
-        <Field
-          key={spec.key}
-          spec={spec}
-          blockType={section.type}
-          path={[spec.key]}
-          value={props[spec.key]}
-          item={props}
-          onChange={(value) => save({ ...props, [spec.key]: value }, `${section.id}.${spec.key}`)}
-          onPatch={(patch, newAsset) =>
-            save({ ...props, ...patch }, `${section.id}.${spec.key}`, newAsset)
-          }
-        />
-      ))}
+      {aiOpen && !free ? <AiPanel section={section} /> : null}
+      {free ? (
+        <FreePanel section={section} />
+      ) : (
+        <>
+          <p className="rounded-lg bg-sunk px-3 py-2 text-xs leading-relaxed text-ink-soft">
+            Tip: click any text in the preview to change it right there.
+          </p>
+          <FreeChoiceNote section={section} />
+          {blockFields[section.type].map((spec) => (
+            <Field
+              key={spec.key}
+              spec={spec}
+              blockType={section.type}
+              path={[spec.key]}
+              value={props[spec.key]}
+              item={props}
+              onChange={(value) =>
+                save({ ...props, [spec.key]: value }, `${section.id}.${spec.key}`)
+              }
+              onPatch={(patch, newAsset) =>
+                save({ ...props, ...patch }, `${section.id}.${spec.key}`, newAsset)
+              }
+            />
+          ))}
+        </>
+      )}
       <AnimationPanel key={section.id} section={section} />
       <div className="flex gap-2 border-t border-line pt-4">
         <button type="button" className="btn btn-line flex-1" onClick={() => duplicate(section.id)}>
@@ -153,5 +170,27 @@ function SectionSettings({ section }: { section: Section }) {
         </button>
       </div>
     </div>
+  );
+}
+
+/** After "No" with "Don't ask again": dragging keeps the optimized layout; this undoes that choice. */
+function FreeChoiceNote({ section }: { section: Section }) {
+  const projectId = useEditor((s) => s.projectId);
+  const [, refresh] = useState(0);
+  if (!canBeFree(section) || freeChoice(projectId, section.id) !== 'no') return null;
+  return (
+    <p className="help">
+      Free positioning is off for this section.{' '}
+      <button
+        type="button"
+        className="font-semibold underline underline-offset-2"
+        onClick={() => {
+          rememberFreeChoice(projectId, section.id, null);
+          refresh((n) => n + 1);
+        }}
+      >
+        Ask me again
+      </button>
+    </p>
   );
 }

@@ -24,7 +24,16 @@ export interface BlockCtx {
 
 /** In the editor preview, names the prop an element shows so it can be edited in place. */
 function field(ctx: { editable?: boolean | undefined }, name: string): string {
-  return ctx.editable ? ` data-k-field="${name}"` : '';
+  return ctx.editable ? ` data-k-field="${name}" data-k-from="${name}"` : '';
+}
+
+/**
+ * In the editor preview, names the prop path an element shows (`buttons.0`,
+ * `items.2.image`), so the editor can measure it when the owner places the
+ * section freely (see free.ts). Paths are built here, never from user text.
+ */
+function from(ctx: { editable?: boolean | undefined }, path: string): string {
+  return ctx.editable ? ` data-k-from="${path}"` : '';
 }
 
 const EXT: Record<Asset['mime'], string> = {
@@ -74,15 +83,15 @@ function heading(
   return `<h${level} class="${className}"${attrs}>${lines(text)}</h${level}>`;
 }
 
-function link(item: LinkProps | undefined, className: string, inner?: string): string {
+function link(item: LinkProps | undefined, className: string, inner?: string, attrs = ''): string {
   if (!item) return '';
   const label = esc(item.label);
   if (!label) return '';
   const content = inner ?? label;
   const href = safeUrl(item.href);
-  if (!href) return `<span class="${className}">${content}</span>`;
+  if (!href) return `<span class="${className}"${attrs}>${content}</span>`;
   const external = href.startsWith('https:') ? ' rel="noopener noreferrer"' : '';
-  return `<a class="${className}" href="${esc(href)}"${external}>${content}</a>`;
+  return `<a class="${className}" href="${esc(href)}"${external}${attrs}>${content}</a>`;
 }
 
 interface ImageRef {
@@ -98,11 +107,11 @@ export function source(asset: Asset, ctx: BlockCtx): string {
 export const sizeAttrs = (asset: Asset): string =>
   asset.width && asset.height ? ` width="${asset.width}" height="${asset.height}"` : '';
 
-function img(ref: ImageRef, ctx: BlockCtx): string {
+function img(ref: ImageRef, ctx: BlockCtx, path = 'image'): string {
   const asset = ref.image ? ctx.assets.get(ref.image) : undefined;
   if (!asset || asset.kind !== 'image') return '';
   const loading = ctx.first ? ' fetchpriority="high"' : ' loading="lazy"';
-  return `<img${source(asset, ctx)} alt="${esc(ref.imageAlt ?? '')}"${sizeAttrs(asset)}${loading} decoding="async">`;
+  return `<img${source(asset, ctx)} alt="${esc(ref.imageAlt ?? '')}"${sizeAttrs(asset)}${loading} decoding="async"${from(ctx, path)}>`;
 }
 
 interface HeadProps {
@@ -155,11 +164,13 @@ function hero(p: BlockProps<'hero'>, ctx: BlockCtx): string {
   if (layout === 'poster') return posterHero(p, ctx);
   const media = img(p, ctx);
   const actions = (p.buttons ?? [])
-    .map((b, i) => link(b, i === 0 ? 'button' : 'button button-ghost'))
+    .map((b, i) =>
+      link(b, i === 0 ? 'button' : 'button button-ghost', undefined, from(ctx, `buttons.${i}`)),
+    )
     .join('');
   const text =
     (p.status
-      ? `<p class="status"><span class="dot" aria-hidden="true"></span>${esc(p.status)}</p>`
+      ? `<p class="status"${from(ctx, 'status')}><span class="dot" aria-hidden="true"></span>${esc(p.status)}</p>`
       : '') +
     (p.eyebrow ? `<p class="eyebrow"${field(ctx, 'eyebrow')}>${esc(p.eyebrow)}</p>` : '') +
     heading(p.heading, ctx.level, 'display', field(ctx, 'heading'), ctx.split) +
@@ -173,12 +184,14 @@ function hero(p: BlockProps<'hero'>, ctx: BlockCtx): string {
 function posterHero(p: BlockProps<'hero'>, ctx: BlockCtx): string {
   const media = img(p, ctx);
   const actions = (p.buttons ?? [])
-    .map((b, i) => link(b, i === 0 ? 'button' : 'button button-ghost'))
+    .map((b, i) =>
+      link(b, i === 0 ? 'button' : 'button button-ghost', undefined, from(ctx, `buttons.${i}`)),
+    )
     .join('');
   const top =
     (p.eyebrow ? `<p class="eyebrow"${field(ctx, 'eyebrow')}>${esc(p.eyebrow)}</p>` : '') +
     (p.status
-      ? `<p class="status"><span class="dot" aria-hidden="true"></span>${esc(p.status)}</p>`
+      ? `<p class="status"${from(ctx, 'status')}><span class="dot" aria-hidden="true"></span>${esc(p.status)}</p>`
       : '');
   const foot =
     paras(p.subheading, 'lede', field(ctx, 'subheading')) +
@@ -196,7 +209,10 @@ function posterHero(p: BlockProps<'hero'>, ctx: BlockCtx): string {
 function about(p: BlockProps<'about'>, ctx: BlockCtx): string {
   const media = img(p, ctx);
   const facts = (p.facts ?? [])
-    .map((f) => `<div><dt>${esc(f.label)}</dt><dd>${esc(f.value)}</dd></div>`)
+    .map(
+      (f, i) =>
+        `<div><dt${from(ctx, `facts.${i}.label`)}>${esc(f.label)}</dt><dd${from(ctx, `facts.${i}.value`)}>${esc(f.value)}</dd></div>`,
+    )
     .join('');
   return `<div class="about${has(media, 'has-media')}">${
     media ? `<div class="about-media">${media}</div>` : ''
@@ -208,7 +224,7 @@ function about(p: BlockProps<'about'>, ctx: BlockCtx): string {
 function textImage(p: BlockProps<'textImage'>, ctx: BlockCtx): string {
   const media = img(p, ctx);
   const side = p.imageSide ?? 'right';
-  const button = link(p.button, 'button');
+  const button = link(p.button, 'button', undefined, from(ctx, 'button'));
   return `<div class="split split-${side}${media ? '' : ' no-media'}"><div class="split-text">${head(p, ctx)}<div class="prose">${paras(p.body, '', field(ctx, 'body'))}${
     button ? `<p>${button}</p>` : ''
   }</div></div>${media ? `<div class="split-media">${media}</div>` : ''}</div>`;
@@ -216,10 +232,12 @@ function textImage(p: BlockProps<'textImage'>, ctx: BlockCtx): string {
 
 function gallery(p: BlockProps<'gallery'>, ctx: BlockCtx): string {
   const items = (p.images ?? [])
-    .map((item) => {
-      const picture = img(item, ctx);
+    .map((item, i) => {
+      const picture = img(item, ctx, `images.${i}.image`);
       if (!picture) return '';
-      const caption = item.caption ? `<figcaption>${esc(item.caption)}</figcaption>` : '';
+      const caption = item.caption
+        ? `<figcaption${from(ctx, `images.${i}.caption`)}>${esc(item.caption)}</figcaption>`
+        : '';
       return `<li><figure>${picture}${caption}</figure></li>`;
     })
     .join('');
@@ -242,12 +260,18 @@ export function videoEmbed(url: string, title: string): string {
 function videoFile(id: string | undefined, title: string, ctx: BlockCtx): string {
   const asset = id ? ctx.assets.get(id) : undefined;
   if (!asset || asset.kind !== 'video') return '';
-  return `<div class="video-file"><video${source(asset, ctx)} controls playsinline preload="metadata"${sizeAttrs(asset)} aria-label="${esc(title || 'Video')}"></video></div>`;
+  return `<div class="video-file"${from(ctx, 'video')}><video${source(asset, ctx)} controls playsinline preload="metadata"${sizeAttrs(asset)} aria-label="${esc(title || 'Video')}"></video></div>`;
 }
 
 function video(p: BlockProps<'video'>, ctx: BlockCtx): string {
   const title = (p.heading ?? '').replace(/\s+/g, ' ').trim();
-  const media = (p.embedUrl ? videoEmbed(p.embedUrl, title) : '') || videoFile(p.video, title, ctx);
+  const embed = p.embedUrl ? videoEmbed(p.embedUrl, title) : '';
+  // The player box is what the owner sees and drags, so it carries the marker.
+  const marked = embed.replace(
+    '<div class="video-frame"',
+    () => `<div class="video-frame"${from(ctx, 'embedUrl')}`,
+  );
+  const media = marked || videoFile(p.video, title, ctx);
   return `${head(p, ctx)}${media}${paras(p.caption, 'caption', field(ctx, 'caption'))}`;
 }
 
@@ -284,7 +308,7 @@ function projects(p: BlockProps<'projects'>, ctx: BlockCtx): string {
     const rows = items
       .map((item, i) => {
         const meta = [item.tag, item.year].filter(Boolean).map((m) => esc(m ?? ''));
-        return `<li><span class="num" aria-hidden="true">${pad(i + 1)}</span><div class="row-main">${heading(item.title, sub, 'row-title')}${paras(item.description, 'row-text')}${link(item.link, 'more')}</div>${
+        return `<li><span class="num" aria-hidden="true">${pad(i + 1)}</span><div class="row-main">${heading(item.title, sub, 'row-title', from(ctx, `items.${i}.title`))}${paras(item.description, 'row-text', from(ctx, `items.${i}.description`))}${link(item.link, 'more', undefined, from(ctx, `items.${i}.link`))}</div>${
           meta.length ? `<p class="row-meta">${meta.join('<br>')}</p>` : ''
         }</li>`;
       })
@@ -294,14 +318,14 @@ function projects(p: BlockProps<'projects'>, ctx: BlockCtx): string {
   const cards = items
     .map((item, i) => {
       const picture =
-        img(item, { ...ctx, first: false }) ||
+        img(item, { ...ctx, first: false }, `items.${i}.image`) ||
         `<span class="cover-num" aria-hidden="true">${pad(i + 1)}</span>`;
       const meta = [item.tag, item.year].filter(Boolean).map((m) => esc(m ?? ''));
       return `<li class="card"><div class="cover cover-${(i % 4) + 1}">${picture}</div><div class="card-body">${
         meta.length
           ? `<p class="card-meta">${meta.join('<span aria-hidden="true"> · </span>')}</p>`
           : ''
-      }${heading(item.title, sub, 'card-title')}${paras(item.description, 'card-text')}${link(item.link, 'more stretch')}</div></li>`;
+      }${heading(item.title, sub, 'card-title', from(ctx, `items.${i}.title`))}${paras(item.description, 'card-text', from(ctx, `items.${i}.description`))}${link(item.link, 'more stretch', undefined, from(ctx, `items.${i}.link`))}</div></li>`;
     })
     .join('');
   return `${head(p, ctx)}${cards ? `<ul class="cards" role="list">${cards}</ul>` : ''}`;
@@ -310,9 +334,9 @@ function projects(p: BlockProps<'projects'>, ctx: BlockCtx): string {
 function testimonials(p: BlockProps<'testimonials'>, ctx: BlockCtx): string {
   const quotes = (p.items ?? [])
     .map(
-      (q) =>
-        `<figure class="quote"><blockquote>${paras(q.quote)}</blockquote><figcaption><span class="who">${esc(q.name)}</span>${
-          q.role ? `<span class="role">${esc(q.role)}</span>` : ''
+      (q, i) =>
+        `<figure class="quote"><blockquote${from(ctx, `items.${i}.quote`)}>${paras(q.quote)}</blockquote><figcaption><span class="who"${from(ctx, `items.${i}.name`)}>${esc(q.name)}</span>${
+          q.role ? `<span class="role"${from(ctx, `items.${i}.role`)}>${esc(q.role)}</span>` : ''
         }</figcaption></figure>`,
     )
     .join('');
@@ -322,11 +346,12 @@ function testimonials(p: BlockProps<'testimonials'>, ctx: BlockCtx): string {
 function links(p: BlockProps<'links'>, ctx: BlockCtx): string {
   const avatar = img(p, ctx);
   const items = (p.items ?? [])
-    .map((item) =>
+    .map((item, i) =>
       link(
         item,
         'linkbtn',
         `<span>${esc(item.label)}</span><span class="arrow" aria-hidden="true">→</span>`,
+        from(ctx, `items.${i}`),
       ),
     )
     .filter(Boolean)
@@ -341,8 +366,12 @@ function contact(p: BlockProps<'contact'>, ctx: BlockCtx): string {
   const mail = p.email ? safeUrl(`mailto:${p.email.trim()}`) : null;
   const tel = p.phone ? safeUrl(`tel:${p.phone.replace(/\s+/g, '')}`) : null;
   const details =
-    (mail && p.email ? `<a class="big-link" href="${esc(mail)}">${esc(p.email.trim())}</a>` : '') +
-    (tel && p.phone ? `<a class="phone" href="${esc(tel)}">${esc(p.phone)}</a>` : '');
+    (mail && p.email
+      ? `<a class="big-link" href="${esc(mail)}"${from(ctx, 'email')}>${esc(p.email.trim())}</a>`
+      : '') +
+    (tel && p.phone
+      ? `<a class="phone" href="${esc(tel)}"${from(ctx, 'phone')}>${esc(p.phone)}</a>`
+      : '');
   const action = p.formAction ? safeUrl(p.formAction) : null;
   const form =
     action && action.startsWith('https:')

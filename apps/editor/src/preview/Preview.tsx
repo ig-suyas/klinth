@@ -1,13 +1,15 @@
-import { sectionAssetIds } from '@klinth/core';
+import { sectionAssetIds, type Project } from '@klinth/core';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useFontUrls } from '../lib/fonts.ts';
 import { assetBlobs } from '../media/files.ts';
 import { HEADER_ID } from '../state/header.ts';
+import { useFreeUi } from '../state/free-intent.ts';
 import { setSectionProps, type Props } from '../state/sections.ts';
 import { removeHeaderNow } from '../state/useHeaderActions.ts';
 import { useEditor, type Device } from '../state/store.ts';
 import { PREVIEW_PATH } from '../security/headers.ts';
 import { buildPreviewDocument, previewMessageSchema } from './document.ts';
+import { handleFreeMessage, isFreeMessage } from './free-messages.ts';
 
 /** Frame widths per device, in CSS pixels of the previewed site. */
 export const DEVICE_WIDTH: Record<Device, number> = {
@@ -63,6 +65,16 @@ export function Preview() {
   /** "Preview animations" (or a newly picked animation): the next redraw plays them. */
   const replay = useEditor((s) => s.animationReplay);
   const shownReplay = useRef(replay);
+  /**
+   * A project the preview already shows because it made the change itself
+   * (moving a free item): that one change needs no redraw, so dragging and
+   * arrow-key nudges stay smooth and keep keyboard focus in the frame.
+   */
+  const live = useRef<Project | null>(null);
+  /** A redraw is waiting for its timer (then a "live" change must not cancel it). */
+  const scheduled = useRef(false);
+  /** Goes up to force a redraw (a change the preview showed was refused). */
+  const [redraws, setRedraws] = useState(0);
 
   /** Hands the latest page to the shell, which shows it in a fresh inner frame. */
   const sendPage = (el: HTMLIFrameElement) =>
@@ -84,7 +96,14 @@ export function Preview() {
   // Typing stays smooth: the frame reloads shortly after the last change.
   useEffect(() => {
     if (!project) return;
+    if (project === live.current && !scheduled.current) {
+      live.current = null;
+      return;
+    }
+    live.current = null;
+    scheduled.current = true;
     const timer = setTimeout(() => {
+      scheduled.current = false;
       if (!frame.current) return;
       if (shownPage.current !== pageIndex) scrollY.current = 0;
       shownPage.current = pageIndex;
@@ -99,13 +118,14 @@ export function Preview() {
         scrollTo: scrollTo.current,
         selectedId: useEditor.getState().selectedId,
         fontUrls,
+        freeItem: useFreeUi.getState().item,
       });
       scrollTo.current = null;
       if (hostReady.current) sendPage(frame.current);
       else if (!frame.current.getAttribute('src')) frame.current.setAttribute('src', PREVIEW_PATH);
     }, PREVIEW_DELAY_MS);
     return () => clearTimeout(timer);
-  }, [project, pageIndex, fontUrls, replay]);
+  }, [project, pageIndex, fontUrls, replay, redraws]);
 
   // The shell never said it is ready (offline on first visit, or the host served
   // an error page): say so instead of showing an empty white box.
@@ -134,6 +154,15 @@ export function Preview() {
       // The shell only says it is ready; everything else must come from the page.
       if (fromShell !== (message.type === 'host')) return;
       const state = useEditor.getState();
+      if (isFreeMessage(message)) {
+        handleFreeMessage(message, {
+          shown: (shown) => {
+            live.current = shown;
+          },
+          redraw: () => setRedraws((n) => n + 1),
+        });
+        return;
+      }
       switch (message.type) {
         case 'host':
           hostReady.current = true;
@@ -208,6 +237,20 @@ export function Preview() {
       }),
     [],
   );
+
+  // Free layout: the answer to the warning, and the item picked in the settings panel.
+  useEffect(() => {
+    const post = (message: Record<string, unknown>) =>
+      siteWindow(frame.current)?.postMessage({ source: 'klinth-editor', ...message }, '*');
+    useFreeUi.getState().setBridge((accept) => post({ type: 'freeDecision', accept }));
+    const stop = useFreeUi.subscribe((state, previous) => {
+      if (state.item !== previous.item) post({ type: 'freeItem', item: state.item });
+    });
+    return () => {
+      stop();
+      useFreeUi.getState().setBridge(null);
+    };
+  }, []);
 
   const logical = Math.max(DEVICE_WIDTH[device], device === 'desktop' ? space.width : 0);
   // Narrow windows still show the real desktop layout, scaled down to fit.

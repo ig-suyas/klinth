@@ -8,6 +8,7 @@ import {
   type AnimationPreset,
   type AnimationTarget,
   type Section,
+  freeCanvas,
 } from '@klinth/core';
 import { useId, useState } from 'react';
 import {
@@ -28,7 +29,9 @@ const hasSpeed = (preset: AnimationPreset): boolean => isEntrance(preset) || pre
  * replays the preview so the result is visible at once.
  */
 export function AnimationPanel({ section }: { section: Section }) {
-  const targets = animationTargets(section.type);
+  // A free section only animates as a whole: its items have their own positions.
+  const all = animationTargets(section.type);
+  const targets = freeCanvas(section) ? all.filter((t) => t === 'section') : all;
   const [target, setTarget] = useState<AnimationTarget | undefined>(
     () => targets.find((t) => section.animation?.[t]) ?? targets[0],
   );

@@ -11,6 +11,7 @@ import { Preview } from './preview/Preview.tsx';
 import { pruneAssets } from './lib/storage.ts';
 import { useEditor } from './state/store.ts';
 import { useAutosave } from './state/useAutosave.ts';
+import { FreeLayoutDialog } from './ui/FreeLayoutDialog.tsx';
 import { NoticeBar } from './ui/Notice.tsx';
 import { SafetyBanners } from './ui/SafetyBanners.tsx';
 import { Tour } from './ui/Tour.tsx';
@@ -70,6 +71,7 @@ export function Editor({ onExit }: { onExit: () => void }) {
       <MediaLibrary />
       <AiSettings />
       <GitHubDialog />
+      <FreeLayoutDialog />
       <NoticeBar />
     </div>
   );

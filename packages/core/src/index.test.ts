@@ -234,7 +234,7 @@ describe('editor preview markers', () => {
 
   it('do not change anything else in the page', () => {
     const stripped = html(true)
-      .replace(/ data-k-(section|field)="[^"]*"/g, '')
+      .replace(/ data-k-(section|field|from)="[^"]*"/g, '')
       .replace(/ data-k-header/g, '');
     expect(stripped).toBe(html(false));
   });
