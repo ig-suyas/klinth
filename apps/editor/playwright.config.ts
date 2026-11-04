@@ -4,6 +4,11 @@ import { defineConfig, devices } from '@playwright/test';
 // security headers (the dev server cannot send them).
 const PORT = 4173;
 
+const EXTRA_BROWSERS = (process.env.E2E_BROWSERS ?? (process.env.CI ? 'firefox,webkit' : ''))
+  .split(',')
+  .map((name) => name.trim())
+  .filter((name) => name === 'firefox' || name === 'webkit');
+
 export default defineConfig({
   testDir: './e2e',
   timeout: 60_000,
@@ -21,6 +26,16 @@ export default defineConfig({
     video: 'off',
   },
   projects: [
+    // First-visit checks also run in Firefox and Safari's engine (CI installs them;
+    // locally pick them with E2E_BROWSERS=chromium,webkit).
+    ...EXTRA_BROWSERS.map((name) => ({
+      name,
+      testMatch: /fresh-start\.spec\.ts$/,
+      use: {
+        ...devices[name === 'firefox' ? 'Desktop Firefox' : 'Desktop Safari'],
+        viewport: { width: 2000, height: 1000 },
+      },
+    })),
     {
       name: 'chromium',
       // Locally, use the installed Chrome (no browser download on a small laptop).

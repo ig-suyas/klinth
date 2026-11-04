@@ -10,8 +10,10 @@ import {
   loadProject,
   loadRawProject,
   openStorage,
+  resetStorageModeForTests,
   saveAsset,
   saveProject,
+  storageInMemory,
 } from './storage.ts';
 
 /**
@@ -30,6 +32,7 @@ async function writeRaw(record: unknown): Promise<void> {
 afterEach(async () => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
+  resetStorageModeForTests();
   await closeStorage();
   await new Promise<void>((resolve) => {
     const req = indexedDB.deleteDatabase('klinth');
@@ -75,19 +78,23 @@ describe('quota exceeded', () => {
   });
 });
 
+// Changed on purpose (fresh-profile fix): a browser that refuses storage no longer
+// stops the editor; this tab keeps the work in memory and the UI says so.
 describe('storage unavailable', () => {
-  it('gives a plain error when IndexedDB does not exist (some private modes)', async () => {
+  it('keeps working in memory when IndexedDB does not exist (some private modes)', async () => {
     vi.stubGlobal('indexedDB', undefined);
-    await expect(listProjects()).rejects.toMatchObject({ code: 'unavailable' });
+    await expect(listProjects()).resolves.toEqual([]);
+    expect(storageInMemory()).toBe(true);
+    await saveProject('a', clone(), 0);
+    expect((await loadProject('a'))?.revision).toBe(1);
   });
 
-  it('gives a plain error when opening is refused, and recovers on the next try', async () => {
-    const open = vi.spyOn(indexedDB, 'open').mockImplementationOnce(() => {
+  it('keeps working in memory when opening is refused', async () => {
+    vi.spyOn(indexedDB, 'open').mockImplementationOnce(() => {
       throw new DOMException('denied', 'SecurityError');
     });
-    await expect(listProjects()).rejects.toMatchObject({ code: 'unavailable' });
-    open.mockRestore();
     await expect(listProjects()).resolves.toEqual([]);
+    expect(storageInMemory()).toBe(true);
   });
 });
 

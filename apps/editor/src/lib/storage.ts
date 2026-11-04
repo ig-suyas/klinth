@@ -150,10 +150,77 @@ function db(): Promise<IDBPDatabase<KlinthDB>> {
   return dbPromise;
 }
 
-/** Runs a storage operation and turns any failure into a StorageError. */
-async function run<T>(operation: (database: IDBPDatabase<KlinthDB>) => Promise<T>): Promise<T> {
+/**
+ * In-memory fallback for browsers that refuse IndexedDB (some private windows,
+ * storage turned off, a broken profile). The editor keeps working; the work
+ * lives only in this tab, and `useStorageMode` lets the UI say so.
+ */
+const memory = {
+  projects: new Map<string, ProjectRecord>(),
+  assets: new Map<string, AssetRecord>(),
+};
+const memoryKey = (projectId: string, assetId: string) => `${projectId}\u0000${assetId}`;
+let inMemory = false;
+const modeListeners = new Set<() => void>();
+
+/** True when this tab saves in memory only, because the browser refused storage. */
+export function storageInMemory(): boolean {
+  return inMemory;
+}
+
+/** Calls `listener` when storage falls back to memory. Returns the unsubscribe. */
+export function onStorageModeChange(listener: () => void): () => void {
+  modeListeners.add(listener);
+  return () => modeListeners.delete(listener);
+}
+
+function switchToMemory(): void {
+  if (inMemory) return;
+  inMemory = true;
+  for (const listener of modeListeners) listener();
+}
+
+/** Tests only: back to IndexedDB with an empty memory store. */
+export function resetStorageModeForTests(): void {
+  inMemory = false;
+  memory.projects.clear();
+  memory.assets.clear();
+}
+
+/**
+ * The open database, or null when the browser will not open one at all; then
+ * this tab switches to memory for good. Other failures (another tab blocking an
+ * upgrade, a newer version) are real errors and are reported as before.
+ */
+async function database(): Promise<IDBPDatabase<KlinthDB> | null> {
+  if (inMemory) return null;
   try {
-    return await operation(await db());
+    return await db();
+  } catch (error) {
+    const failure = toStorageError(error);
+    if (
+      failure instanceof StorageError &&
+      (failure.code === 'unavailable' || failure.code === 'unknown')
+    ) {
+      switchToMemory();
+      return null;
+    }
+    throw failure;
+  }
+}
+
+/**
+ * Runs a storage operation and turns any failure into a StorageError. `fallback`
+ * does the same work on the in-memory store.
+ */
+async function run<T>(
+  operation: (database: IDBPDatabase<KlinthDB>) => Promise<T>,
+  fallback: () => T,
+): Promise<T> {
+  const open = await database();
+  if (!open) return fallback();
+  try {
+    return await operation(open);
   } catch (error) {
     throw toStorageError(error);
   }
@@ -173,20 +240,29 @@ export async function saveProject(
   // Secrets first: a clear "key or token" message beats a generic validation error.
   assertNoSecrets(project);
   const valid = migrateProject(project);
-  return run(async (database) => {
-    const tx = database.transaction('projects', 'readwrite');
-    const current = await tx.store.get(id);
-    const currentRevision = current ? revisionOf(current) : 0;
-    if (currentRevision !== baseRevision) {
-      tx.abort();
-      await tx.done.catch(() => undefined);
-      throw new StorageError('conflict');
-    }
-    const revision = baseRevision + 1;
-    await tx.store.put({ id, updatedAt: now, revision, project: valid });
-    await tx.done;
-    return revision;
-  });
+  return run(
+    async (database) => {
+      const tx = database.transaction('projects', 'readwrite');
+      const current = await tx.store.get(id);
+      const currentRevision = current ? revisionOf(current) : 0;
+      if (currentRevision !== baseRevision) {
+        tx.abort();
+        await tx.done.catch(() => undefined);
+        throw new StorageError('conflict');
+      }
+      const revision = baseRevision + 1;
+      await tx.store.put({ id, updatedAt: now, revision, project: valid });
+      await tx.done;
+      return revision;
+    },
+    () => {
+      const current = memory.projects.get(id);
+      if ((current ? revisionOf(current) : 0) !== baseRevision) throw new StorageError('conflict');
+      const revision = baseRevision + 1;
+      memory.projects.set(id, { id, updatedAt: now, revision, project: structuredClone(valid) });
+      return revision;
+    },
+  );
 }
 
 function revisionOf(record: ProjectRecord): number {
@@ -197,7 +273,10 @@ function revisionOf(record: ProjectRecord): number {
 export async function loadProject(
   id: string,
 ): Promise<{ project: Project; revision: number } | undefined> {
-  const record = await run((database) => database.get('projects', id));
+  const record = await run(
+    (database) => database.get('projects', id),
+    () => memory.projects.get(id),
+  );
   if (!record) return undefined;
   try {
     return { project: migrateProject(record.project), revision: revisionOf(record) };
@@ -208,7 +287,12 @@ export async function loadProject(
 
 /** Returns a saved project's data exactly as stored, to rescue a damaged one. */
 export async function loadRawProject(id: string): Promise<unknown> {
-  return (await run((database) => database.get('projects', id)))?.project;
+  return (
+    await run(
+      (database) => database.get('projects', id),
+      () => memory.projects.get(id),
+    )
+  )?.project;
 }
 
 function summarize(record: ProjectRecord): ProjectSummary {
@@ -227,7 +311,10 @@ function summarize(record: ProjectRecord): ProjectSummary {
 
 /** Lists saved projects, newest first. Damaged ones are listed, not hidden. */
 export async function listProjects(): Promise<ProjectSummary[]> {
-  const records = await run((database) => database.getAll('projects'));
+  const records = await run(
+    (database) => database.getAll('projects'),
+    () => [...memory.projects.values()],
+  );
   return records.map(summarize).sort((a, b) => b.updatedAt - a.updatedAt);
 }
 
@@ -237,12 +324,20 @@ function projectRange(projectId: string): IDBKeyRange {
 }
 
 export async function deleteProject(id: string): Promise<void> {
-  await run(async (database) => {
-    const tx = database.transaction(['projects', 'assets'], 'readwrite');
-    await tx.objectStore('projects').delete(id);
-    await tx.objectStore('assets').delete(projectRange(id));
-    await tx.done;
-  });
+  await run(
+    async (database) => {
+      const tx = database.transaction(['projects', 'assets'], 'readwrite');
+      await tx.objectStore('projects').delete(id);
+      await tx.objectStore('assets').delete(projectRange(id));
+      await tx.done;
+    },
+    () => {
+      memory.projects.delete(id);
+      for (const record of [...memory.assets.values()]) {
+        if (record.projectId === id) memory.assets.delete(memoryKey(id, record.assetId));
+      }
+    },
+  );
 }
 
 export async function saveAsset(
@@ -251,7 +346,16 @@ export async function saveAsset(
   data: Uint8Array,
   now = Date.now(),
 ): Promise<void> {
-  await run((database) => database.put('assets', { projectId, assetId, data, savedAt: now }));
+  await run(
+    (database) => database.put('assets', { projectId, assetId, data, savedAt: now }),
+    () =>
+      void memory.assets.set(memoryKey(projectId, assetId), {
+        projectId,
+        assetId,
+        data,
+        savedAt: now,
+      }),
+  );
 }
 
 const asBytes = (data: unknown): Uint8Array | undefined =>
@@ -265,7 +369,10 @@ export async function loadAsset(
   projectId: string,
   assetId: string,
 ): Promise<Uint8Array | undefined> {
-  const row = await run((database) => database.get('assets', [projectId, assetId]));
+  const row = await run(
+    (database) => database.get('assets', [projectId, assetId]),
+    () => memory.assets.get(memoryKey(projectId, assetId)),
+  );
   return row ? asBytes(row.data) : undefined;
 }
 
@@ -282,27 +389,43 @@ export async function pruneAssets(
   keep: ReadonlySet<string>,
   now = Date.now(),
 ): Promise<number> {
-  return run(async (database) => {
-    const tx = database.transaction('assets', 'readwrite');
-    let removed = 0;
-    let cursor = await tx.store.openCursor(projectRange(projectId));
-    while (cursor) {
-      const { assetId, savedAt } = cursor.value;
-      const old = typeof savedAt !== 'number' || now - savedAt > PRUNE_AFTER_MS;
-      if (!keep.has(assetId) && old) {
-        await cursor.delete();
-        removed += 1;
+  return run(
+    async (database) => {
+      const tx = database.transaction('assets', 'readwrite');
+      let removed = 0;
+      let cursor = await tx.store.openCursor(projectRange(projectId));
+      while (cursor) {
+        const { assetId, savedAt } = cursor.value;
+        const old = typeof savedAt !== 'number' || now - savedAt > PRUNE_AFTER_MS;
+        if (!keep.has(assetId) && old) {
+          await cursor.delete();
+          removed += 1;
+        }
+        cursor = await cursor.continue();
       }
-      cursor = await cursor.continue();
-    }
-    await tx.done;
-    return removed;
-  });
+      await tx.done;
+      return removed;
+    },
+    () => {
+      let removed = 0;
+      for (const { projectId: owner, assetId, savedAt } of [...memory.assets.values()]) {
+        const old = typeof savedAt !== 'number' || now - savedAt > PRUNE_AFTER_MS;
+        if (owner === projectId && !keep.has(assetId) && old) {
+          memory.assets.delete(memoryKey(projectId, assetId));
+          removed += 1;
+        }
+      }
+      return removed;
+    },
+  );
 }
 
 /** Returns every asset binary of a project, ready for `buildExport`. Skips damaged records. */
 export async function loadAssets(projectId: string): Promise<Map<string, Uint8Array>> {
-  const rows = await run((database) => database.getAll('assets', projectRange(projectId)));
+  const rows = await run(
+    (database) => database.getAll('assets', projectRange(projectId)),
+    () => [...memory.assets.values()].filter((row) => row.projectId === projectId),
+  );
   const assets = new Map<string, Uint8Array>();
   for (const { assetId, data } of rows) {
     const bytes = asBytes(data);
@@ -316,4 +439,32 @@ export async function closeStorage(): Promise<void> {
   const current = dbPromise;
   dbPromise = undefined;
   if (current) (await current.catch(() => undefined))?.close();
+}
+
+/**
+ * Deletes everything Klinth keeps in this browser: saved projects, their files
+ * and settings (also the saved AI key). The last resort when a broken saved
+ * state keeps the editor from opening. Never throws; blocked storage is skipped.
+ */
+export async function resetLocalData(): Promise<void> {
+  await closeStorage().catch(() => undefined);
+  resetStorageModeForTests();
+  try {
+    await new Promise<void>((resolve) => {
+      const request = indexedDB.deleteDatabase(DB_NAME);
+      request.onsuccess = request.onerror = request.onblocked = () => resolve();
+    });
+  } catch {
+    // IndexedDB is not available: nothing was stored there.
+  }
+  for (const area of ['localStorage', 'sessionStorage'] as const) {
+    try {
+      const storage = window[area];
+      for (const key of Object.keys(storage)) {
+        if (key.startsWith('klinth')) storage.removeItem(key);
+      }
+    } catch {
+      // Storage blocked: nothing was stored there.
+    }
+  }
 }

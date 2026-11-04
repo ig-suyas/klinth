@@ -12,6 +12,9 @@ export const PREVIEW_PATH = '/preview.html';
  */
 const PREVIEW_PATHS: readonly string[] = [PREVIEW_PATH, '/preview'];
 
+/** Pages that point to hashed build files (Pages also serves `/x.html` as `/x`). */
+const HTML_PATHS: readonly string[] = ['/', '/index.html', ...PREVIEW_PATHS];
+
 export type HeaderMap = Readonly<Record<string, string>>;
 
 const COMMON: HeaderMap = {
@@ -115,6 +118,9 @@ export function pagesHeadersFile(apiBaseUrl: string | undefined): string {
     ...PREVIEW_PATHS.map((path) =>
       block(path, { ...own, ...frame }, ['Content-Security-Policy', 'X-Frame-Options']),
     ),
+    // The HTML names the hashed files of the current build, so browsers must
+    // always ask for it again; the hashed files themselves never change.
+    ...HTML_PATHS.map((path) => block(path, { 'Cache-Control': 'no-cache' })),
     block('/assets/*', { 'Cache-Control': 'public, max-age=31536000, immutable' }),
   ].join('\n');
 }

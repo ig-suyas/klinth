@@ -1,7 +1,7 @@
 import 'fake-indexeddb/auto';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { afterEach, describe, expect, it } from 'vitest';
-import { App, isLoadError } from './App.tsx';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { App, ErrorBoundary, isLoadError } from './App.tsx';
 import { closeStorage, listProjects } from './lib/storage.ts';
 import { useEditor } from './state/store.ts';
 
@@ -82,5 +82,29 @@ describe('isLoadError', () => {
     expect(isLoadError(new TypeError('error loading dynamically imported module'))).toBe(true);
     expect(isLoadError(new TypeError('Importing a module script failed.'))).toBe(true);
     expect(isLoadError(new Error('Cannot read properties of undefined'))).toBe(false);
+  });
+});
+
+describe('ErrorBoundary', () => {
+  function Broken(): never {
+    throw new Error('boom');
+  }
+
+  it('shows a way out instead of a blank page, and asks before deleting local data', () => {
+    const quiet = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    render(
+      <ErrorBoundary>
+        <Broken />
+      </ErrorBoundary>,
+    );
+    expect(screen.getByRole('alert')).toHaveTextContent('Something went wrong.');
+    expect(screen.getByRole('button', { name: 'Reload' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Reset local data' }));
+    expect(screen.getByText(/It cannot be undone/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Yes, delete local data' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByRole('button', { name: 'Yes, delete local data' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Reset local data' })).toBeInTheDocument();
+    quiet.mockRestore();
   });
 });

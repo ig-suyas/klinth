@@ -181,6 +181,10 @@ export const BRIDGE_JS = `(function () {
     mark(id, false);
     send({ type: 'select', id: id });
   }, true);
+  // Safari (iPad, iPhone) turns a tap into a click only when an element under
+  // the finger has its own click listener; one on the document does not count.
+  // This empty one on <body> makes every tap a click, so taps select and edit.
+  document.body.addEventListener('click', function () {});
 
   document.addEventListener('dblclick', function (e) {
     var fieldEl = e.target.closest('[data-k-field]');

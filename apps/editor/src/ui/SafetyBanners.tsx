@@ -2,6 +2,7 @@ import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import { downloadProjectFile } from '../lib/files.ts';
 import { keepStorage, lastBackup, markBackedUp, needsBackupReminder } from '../lib/safety.ts';
+import { onStorageModeChange, storageInMemory } from '../lib/storage.ts';
 import { useEditor } from '../state/store.ts';
 import { Icon } from './Icon.tsx';
 
@@ -21,6 +22,11 @@ export function useOnline(): boolean {
     () => navigator.onLine,
     () => true,
   );
+}
+
+/** True when the browser refused storage and this tab keeps the work in memory only. */
+export function useStorageInMemory(): boolean {
+  return useSyncExternalStore(onStorageModeChange, storageInMemory, () => false);
 }
 
 /** Counts changes to the open project and keeps the browser from clearing Klinth's storage. */
@@ -56,12 +62,14 @@ function useEditsAndStorage(): { edits: number; at: number; persisted: boolean }
  */
 export function SafetyBanners() {
   const online = useOnline();
+  const inMemory = useStorageInMemory();
   const projectId = useEditor((s) => s.projectId);
   const { edits, at, persisted } = useEditsAndStorage();
   const [hidden, setHidden] = useState<string | null>(null);
   const reduce = useReducedMotion();
 
   const remind =
+    !inMemory &&
     projectId !== null &&
     hidden !== projectId &&
     needsBackupReminder({ edits, lastBackup: lastBackup(projectId), persisted, now: at });
@@ -75,6 +83,31 @@ export function SafetyBanners() {
 
   return (
     <AnimatePresence initial={false}>
+      {inMemory ? (
+        <motion.div
+          key="memory"
+          role="status"
+          {...motionProps}
+          className="mx-4 mt-3 flex items-center gap-3 rounded-xl border border-line bg-panel px-4 py-2.5"
+        >
+          <Icon name="file" className="size-4 shrink-0 text-ink-soft" />
+          <p className="flex-1 text-sm leading-snug">
+            <span className="font-semibold">Klinth cannot save in this browser.</span> It may be a
+            private window or storage is turned off. Your work is kept in this tab only, so download
+            your project file before you close it.
+          </p>
+          <button
+            type="button"
+            className="btn btn-line"
+            onClick={() => {
+              const { project } = useEditor.getState();
+              if (project) downloadProjectFile(project);
+            }}
+          >
+            Download project file
+          </button>
+        </motion.div>
+      ) : null}
       {!online ? (
         <motion.div
           key="offline"

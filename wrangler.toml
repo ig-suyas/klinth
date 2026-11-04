@@ -1,0 +1,9 @@
+# Cloudflare Pages project "klinth" (the editor). Pages reads this file on every
+# Git build. It pins where the built editor is, so a build that did not run
+# (no build command in the dashboard) fails instead of publishing the repository
+# root, which replaced the live site with a page of 404s in November 2026.
+# Dashboard build command: npm run build:deploy -w @klinth/editor
+# The API Worker has its own config in workers/api/wrangler.jsonc.
+name = "klinth"
+pages_build_output_dir = "apps/editor/dist"
+compatibility_date = "2026-11-01"

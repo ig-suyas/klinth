@@ -2,25 +2,81 @@
 
 ## Phase status
 
-| Phase                         | Status                                |
-| ----------------------------- | ------------------------------------- |
-| 0 Scaffold and architecture   | done                                  |
-| 1 Core engine                 | done (reviewed, hardened)             |
-| 2 Blocks and templates        | done                                  |
-| 3 Editor UI                   | done                                  |
-| 4 Media, embeds, custom code  | done                                  |
-| 5 AI Worker, key vault, AI    | done (owner to review the skill text) |
-| 5.5 Blank start, multi-page   | done                                  |
-| 6 GitHub connect, export      | done (live push needs owner's app)    |
-| 7 Hardening                   | done                                  |
-| 8 Deploy, launch, push        | done (push waits for owner's go)      |
-| 6A Blank, pages, styles, code | done (all 4 parts)                    |
-| 6B Header polish              | done                                  |
-| 6C Editor fits the window     | done                                  |
-| 6D Header links, no header    | done                                  |
-| 6E Animations                 | done                                  |
+| Phase                          | Status                                |
+| ------------------------------ | ------------------------------------- |
+| 0 Scaffold and architecture    | done                                  |
+| 1 Core engine                  | done (reviewed, hardened)             |
+| 2 Blocks and templates         | done                                  |
+| 3 Editor UI                    | done                                  |
+| 4 Media, embeds, custom code   | done                                  |
+| 5 AI Worker, key vault, AI     | done (owner to review the skill text) |
+| 5.5 Blank start, multi-page    | done                                  |
+| 6 GitHub connect, export       | done (live push needs owner's app)    |
+| 7 Hardening                    | done                                  |
+| 8 Deploy, launch, push         | done (push waits for owner's go)      |
+| 6A Blank, pages, styles, code  | done (all 4 parts)                    |
+| 6B Header polish               | done                                  |
+| 6C Editor fits the window      | done                                  |
+| 6D Header links, no header     | done                                  |
+| 6E Animations                  | done                                  |
+| Fix: blank site on first visit | done (owner must fix Pages build)     |
 
 ## 1. Current state
+
+**Fix: live site blank for new visitors (2026-11-05).** Symptom: blank white page, empty
+templates, stuck "add section", no touch, for everyone except the owner's own Chrome.
+**Root cause: Cloudflare Pages deployment, not app code.** The `klinth` Pages project was
+connected to GitHub (Git Provider: Yes). Every push to `main` since 37c23a3 made a Git build with
+no build command and the repository root as output: those deployments (cbd46fa9, 0cb3161b,
+45fb6c53, 2ff42ba5) serve `README.md`, `handoff.md`, `package.json` and answer **404 (empty
+body) for `/`, `/preview.html`, `/terms.html` and every asset**. The newest one became production,
+so `klinth.pages.dev` only worked where Cloudflare's edge or the browser still held files from the
+last good direct upload (79dd6488): the owner's Chrome had `/`, the JS and the cached 308
+`/preview.html` -> `/preview`; a fresh profile got a 404 blank page, or the old editor with a 404
+preview frame. Evidence: `curl` of each deployment URL (good ones send our CSP and
+`max-age=0, must-revalidate`; broken ones 404 everything), Playwright fresh contexts on the live
+URL (Chromium and WebKit: `404 /preview.html`, empty preview, uncaught SecurityError).
+Checked and ruled out: `_headers` (no CSP/COOP/COEP blocks on a fresh load; the only violation was
+Zod's `new Function` probe, now off), SPA routing (no client routes; Pages serves `index.html`
+for unknown paths), service worker (none ever), Cloudflare zone optimisations (`*.pages.dev` has
+no Rocket Loader / Auto Minify), first-run data (empty IndexedDB, no settings, no tour flag all
+fine), schema/Zod on fresh projects (fine), render loops (none; adds take < 1 s at 4x CPU).
+**App bugs the broken deploy exposed, fixed:** (1) `Preview.tsx` `siteWindow()` read
+`frame.contentWindow.frames[0]`, which **throws** SecurityError in Chrome/Safari when the shell
+page failed to load (no inner frame); it ran inside a zustand subscriber, so selecting or adding a
+section threw mid-click and the "Add a section" menu stayed open = "stuck". Now try/catch, plus a
+notice "The preview could not load..." if the shell is not ready after 10 s. (2) **Touch on
+iPad/iPhone:** Safari only turns a tap into a click when an element under the finger has its own
+click listener; the bridge listened on `document` only, so taps in the preview did nothing. The
+bridge now adds an empty click listener on `<body>` (verified in WebKit: pointerdown, touch,
+mousedown, click). Section drag already used pointer events with `touch-none`. (3) IndexedDB
+blocked (private window, storage off, broken profile): the template picker failed to open
+anything. `lib/storage.ts` now falls back to an in-memory store (`storageInMemory()`,
+`onStorageModeChange`; only when the database cannot be opened at all: `unavailable`/`unknown`;
+quota, conflict, blocked, version still report as before) and the editor shows "Klinth cannot
+save in this browser..." with "Download project file". (4) Safety net: the whole app is inside
+`ErrorBoundary` (`main.tsx`), which now also has "Reset local data" (confirm step; deletes the
+`klinth` IndexedDB and `klinth*` local/session storage keys via `resetLocalData()`).
+Console on load is now empty: `lib/zod-config.ts` (`z.config({jitless:true})`, imported first)
+and `<link rel="icon" href="data:,">`. `_headers` adds `Cache-Control: no-cache` for `/`,
+`/index.html`, `/preview.html`, `/preview` (assets stay immutable). New root `wrangler.toml`
+(`pages_build_output_dir = "apps/editor/dist"`): a Git build that did not build now fails instead
+of replacing production with the repo root.
+Tests: e2e `fresh-start.spec.ts` (fresh context each: all templates listed, each opens with real
+preview content, add section twice without freezing, no console/page errors or 4xx, IndexedDB
+blocked, localStorage blocked, preview page 404, touch taps). Runs in Chromium and WebKit locally;
+CI also installs Firefox (`E2E_BROWSERS`, CI default `firefox,webkit` for this spec). Firefox
+cannot launch on this laptop (exe permission denied), so it is unverified locally. Tracing is off
+in this spec: Playwright's trace snapshotter logs "Blocked script execution" from the
+script-free thumbnails. Unit: `storage.fallback.test.ts`, ErrorBoundary test, `_headers` cache
+test; two storage tests changed on purpose (blocked storage now means memory, not an error).
+**Owner, in the Cloudflare dashboard (Workers & Pages > klinth > Settings > Build):** Build command
+`npm run build:deploy -w @klinth/editor`, Build output directory `apps/editor/dist`, Root
+directory empty, env var `NODE_VERSION` = `24` (Production and Preview). Or turn off automatic Git
+deployments and keep using `npm run deploy:editor`. Then delete the broken deployments listed
+above (they publish the repo files, e.g. `<id>.klinth.pages.dev/handoff.md`; nothing secret in
+them). No zone settings apply to `*.pages.dev`; if a custom domain is added later, keep Rocket
+Loader and Auto Minify off for it.
 
 **6E (animations): schema version 4.** `MIGRATIONS[3]` changes nothing (older files have no
 animations; the bump stops older editors from dropping them). New optional `section.animation`
@@ -321,6 +377,9 @@ repos at ₹0.
 
 ## 3. Files
 
+- `wrangler.toml` (root) : Pages output dir for Git builds; `e2e/fresh-start.spec.ts` : first visit
+- `apps/editor/src/lib/storage.ts` : in-memory fallback, `resetLocalData`; `lib/zod-config.ts`
+
 - `packages/core/src/animation.ts` (+ test) : animation schema, split text, `ANIM_CSS`, `ANIM_JS`
 - `apps/editor/src/inspector/AnimationPanel.tsx`, `state/animation.ts` : animation picker; `e2e/animations.spec.ts`
 - `packages/core/src/nav.ts` (+ `nav.test.ts`) : header links, section anchors, `headerShown`
@@ -438,7 +497,8 @@ repos at ₹0.
 
 ## 6. What is still left to do
 
-1. **Owner:** run `npm run deploy:editor` to put 6B-6E live (the deployed editor is older).
+1. **Owner:** fix the Pages build settings (see "Fix: live site blank" in section 1); until then
+   every push to `main` makes a failing Git build and `npm run deploy:editor` is the way to deploy.
 2. **Owner:** review the live skill text (`workers/api/skill/skill.md`, then `skill:remote`); review
    Terms/Privacy with a lawyer; turn on 2FA for GitHub and Cloudflare; delete `klinth-test-site`.
 3. Optional: custom domain (README "Deploy" section lists the follow-up config changes); rename the

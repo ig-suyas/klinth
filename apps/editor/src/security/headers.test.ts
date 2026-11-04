@@ -67,6 +67,13 @@ describe('pagesHeadersFile', () => {
     expect(file).toMatch(/^\/preview\n {2}! Content-Security-Policy\n {2}! X-Frame-Options\n/m);
   });
 
+  it('never lets the HTML be cached long; hashed files are immutable', () => {
+    for (const path of ['/', '/index.html', '/preview.html', '/preview']) {
+      expect(file).toContain(`\n${path}\n  Cache-Control: no-cache\n`);
+    }
+    expect(file).toContain('/assets/*\n  Cache-Control: public, max-age=31536000, immutable');
+  });
+
   it('writes one header per line under each path', () => {
     for (const line of file.split('\n').filter(Boolean)) {
       expect(line).toMatch(/^(\/\S*| {2}(! )?[A-Za-z-]+(: .+)?)$/);

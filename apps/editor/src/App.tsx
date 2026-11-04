@@ -1,7 +1,7 @@
 import type { Project } from '@klinth/core';
 import { Component, Suspense, lazy, useEffect, useState, type ReactNode } from 'react';
 import { downloadProjectFile, missingFilesNote, type ImportedProject } from './lib/files.ts';
-import { loadProject, saveAsset, saveProject } from './lib/storage.ts';
+import { loadProject, resetLocalData, saveAsset, saveProject } from './lib/storage.ts';
 import { useEditor } from './state/store.ts';
 
 // Split so a first visit downloads only the start screen, and a return visit only the editor.
@@ -139,6 +139,8 @@ function SmallScreenNotice() {
 
 interface BoundaryState {
   failed: boolean;
+  /** The user asked to delete local data and is being asked to confirm. */
+  confirmingReset?: boolean;
   /** A part of Klinth could not be downloaded (offline, or Klinth was just updated). */
   loadFailed: boolean;
 }
@@ -151,8 +153,11 @@ export function isLoadError(error: unknown): boolean {
   );
 }
 
-/** If the editor crashes, the user can still download their work. */
-class ErrorBoundary extends Component<{ children: ReactNode }, BoundaryState> {
+/**
+ * If the editor crashes, the user can still download their work. Also wraps the
+ * whole app (main.tsx), so a crash anywhere shows this instead of a blank page.
+ */
+export class ErrorBoundary extends Component<{ children: ReactNode }, BoundaryState> {
   override state: BoundaryState = { failed: false, loadFailed: false };
 
   static getDerivedStateFromError(error: unknown): BoundaryState {
@@ -210,6 +215,45 @@ class ErrorBoundary extends Component<{ children: ReactNode }, BoundaryState> {
           >
             Reload
           </button>
+        </div>
+        <div className="mt-10 border-t border-line pt-6">
+          {this.state.confirmingReset ? (
+            <>
+              <p className="leading-relaxed">
+                This deletes every project and setting Klinth saved in this browser. It cannot be
+                undone. Download your project file first if you need it.
+              </p>
+              <div className="mt-4 flex gap-2">
+                <button
+                  type="button"
+                  className="btn btn-line"
+                  onClick={() => this.setState({ confirmingReset: false })}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={() => void resetLocalData().then(() => window.location.reload())}
+                >
+                  Yes, delete local data
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="text-sm leading-relaxed text-ink-soft">
+                Still broken after a reload? Starting fresh may help.
+              </p>
+              <button
+                type="button"
+                className="btn btn-line mt-3"
+                onClick={() => this.setState({ confirmingReset: true })}
+              >
+                Reset local data
+              </button>
+            </>
+          )}
         </div>
       </div>
     );

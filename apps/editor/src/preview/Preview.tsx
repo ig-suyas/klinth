@@ -21,10 +21,19 @@ export const DEVICE_WIDTH: Record<Device, number> = {
 const PREVIEW_DELAY_MS = 120;
 
 /** The window of the shown page: the inner frame of the preview.html shell. */
-function siteWindow(el: HTMLIFrameElement | null): Window | null {
-  // `frames[0]` may be read across origins; it is null until the shell has loaded.
-  return el?.contentWindow?.frames[0] ?? null;
+export function siteWindow(el: HTMLIFrameElement | null): Window | null {
+  // `frames[0]` may be read across origins once the shell has its inner frame.
+  // Before that, or when the shell failed to load (a 404 page has no frames),
+  // Chrome and Safari throw a SecurityError instead of returning undefined.
+  try {
+    return el?.contentWindow?.frames[0] ?? null;
+  } catch {
+    return null;
+  }
 }
+
+/** How long the preview shell may take to say it is ready before the user is told. */
+export const PREVIEW_LOAD_TIMEOUT_MS = 10_000;
 
 /**
  * The live preview: the real rendered page in a sandboxed frame. The frame
@@ -97,6 +106,21 @@ export function Preview() {
     }, PREVIEW_DELAY_MS);
     return () => clearTimeout(timer);
   }, [project, pageIndex, fontUrls, replay]);
+
+  // The shell never said it is ready (offline on first visit, or the host served
+  // an error page): say so instead of showing an empty white box.
+  const hasProject = project !== null;
+  useEffect(() => {
+    if (!hasProject) return;
+    const timer = setTimeout(() => {
+      if (!hostReady.current) {
+        useEditor
+          .getState()
+          .notify('The preview could not load. Check your connection, then reload the page.');
+      }
+    }, PREVIEW_LOAD_TIMEOUT_MS);
+    return () => clearTimeout(timer);
+  }, [hasProject]);
 
   // Messages from the frame. Checked by source and by schema; anything else is ignored.
   useEffect(() => {
