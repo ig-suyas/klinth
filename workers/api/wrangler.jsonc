@@ -10,21 +10,22 @@
     "logs": { "enabled": true, "invocation_logs": false },
   },
   "vars": {
-    "ALLOWED_ORIGINS": "http://localhost:5173",
+    // Production editor origin. Local dev overrides it in .dev.vars (localhost:5173).
+    "ALLOWED_ORIGINS": "https://klinth.pages.dev",
     // Stable free-tier model, verified 2026-11-04. Change here if Google retires it.
     "GEMINI_MODEL": "gemini-3.6-flash",
     // minimal | low | medium | high. Lowest thinking keeps the user's quota and waits small.
     "GEMINI_THINKING_LEVEL": "minimal",
-    // GitHub OAuth app id (public). Filled in during Phase 8. The secret is set with
+    // GitHub OAuth app id (public, callback https://klinth.pages.dev/github-callback.html). Secret:
     //   npx wrangler secret put GITHUB_CLIENT_SECRET      (production)
     //   workers/api/.dev.vars                             (local, git-ignored)
-    "GITHUB_CLIENT_ID": "",
+    "GITHUB_CLIENT_ID": "Ov23liHbdVjZ2EXOgKJ0",
   },
   // The private design skill, key "design-skill". Put it with:
   //   npm run skill:local -w @klinth/api            (local dev)
   //   npx wrangler kv key put design-skill --binding SKILL --path skill/skill.md --remote
-  // The id is filled in during Phase 8 (wrangler kv namespace create SKILL).
-  "kv_namespaces": [{ "binding": "SKILL", "id": "00000000000000000000000000000000" }],
+  // Created in Phase 8 (wrangler kv namespace create SKILL).
+  "kv_namespaces": [{ "binding": "SKILL", "id": "a35fe0087d1d4de39f4550479ef5fa33" }],
   // Exact hourly limit per IP (SQLite-backed, the only kind on the free plan).
   "durable_objects": { "bindings": [{ "name": "RATE_LIMITER", "class_name": "RateLimiter" }] },
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["RateLimiter"] }],

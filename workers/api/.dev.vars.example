@@ -1,4 +1,6 @@
 # Copy to .dev.vars (git-ignored) for `wrangler dev`. Never commit real values.
+# Local editor origin (wrangler.jsonc holds the production one).
+ALLOWED_ORIGINS=http://localhost:5173
 # GitHub OAuth app for local testing. Its callback URL must be
 #   http://localhost:5173/github-callback.html
 GITHUB_CLIENT_ID=

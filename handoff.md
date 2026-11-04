@@ -13,9 +13,28 @@
 | 5.5 Blank start, multi-page  | done                                  |
 | 6 GitHub connect, export     | done (live push needs owner's app)    |
 | 7 Hardening                  | done                                  |
-| 8 Deploy, launch, push       | not started                           |
+| 8 Deploy, launch, push       | done (push waits for owner's go)      |
 
 ## 1. Current state
+
+**Phase 8 (deploy):** Live, free plan. Editor: **https://klinth.pages.dev** (classic Cloudflare Pages
+project `klinth`, prod branch `main`). Worker: **https://klinth-api.klinth-api.workers.dev**
+(`klinth-api`; account workers.dev subdomain `klinth-api`, auto-picked by Wrangler). KV `SKILL` id
+`a35fe0087d1d4de39f4550479ef5fa33`, key `design-skill` = the Phase 5 skill (owner may replace:
+`npm run skill:remote -w @klinth/api`). Vars: `ALLOWED_ORIGINS=https://klinth.pages.dev`,
+`GITHUB_CLIENT_ID=Ov23liHbdVjZ2EXOgKJ0` (OAuth app "Klinth", callback
+`https://klinth.pages.dev/github-callback.html`, expiring user tokens on; refresh token is dropped by
+the Worker's Zod parse). Secret `GITHUB_CLIENT_SECRET` set (only secret). Local dev origin now comes
+from `workers/api/.dev.vars` (copy the example). Live build: `vite build --mode deploy` reads
+`apps/editor/.env.deploy` (public Worker URL, committed); e2e keeps default mode (localhost mocks).
+Deploy: `npm run deploy:api`, `npm run deploy:editor`. Smoke tests passed live: health 200, CORS only
+for the Pages origin (other origin 403), fake Gemini key → plain 401 "bad_key", fake OAuth code →
+GitHub checks real id+secret and refuses only the code, editor + preview load with no console/CSP
+errors, all security headers present. **Owner verified in production:** ZIP download and Publish to
+GitHub (new repo + Pages) both work. Fix found only live: Pages 308-redirects `/x.html` → `/x`, so
+`/preview` got the editor CSP (`frame-ancestors 'none'`) and the preview was blocked; `_headers` now
+covers `/preview.html` and `/preview` (test added). Secrets scan of all git history: only fake test
+values. `npm audit --omit=dev`: 0; 12 moderate in eslint's minimatch (dev only).
 
 **Phase 7 (hardening):** Report in `security-report.md` (0 open high/critical). Editor CSP and
 headers from `apps/editor/src/security/headers.ts` → `dist/_headers` on build and sent by
@@ -116,7 +135,7 @@ them. **Owner should review it.** Local KV: `npm run skill:local -w @klinth/api`
 
 ## 2. Goal
 
-Next: Phase 8 (deploy, launch checks, push). Before it, optionally the owner's live GitHub push test (section 6). Overall: free, no-login site builder exporting plain HTML
+All phases done; only the push to `github.com/ig-suyas/klinth` (public) waits for the owner. Overall: free, no-login site builder exporting plain HTML
 repos at ₹0.
 
 ## 3. Files
@@ -151,6 +170,8 @@ repos at ₹0.
 - `packages/core/src/pages.ts`, `links.ts`, `pages.test.ts` : page add/rename/move/delete, slugs,
   link walking (`collectHrefs`, `mapHrefs`), blank project
 - `apps/editor/src/panels/PagesPanel.tsx` : page list UI; `e2e/pages.spec.ts`
+- `apps/editor/.env.deploy` : live Worker URL for `--mode deploy` builds (public)
+- `package.json` / workspace `deploy`, `build:deploy`, `skill:remote` scripts; README "Deploy"
 - `.claude/launch.json` (untracked) : now also `api` (wrangler dev on 8787)
 
 - `apps/editor/src/security/headers.ts` (+ test) : CSP/headers, `_headers` text; `vite.config.ts` plugin
@@ -160,6 +181,12 @@ repos at ₹0.
 - `apps/editor/e2e/security.spec.ts`, `a11y.spec.ts`, `offline.spec.ts`; `security-report.md`
 
 ## 4. What worked
+
+- `wrangler pages project create klinth --production-branch main --force` makes a classic Pages
+  project (without `--force`, Wrangler 4.157 now delegates to Workers). After that, plain
+  `wrangler pages deploy dist --project-name klinth --branch main` works.
+- `wrangler secret put NAME --name klinth-api` works from any folder; running it for the owner in a
+  Terminal tab avoided typos in the name.
 
 - Cloudflare Pages `_headers`: rules matching one path combine; `! Header` detaches an earlier one.
 - `frames[0]` and `location`/`postMessage` work across opaque origins, so the editor can reach the
@@ -196,6 +223,15 @@ repos at ₹0.
 
 ## 5. What didn't work
 
+- `wrangler pages project create` without `--force` ran Workers "autoconfig": added
+  `@cloudflare/vite-plugin` + `wrangler.jsonc` to the editor, rewrote `preview`/`deploy` scripts and
+  deployed a stray Worker `klinth`. All reverted, stray Worker deleted, and the leftover
+  `apps/editor/.wrangler/deploy/config.json` removed (it broke `pages deploy`).
+- The owner twice ran `secret put <client id>` (wrong name); deleted the wrong secret afterwards.
+- `e2e/pages.spec.ts` failed once in the full run (Sections had 13 items, expected 1, test took
+  22 s), then passed 3/3 alone. Likely the known lost-click timing flake; watch it.
+- A brand-new workers.dev address needs a few minutes before TLS works (curl exit 35 at first).
+
 - Detecting a ZIP by file name failed for Playwright downloads (no extension); now by `PK` bytes.
 - Python `open(...,'w')` on Windows wrote CRLF; use `newline=''` or run Prettier after.
 - The Interactions docs say 401 for a bad key; the live API said 400. Trust live checks.
@@ -214,21 +250,12 @@ repos at ₹0.
 
 ## 6. What is still left to do
 
-1. **Owner:** review `workers/api/skill/skill.md` (or send your own text). It is never committed.
-2. **Owner (live GitHub test, Phase 6 "done when"):** create a GitHub OAuth app (Settings →
-   Developer settings → OAuth Apps → New): homepage `http://localhost:5173`, callback
-   `http://localhost:5173/github-callback.html`. Put its id and a new secret in
-   `workers/api/.dev.vars` (copy `.dev.vars.example`), run `npm run dev:api` and `npm run dev`,
-   then Export → Publish to GitHub with a throwaway name. Delete the test repo afterwards.
-   Production needs a second app (or updated URLs) with the Pages address in Phase 8.
-3. Phase 7 leftovers (low): Lighthouse re-run on both templates (templates unchanged in Phase 7);
-   Turnstile only if abuse appears; `wrangler tail` shows headers to the owner; Inspector exit
-   animation `inert` window; zod v4 is ~360 KB source in the main chunk (zod/mini would cut it).
-   **Owner/lawyer:** review Terms and Privacy; contact link points to `github.com/ig-suyas/klinth/issues`,
-   change it if the public repo differs. Turn on 2FA for GitHub and Cloudflare.
-4. Phase 8: create the KV namespace and replace the placeholder id in `wrangler.jsonc`; set
-   `ALLOWED_ORIGINS` to the Pages URL; put the skill with `--remote`; set `VITE_API_BASE_URL` (also
-   feeds `connect-src` in the generated `_headers`, so set it at build time) to the
-   Worker's https URL. Re-check the Gemini model is still stable and free.
-5. Item-level inline editing is inspector-only. Props changed without version bumps (no users yet).
-   `stash@{0}` (old Phase 2 WIP) can be dropped.
+1. **Owner:** say "push" to push `main` to `github.com/ig-suyas/klinth` (public, as chosen).
+2. **Owner:** review the live skill text (`workers/api/skill/skill.md`, then `skill:remote`); review
+   Terms/Privacy with a lawyer; turn on 2FA for GitHub and Cloudflare; delete `klinth-test-site`.
+3. Optional: custom domain (README "Deploy" section lists the follow-up config changes); rename the
+   workers.dev subdomain in the dashboard (then update `.env.deploy` and redeploy the editor).
+4. Low: Lighthouse re-run on live exported sites; Turnstile only if abuse appears; zod/mini to trim
+   the main chunk; eslint minimatch moderate advisories (dev only) clear with an eslint update;
+   `stash@{0}` can be dropped. Item-level inline editing is inspector-only.
+5. Re-check yearly or when Google announces changes: `GEMINI_MODEL` (`gemini-3.6-flash`) still free.

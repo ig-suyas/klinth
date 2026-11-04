@@ -6,6 +6,12 @@
 
 export const PREVIEW_PATH = '/preview.html';
 
+/**
+ * Cloudflare Pages answers `/preview.html` with a redirect to `/preview`, so the
+ * preview's own policy must cover both addresses or the frame gets the editor's.
+ */
+const PREVIEW_PATHS: readonly string[] = [PREVIEW_PATH, '/preview'];
+
 export type HeaderMap = Readonly<Record<string, string>>;
 
 const COMMON: HeaderMap = {
@@ -81,7 +87,7 @@ export function previewCsp(): string {
 
 /** Headers for one request path. */
 export function headersFor(path: string, apiBaseUrl: string | undefined): HeaderMap {
-  if (path === PREVIEW_PATH) {
+  if (PREVIEW_PATHS.includes(path)) {
     return { ...COMMON, 'Content-Security-Policy': previewCsp(), 'X-Frame-Options': 'SAMEORIGIN' };
   }
   return { ...COMMON, 'Content-Security-Policy': editorCsp(apiBaseUrl), 'X-Frame-Options': 'DENY' };
@@ -106,7 +112,9 @@ export function pagesHeadersFile(apiBaseUrl: string | undefined): string {
   const frame = { 'X-Frame-Options': preview['X-Frame-Options'] ?? '' };
   return [
     block('/*', editor),
-    block(PREVIEW_PATH, { ...own, ...frame }, ['Content-Security-Policy', 'X-Frame-Options']),
+    ...PREVIEW_PATHS.map((path) =>
+      block(path, { ...own, ...frame }, ['Content-Security-Policy', 'X-Frame-Options']),
+    ),
     block('/assets/*', { 'Cache-Control': 'public, max-age=31536000, immutable' }),
   ].join('\n');
 }

@@ -8,6 +8,8 @@ coverage/
 .env
 .env.*
 !.env.example
+# Public Worker address for the live build (not a secret)
+!apps/editor/.env.deploy
 .dev.vars
 .dev.vars.*
 !.dev.vars.example

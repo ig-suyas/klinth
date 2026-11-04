@@ -62,6 +62,11 @@ describe('pagesHeadersFile', () => {
     );
   });
 
+  it('also covers /preview, where Cloudflare Pages redirects /preview.html', () => {
+    expect(headersFor('/preview', undefined)['Content-Security-Policy']).toBe(previewCsp());
+    expect(file).toMatch(/^\/preview\n {2}! Content-Security-Policy\n {2}! X-Frame-Options\n/m);
+  });
+
   it('writes one header per line under each path', () => {
     for (const line of file.split('\n').filter(Boolean)) {
       expect(line).toMatch(/^(\/\S*| {2}(! )?[A-Za-z-]+(: .+)?)$/);
