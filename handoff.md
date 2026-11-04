@@ -6,7 +6,7 @@
 | ---------------------------- | ------------------------- |
 | 0 Scaffold and architecture  | done                      |
 | 1 Core engine                | done (reviewed, hardened) |
-| 2 Blocks and templates       | not started (WIP stashed) |
+| 2 Blocks and templates       | done                      |
 | 3 Editor UI                  | not started               |
 | 4 Media, embeds, custom code | not started               |
 | 5 AI Worker, key vault, AI   | not started               |
@@ -16,96 +16,72 @@
 
 ## 1. Current state
 
-Phase 1 done, then given a high-effort review (attack tests first, then small fixes). `packages/core`:
-versioned Zod schema, migrations hook, tokens, `renderSite()`, exporter, deterministic ZIP, project
-file import/export, secret guard. Editor: hardened IndexedDB storage and file helpers (no UI yet).
-`npm run check` and `npm run build` green: 254 tests (core 232, editor 19, templates 1, api 2).
+Phase 2 done. Every v1 block has strict typed props (Zod discriminated union). The renderer writes
+a premium, responsive, accessible site: sticky header with menu, skip link, hero layouts, numbered
+project covers, index list, facts, quotes, link page, contact (mailto, tel, optional form), footer
+outside `<main>`, monogram favicon, staggered scroll reveal. Two templates: **portfolio** (light
+paper, didone serif, sharp) and **landing** (dark green and saffron, grotesk, rounded, link page).
+`npm run check` and `npm run build` green: 307 tests (core 259, templates 27, editor 19, api 2).
+`stash@{0}` (old Phase 2 WIP) is now merged by hand and can be dropped.
 
-**Stash:** uncommitted Phase 2 work found during the review (new `packages/core/src/blocks.ts` with typed
-block props, plus `schema.ts` edits; it did not typecheck) is saved as `stash@{0}`
-("phase2-wip-not-from-review"). It did not come from a Klinth session. Restoring it will conflict in
-`schema.ts` (the review changed that file): merge by hand and keep the review's checks.
-
-**Remote:** `origin` = `github.com/ig-suyas/klinth`. Phase 0 (`6df961c`) is already on `origin/main`
-(pushed before the review). Phase 1 and the review commit are local only.
+**Remote:** `origin` = `github.com/ig-suyas/klinth`. Only Phase 0 is pushed; later commits are local.
 
 ## 2. Goal
 
-Next: Phase 2, the v1 blocks with real props and the 2 premium templates (Lighthouse 95+, visual
-snapshot tests). Overall: free, no-login visual site builder exporting plain HTML repos at ₹0.
+Next: Phase 3, the editor UI (panels, sandboxed preview with click-to-select, inspector, undo/redo,
+autosave, template picker, tour, Playwright flow). Overall: free, no-login site builder exporting
+plain HTML repos at ₹0.
 
 ## 3. Files
 
-- `packages/core/src/schema.ts` : Zod schemas; reserved slugs, unique ids, single-line text, prop-name rules
-- `packages/core/src/migrations.ts` : `runMigrations` (v0+), `assertPlainJson` (depth/keys), `migrateProject`
-- `packages/core/src/tokens.ts` : theme schema (hex colors, closed font-stack list), `themeToCss`
-- `packages/core/src/html.ts` : `escapeHtml`, `safeUrl` (https/mailto/tel/#anchor only), `hasControlChar`
-- `packages/core/src/render.ts` : `renderSite`, block renderers (basic markup), base CSS, site JS
-- `packages/core/src/export.ts` : `buildExport` (3.6 layout + README), `buildZip` (path guard, deterministic)
-- `packages/core/src/project-file.ts` : `serializeProject`/`parseProjectFile`, `containsSecret`, `assertNoSecrets`
-- `packages/core/src/review.test.ts` : the review's attack tests (items 1 to 7 and 9)
-- `apps/editor/src/lib/storage.ts` : IndexedDB with `StorageError` codes, revisions, damaged-record handling
-- `apps/editor/src/lib/storage.review.test.ts` : quota, unavailable, blocked, versionchange, two tabs, corruption
-- `apps/editor/src/lib/files.ts` : download project file / site ZIP, import project file (size checked first)
+- `packages/core/src/blocks.ts` : strict prop schemas per block, `singleLine`, `BlockProps<T>`
+- `packages/core/src/schema.ts` : `sectionSchema` is a discriminated union; asset `width`/`height`
+- `packages/core/src/render.ts` : page shell, header/menu, h1 rule, footer, monogram favicon
+- `packages/core/src/render-blocks.ts` : one renderer per block (`renderBlock` switch)
+- `packages/core/src/site-assets.ts` : exported `site.css` and `site.js`
+- `packages/core/src/contrast.ts` : `contrastRatio`, `mixSrgb`, `themeContrastIssues` (for editor warnings)
+- `packages/core/src/tokens.ts` : 9 font stacks; heading weight/tracking derived from the font
+- `packages/core/src/blocks.test.ts` : schema, structure, block and contrast tests
+- `packages/templates/src/{portfolio,landing}.ts` : the two templates (`create()` returns a fresh copy)
+- `packages/templates/src/blocks.ts` : `blockDefinitions` (plain labels, descriptions, starting props)
+- `packages/templates/src/__snapshots__/` : rendered HTML/CSS/JS/favicon snapshots per template
 
 ## 4. What worked
 
-- Deps: zod 4.6.7, fflate 0.8.3, idb 8.0.4, fake-indexeddb 6.2.7 (dev).
-- Held on the first try (tests kept): the URL allow-list (60+ hostile inputs: tab/newline/control
-  chars, entity and percent encoding, `data:`, `vbscript:`, `//`, userinfo, long input, ReDoS input),
-  escaping in text and attributes (`"><script>`, `</style>`, `</script>`, backticks, bidi and
-  full-width tricks), CSS tokens (hex-only colors, int ranges, fixed font list, NaN/Infinity).
-- Fixed in the review (each had a failing test first):
-  - Paths: slug `index` collided with the home page; added reserved slugs (`index`, `assets`, `css`,
-    `js`, `readme`) and Windows device names (`con`, `nul`, `com1`...), slug max 60. Asset ids must be
-    unique case-insensitively and avoid device names. Section ids are unique per page. `buildZip`
-    refuses unsafe or case-colliding paths.
-  - Text: titles, page titles, asset names and the description are single-line (no newline/control
-    chars), so nothing can be injected into README.md or `<title>`.
-  - Prop names must be plain identifiers. Zod 4 **silently drops** a `__proto__` key instead of rejecting
-    it, so `assertPlainJson` rejects `__proto__`/`constructor`/`prototype` before validation.
-  - Secrets: the name check was exact-match on JSON text (missed `geminiApiKey`, `githubToken`,
-    `authToken`, `clientSecret`...). It now walks objects and arrays at any depth, checking camelCase,
-    snake and kebab name words plus `AIza…`, `ghp_/gho_/ghu_/ghs_/ghr_…`, `github_pat_…` values. No false
-    positives on `keyline`, `monkey`, "token of thanks" etc. It now also blocks **IndexedDB saves**
-    (before, only export and import were checked).
-  - Import: depth limit 16 (iterative walk, no stack overflow), migrations accept v0, a crashing or
-    bad migration step becomes a plain `ProjectError`. The editor checks `Blob.size` before reading.
-  - ZIP: fflate writes DOS time from **local** time fields, so a `…Z` date gave different bytes in
-    different time zones. The date is now built from local parts on each call, entries are sorted, and
-    os=Unix with mode 0644 is fixed. Tested under UTC, IST and LA, plus a mutation check.
-  - Storage: a failed open was cached forever (now retried); added `blocking` (close for a newer tab),
-    `blocked` (reject instead of hanging) and `terminated` (reopen) handlers; quota, security and
-    version errors map to plain `StorageError` codes; `listProjects` lists damaged records instead of
-    crashing; `loadProject` reports `damaged` and keeps the record (`loadRawProject` rescues it);
-    `saveProject` takes a base revision and throws `conflict` instead of overwriting another tab.
-- Offline: exported sample unzipped to disk; a script checks every `src`/`href` exists locally and
-  nothing loads from the internet (only `<a>` links are remote). Result: OFFLINE OK.
-- Git: no AI attribution in any commit message (checked all refs).
+- **Lighthouse 12, mobile, both templates: Performance 100, Accessibility 100, Best Practices 100,
+  SEO 100.** LCP 0.9 s, CLS 0, TBT 0 ms. Run against the exported files on a local node server with
+  Chrome, screenshot audits skipped. The scripts are not in the repo (scratchpad only).
+- Headless Chrome (puppeteer-core) at 375 and 1280 px: no horizontal overflow, no console errors,
+  every revealed element ends visible; with reduced motion no reveal classes are added at all.
+- System font stacks only (no font host, no font files): fast, offline, Lighthouse-friendly.
+- First section is never hidden by the reveal (keeps LCP fast); only `.status` and `.actions` get
+  a short CSS rise. Menu is a `<details>` (works without JS, no layout jump); JS only closes it.
+- Bold-section soft text and card mixes are shared constants (`BOLD_MUTED_MIX` 0.9,
+  `BOLD_CARD_MIX` 0.08) used by both the CSS and the contrast check. The default accent moved to
+  `#b13a0b` to pass AA there.
+- Secrets are now checked **before** schema validation (core `serializeProject` and editor
+  `saveProject`), so a key-like prop gets the clear "key or token" message.
+- Snapshot folders are ignored by ESLint and Prettier (Prettier would otherwise rewrite them).
 
 ## 5. What didn't work
 
-- jsdom's `DOMException` is not `instanceof Error` and cloned typed arrays come from another realm, so
-  storage reads `error.name` and uses `ArrayBuffer.isView` instead of `instanceof`.
-- Assigning `process.env.TZ = undefined` sets the string "undefined"; delete the key to restore.
-- Storing `Blob` in fake-indexeddb under jsdom loses `arrayBuffer()`; assets are stored as `Uint8Array`.
-- sed with backslashes from Bash on Windows is unreliable; use the Edit tool for regex-heavy edits.
-  No Python on this machine.
+- "Visual snapshot tests" are **text snapshots** of the rendered files (`toMatchFileSnapshot`), not
+  pixel screenshots: the owner's global rule forbids generating screenshots unless asked. Add
+  Playwright `toHaveScreenshot` only if the owner asks for it.
+- The Claude browser pane runs hidden, which stops IntersectionObserver; use headless Chrome for
+  motion checks.
+- Writing TS source through `node -e` from Bash breaks on template literals and `'`; use Edit.
+- Lighthouse warns "no text compression" on the local server only; real hosts compress.
 
 ## 6. What is still left to do
 
-1. **Real-browser checks for Phase 3** (fake-indexeddb cannot prove these): real quota errors (Chrome
-   reports them on transaction abort, Safari often as `UnknownError`), eviction and
-   `navigator.storage.persist()`, private-mode behaviour in Safari/Firefox, true multi-tab
-   `versionchange`/`blocked` across processes, durability after a browser restart, and large
-   `Uint8Array` assets. Phase 3 should also use `BroadcastChannel` to tell other tabs about saves, and
-   reload on `conflict`.
-2. Phase 2: restore `stash@{0}` (see section 1). `containsSecret` flags props whose name words include
-   token/secret/password/passphrase/credential/authorization or `…key` after api/gemini/access/auth/
-   private/secret, so block props must avoid those names.
-3. `video` and `customCode` render placeholders only (Phase 4). SVG uploads are allowed: harmless in
-   `<img>`, but scripts would run if an SVG is opened directly. Decide in Phase 4.
-4. **CSP deferred to Phase 7:** exported-site CSP meta not added yet (check `'self'` behaviour over
-   `file://` first; prompt 5.5). Editor CSP via `_headers` also Phase 7.
-5. Before Phase 5: verify Cloudflare free limits and a current free-tier Gemini model.
-6. Playwright arrives in Phase 3. `npm audit`: moderate minimatch advisory in ESLint (dev only).
+1. Phase 3: use `templates[].create()`, `blockDefinitions` and `themeContrastIssues` (warn when a
+   color pick is hard to read). The preview needs CSS/JS inlined into `srcdoc` (pages link
+   `css/site.css` and `js/site.js`). Real-browser storage checks from the Phase 1 list still apply
+   (quota, eviction, private mode, multi-tab, `BroadcastChannel`, reload on `conflict`).
+2. Props changed from loose JSON to strict schemas without a version bump (no users yet). After
+   launch, any prop change needs a migration.
+3. `video` and `customCode` still render placeholders (Phase 4). Decide on SVG uploads in Phase 4.
+4. Images have no `srcset` yet; Phase 4 compression should write sizes (`width`/`height` exist).
+5. CSP still deferred to Phase 7 (exported-site meta and editor `_headers`).
+6. Before Phase 5: verify Cloudflare free limits and a current free-tier Gemini model.

@@ -70,8 +70,9 @@ export function assertNoSecrets(project: unknown): void {
 
 /** Serializes a project for download / `.klinth/project.json`. Throws if a secret slipped in. */
 export function serializeProject(project: Project): string {
+  // Secrets first: a clear "key or token" message beats a generic validation error.
+  assertNoSecrets(project);
   const valid = migrateProject(project);
-  assertNoSecrets(valid);
   return `${JSON.stringify(valid, null, 2)}\n`;
 }
 

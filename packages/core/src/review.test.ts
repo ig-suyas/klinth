@@ -17,8 +17,13 @@ import {
   serializeProject,
   themeToCss,
   type Project,
+  type Section,
   type SiteFile,
 } from './index.ts';
+
+/** Props as plain data, so tests can plant invalid or hostile values. */
+const loose = (section: Section | undefined): Record<string, unknown> =>
+  (section as Section).props as Record<string, unknown>;
 
 /**
  * Phase 1 review: each test tries to break one guarantee.
@@ -118,9 +123,9 @@ describe('1. URL allow-list', () => {
     const p = clone();
     const bad = 'javascript:alert(1)';
     const home = p.pages[0]!.sections;
-    home[0]!.props.buttons = [{ label: 'Go', href: bad }];
-    home[1]!.props.items = [{ title: 'T', href: bad, label: 'More' }];
-    home[2]!.props.items = [{ label: 'L', href: bad }];
+    loose(home[0]).buttons = [{ label: 'Go', href: bad }];
+    loose(home[1]).items = [{ title: 'T', href: bad, label: 'More' }];
+    loose(home[2]).items = [{ label: 'L', href: bad }];
     home.push({ id: 'c', type: 'contact', props: { email: 'x@y.co" onmouseover="alert(1)' } });
     const out = html(renderSite(p));
     expect(out).not.toMatch(/javascript:/i);
@@ -164,7 +169,7 @@ describe('2. escaping by context', () => {
       subheading: payload,
       buttons: [{ label: payload, href: '#work' }],
     };
-    home[1]!.props.items = [
+    loose(home[1]).items = [
       { title: payload, description: payload, image: 'img1', imageAlt: payload, label: payload },
     ];
     home.push(
@@ -408,7 +413,7 @@ describe('5. key and token guard', () => {
 
   it('blocks on export (serialize and buildExport)', () => {
     const p = clone();
-    p.pages[0]!.sections[2]!.props.items = [{ label: 'x', href: '#work', nested: [gemini] }];
+    loose(p.pages[0]!.sections[2]).items = [{ label: 'x', href: '#work', nested: [gemini] }];
     expect(() => serializeProject(p)).toThrow(/key or token/);
     expect(() => buildExport(p, assetData)).toThrow(/key or token/);
   });

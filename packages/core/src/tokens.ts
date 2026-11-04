@@ -11,7 +11,28 @@ export const FONT_STACKS = {
   humanist:
     'Seravek, "Gill Sans Nova", Ubuntu, Calibri, "DejaVu Sans", source-sans-pro, sans-serif',
   didone: 'Didot, "Bodoni MT", "Noto Serif Display", "URW Palladio L", P052, Sylfaen, serif',
+  oldstyle:
+    '"Iowan Old Style", "Palatino Linotype", "URW Palladio L", P052, Palatino, "Book Antiqua", serif',
+  grotesk:
+    '"Helvetica Neue", "Segoe UI Variable Display", "Segoe UI", Helvetica, Arial, "Nimbus Sans", "Liberation Sans", sans-serif',
+  geometric:
+    'Avenir, "Avenir Next LT Pro", Montserrat, Corbel, "URW Gothic", source-sans-pro, sans-serif',
+  rounded:
+    'ui-rounded, "SF Pro Rounded", "Hiragino Maru Gothic ProN", Quicksand, Comfortaa, Manjari, "Arial Rounded MT", "Arial Rounded MT Bold", Calibri, sans-serif',
 } as const;
+
+/** Serif display faces look best light and loose; sans faces bold and tight. */
+const HEADING_STYLE: Record<FontKey, { weight: number; tracking: string }> = {
+  'system-sans': { weight: 700, tracking: '-0.03em' },
+  'system-serif': { weight: 400, tracking: '-0.015em' },
+  'system-mono': { weight: 600, tracking: '-0.02em' },
+  humanist: { weight: 600, tracking: '-0.02em' },
+  didone: { weight: 400, tracking: '-0.02em' },
+  oldstyle: { weight: 400, tracking: '-0.01em' },
+  grotesk: { weight: 700, tracking: '-0.04em' },
+  geometric: { weight: 600, tracking: '-0.03em' },
+  rounded: { weight: 700, tracking: '-0.025em' },
+};
 
 export type FontKey = keyof typeof FONT_STACKS;
 const fontKey = z.enum(Object.keys(FONT_STACKS) as [FontKey, ...FontKey[]]);
@@ -44,7 +65,7 @@ export const defaultTheme: Theme = {
     surface: '#ffffff',
     text: '#1c1a17',
     muted: '#6b645a',
-    accent: '#c2410c',
+    accent: '#b13a0b',
     accentText: '#ffffff',
   },
   fonts: { heading: 'didone', body: 'system-sans' },
@@ -64,6 +85,8 @@ export function themeToCss(theme: Theme): string {
     ['--color-accent-text', c.accentText],
     ['--font-heading', FONT_STACKS[theme.fonts.heading]],
     ['--font-body', FONT_STACKS[theme.fonts.body]],
+    ['--heading-weight', String(HEADING_STYLE[theme.fonts.heading].weight)],
+    ['--heading-tracking', HEADING_STYLE[theme.fonts.heading].tracking],
     ['--radius', `${theme.radius}px`],
     ['--space', `${theme.spacing}px`],
   ];

@@ -40,10 +40,10 @@ afterEach(async () => {
 describe('secrets', () => {
   it('refuses to save a project holding a Gemini key or GitHub token', async () => {
     const p = clone();
-    p.pages[0]!.sections[0]!.props.heading = `AIza${'x'.repeat(35)}`;
+    (p.pages[0]!.sections[0]!.props as Record<string, unknown>).heading = `AIza${'x'.repeat(35)}`;
     await expect(saveProject('a', p, 0)).rejects.toThrow(/key or token/);
     const q = clone();
-    q.pages[0]!.sections[0]!.props.githubToken = 'abc';
+    (q.pages[0]!.sections[0]!.props as Record<string, unknown>).githubToken = 'abc';
     await expect(saveProject('a', q, 0)).rejects.toThrow(/key or token/);
     expect(await loadProject('a')).toBeUndefined();
   });

@@ -5,7 +5,23 @@
  */
 
 export * from './schema.ts';
+export {
+  BACKGROUNDS,
+  blockPropSchemas,
+  type Background,
+  type BlockPropSchemas,
+  type BlockProps,
+  type BlockType,
+  type LinkProps,
+} from './blocks.ts';
 export * from './tokens.ts';
+export {
+  MIN_TEXT_CONTRAST,
+  contrastRatio,
+  mixSrgb,
+  themeContrastIssues,
+  type ContrastIssue,
+} from './contrast.ts';
 export { escapeHtml, hasControlChar, safeUrl } from './html.ts';
 export {
   MAX_DEPTH,

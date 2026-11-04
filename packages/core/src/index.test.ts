@@ -17,7 +17,12 @@ import {
   sampleProject,
   serializeProject,
   type Project,
+  type Section,
 } from './index.ts';
+
+/** Props as plain data, so tests can plant invalid or hostile values. */
+const loose = (section: Section | undefined): Record<string, unknown> =>
+  (section as Section).props as Record<string, unknown>;
 
 const assetData = new Map([['img1', new Uint8Array([1, 2, 3, 4])]]);
 const clone = (): Project => JSON.parse(JSON.stringify(sampleProject)) as Project;
@@ -37,8 +42,8 @@ describe('escaping', () => {
   it('never outputs user markup in rendered pages', () => {
     const p = clone();
     const hero = p.pages[0]!.sections[0]!;
-    hero.props.heading = '<script>alert(1)</script>';
-    hero.props.subheading = '"><img src=x onerror=alert(1)>';
+    loose(hero).heading = '<script>alert(1)</script>';
+    loose(hero).subheading = '"><img src=x onerror=alert(1)>';
     p.meta.title = '</title><script>x()</script>';
     const html = text(renderSite(p), 'index.html');
     expect(html).not.toContain('<script>alert');
@@ -85,10 +90,10 @@ describe('URL allow-list', () => {
 
   it('drops unsafe links when rendering', () => {
     const p = clone();
-    p.pages[0]!.sections[2]!.props.items = [{ label: 'Bad', href: 'javascript:alert(1)' }];
+    loose(p.pages[0]!.sections[2]).items = [{ label: 'Bad', href: 'javascript:alert(1)' }];
     const html = text(renderSite(p), 'index.html');
     expect(html).not.toContain('javascript:');
-    expect(html).toContain('<span class="button">Bad</span>');
+    expect(html).toContain('<span class="linkbtn"><span>Bad</span>');
   });
 });
 
@@ -139,10 +144,10 @@ describe('project file', () => {
 
   it('refuses to save a project with a secret inside block props', () => {
     const p = clone();
-    p.pages[0]!.sections[0]!.props.heading = `AIza${'a'.repeat(35)}`;
+    loose(p.pages[0]!.sections[0]).heading = `AIza${'a'.repeat(35)}`;
     expect(() => serializeProject(p)).toThrow(/key or token/);
     const q = clone();
-    q.pages[0]!.sections[0]!.props.apiKey = 'hello';
+    loose(q.pages[0]!.sections[0]).apiKey = 'hello';
     expect(() => serializeProject(q)).toThrow(/key or token/);
   });
 
@@ -164,6 +169,7 @@ describe('export', () => {
         'README.md',
         'about.html',
         'assets/img1.webp',
+        'favicon.svg',
         'css/site.css',
         'index.html',
         'js/site.js',

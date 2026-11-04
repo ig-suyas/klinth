@@ -162,8 +162,9 @@ export async function saveProject(
   baseRevision: number,
   now = Date.now(),
 ): Promise<number> {
+  // Secrets first: a clear "key or token" message beats a generic validation error.
+  assertNoSecrets(project);
   const valid = migrateProject(project);
-  assertNoSecrets(valid);
   return run(async (database) => {
     const tx = database.transaction('projects', 'readwrite');
     const current = await tx.store.get(id);

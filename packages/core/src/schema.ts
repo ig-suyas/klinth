@@ -1,25 +1,11 @@
 import { z } from 'zod';
-import { hasControlChar } from './html.ts';
+import { blockPropSchemas, singleLine, type BlockType } from './blocks.ts';
 import { themeSchema } from './tokens.ts';
 
 export const SCHEMA_VERSION = 1;
 
-export const BLOCK_TYPES = [
-  'hero',
-  'about',
-  'textImage',
-  'gallery',
-  'video',
-  'projects',
-  'testimonials',
-  'links',
-  'contact',
-  'footer',
-  'customCode',
-  'spacer',
-] as const;
-
-export type BlockType = (typeof BLOCK_TYPES)[number];
+/** Block types in the order the editor lists them. */
+export const BLOCK_TYPES = Object.keys(blockPropSchemas) as BlockType[];
 
 const id = z.string().regex(/^[A-Za-z0-9_-]{1,64}$/, 'Invalid id');
 
@@ -32,38 +18,25 @@ const RESERVED_SLUGS = new Set(['index', 'assets', 'css', 'js', 'readme']);
 /** Asset ids become file names, so they also avoid Windows device names. */
 const assetId = id.refine((v) => !DEVICE_NAME.test(v), 'This file id is reserved');
 
-/** One line of plain text: no line breaks or control characters. */
-const singleLine = (max: number, min = 0) =>
-  z
-    .string()
-    .min(min)
-    .max(max)
-    .refine((v) => !hasControlChar(v), 'Use a single line of text');
-
-const propName = z.string().regex(/^[A-Za-z][A-Za-z0-9]{0,63}$/, 'Invalid field name');
-
-/** Block props are JSON values; each block's renderer reads them defensively. */
-const jsonValue: z.ZodType<unknown> = z.lazy(() =>
-  z.union([
-    z.string().max(200_000),
-    z.number(),
-    z.boolean(),
-    z.null(),
-    z.array(jsonValue).max(500),
-    // Plain identifiers only: blocks `__proto__`, `constructor` and odd names.
-    z.record(propName, jsonValue),
-  ]),
-);
-
 const isUnique = (values: string[]): boolean => new Set(values).size === values.length;
 
-export const sectionSchema = z
-  .object({
-    id,
-    type: z.enum(BLOCK_TYPES),
-    props: z.record(propName, jsonValue),
-  })
-  .strict();
+const sectionOf = <T extends BlockType>(type: T) =>
+  z.object({ id, type: z.literal(type), props: blockPropSchemas[type] }).strict();
+
+export const sectionSchema = z.discriminatedUnion('type', [
+  sectionOf('hero'),
+  sectionOf('about'),
+  sectionOf('textImage'),
+  sectionOf('gallery'),
+  sectionOf('video'),
+  sectionOf('projects'),
+  sectionOf('testimonials'),
+  sectionOf('links'),
+  sectionOf('contact'),
+  sectionOf('footer'),
+  sectionOf('customCode'),
+  sectionOf('spacer'),
+]);
 
 export const pageSchema = z
   .object({
@@ -94,6 +67,9 @@ export const assetSchema = z
       .int()
       .min(0)
       .max(25 * 1024 * 1024),
+    /** Pixel size of images, used to reserve space and avoid layout jumps. */
+    width: z.number().int().min(1).max(10_000).optional(),
+    height: z.number().int().min(1).max(10_000).optional(),
     mime: z.enum([
       'image/webp',
       'image/jpeg',
@@ -133,6 +109,7 @@ export const projectSchema = z
   .strict();
 
 export type Section = z.infer<typeof sectionSchema>;
+export type SectionOf<T extends BlockType> = Extract<Section, { type: T }>;
 export type Page = z.infer<typeof pageSchema>;
 export type Asset = z.infer<typeof assetSchema>;
 export type Project = z.infer<typeof projectSchema>;

@@ -4,3 +4,4 @@ coverage
 .wrangler
 package-lock.json
 klinth-prompt.md
+**/__snapshots__/
