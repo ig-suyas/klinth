@@ -1,4 +1,6 @@
 import { useEffect } from 'react';
+import { AiSettings, useAutoLock } from './ai/AiSettings.tsx';
+import { QuotaBanner } from './ai/QuotaBanner.tsx';
 import { Inspector } from './inspector/Inspector.tsx';
 import { MediaLibrary } from './media/MediaLibrary.tsx';
 import { SectionsPanel } from './panels/SectionsPanel.tsx';
@@ -21,6 +23,7 @@ function isTyping(target: EventTarget | null): boolean {
 /** The editor: top bar, sections on the left, live preview, settings on the right. */
 export function Editor({ onExit }: { onExit: () => void }) {
   useAutosave();
+  useAutoLock();
   const projectId = useEditor((s) => s.projectId);
 
   // Files that were deleted or whose upload was undone are cleaned up when a project opens.
@@ -52,11 +55,13 @@ export function Editor({ onExit }: { onExit: () => void }) {
       <TopBar onExit={onExit} />
       <SectionsPanel />
       <main className="flex min-h-0 min-w-0 flex-col" aria-label="Preview">
+        <QuotaBanner />
         <Preview />
       </main>
       <Inspector />
       <Tour />
       <MediaLibrary />
+      <AiSettings />
       <NoticeBar />
     </div>
   );

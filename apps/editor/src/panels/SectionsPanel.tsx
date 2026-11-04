@@ -2,6 +2,7 @@ import type { Section } from '@klinth/core';
 import { blockDefinitions } from '@klinth/templates';
 import { AnimatePresence, Reorder, motion, useDragControls, useReducedMotion } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
+import { useAi } from '../ai/store.ts';
 import { ADDABLE_BLOCKS } from '../inspector/fields.ts';
 import { sectionTitle } from '../state/sections.ts';
 import { currentPage, useEditor } from '../state/store.ts';
@@ -85,6 +86,7 @@ function SectionRow({
   selected: boolean;
 }) {
   const select = useEditor((s) => s.select);
+  const openPanel = useAi((s) => s.openPanel);
   const { move, duplicate, remove } = useSectionActions();
   const controls = useDragControls();
   const label = blockDefinitions[section.type].label;
@@ -121,6 +123,18 @@ function SectionRow({
       <span
         className={`flex shrink-0 ${selected ? '' : 'opacity-0 group-focus-within:opacity-100 group-hover:opacity-100'}`}
       >
+        <button
+          type="button"
+          className="icon-btn size-7 text-accent"
+          aria-label={`Ask AI about ${label}`}
+          title="Ask AI to write or restyle this section"
+          onClick={() => {
+            select(section.id);
+            openPanel(section.id);
+          }}
+        >
+          <Icon name="sparkle" className="size-3.5" />
+        </button>
         <button
           type="button"
           className="icon-btn size-7"

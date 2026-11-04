@@ -25,6 +25,18 @@ npm run dev:api
 
 Runs the API Worker locally at http://localhost:8787 (check http://localhost:8787/health).
 
+### AI helper (optional)
+
+The AI helper needs the private design skill in the Worker's local KV. Put your skill text in
+`workers/api/skill/skill.md` (this folder is ignored by git), then:
+
+```bash
+npm run skill:local -w @klinth/api
+```
+
+In the editor, click **AI helper** and paste your own free Gemini key from Google AI Studio. Tests
+never call Gemini; they use fake answers.
+
 ## Checks
 
 ```bash

@@ -57,7 +57,9 @@ export {
   assetBytes,
   assetUsage,
   formatBytes,
+  keepAssetRefs,
   removeAsset,
   sectionAssetIds,
 } from './media.ts';
+export * from './ai.ts';
 export { sampleProject } from './sample.ts';

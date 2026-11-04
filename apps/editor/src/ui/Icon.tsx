@@ -19,6 +19,10 @@ const PATHS = {
   warn: 'M12 3 2 20h20zM12 10v4M12 17h.01',
   upload: 'M12 20V9M7 14l5-5 5 5M5 4h14',
   image: 'M4 5h16v14H4zM4 16l5-5 4 4 2-2 5 5M15 9.5h.01',
+  sparkle:
+    'M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8zM19 16l.7 1.8 1.8.7-1.8.7L19 21l-.7-1.8-1.8-.7 1.8-.7z',
+  key: 'M14.5 9.5a4 4 0 1 1-1.2-2.8M13.3 6.7 20 13.4M17.5 11l-2 2M20 13.4l-2 2',
+  lock: 'M6 11h12v9H6zM8.5 11V8a3.5 3.5 0 0 1 7 0v3',
 } as const;
 
 export type IconName = keyof typeof PATHS;

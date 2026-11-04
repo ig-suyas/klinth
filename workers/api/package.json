@@ -6,10 +6,13 @@
   "scripts": {
     "dev": "wrangler dev --port 8787",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "skill:local": "wrangler kv key put design-skill --binding SKILL --path skill/skill.md --local",
+    "check:bundle": "wrangler deploy --dry-run --outdir dist"
   },
   "dependencies": {
-    "@klinth/core": "*"
+    "@klinth/core": "*",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20261103.1",

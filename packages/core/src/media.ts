@@ -37,6 +37,23 @@ export function sectionAssetIds(sections: readonly Section[]): Set<string> {
   return ids;
 }
 
+/**
+ * Copy of `value` without file references outside `allowed`. Used on AI
+ * answers, so the AI can keep or drop a section's files but never invent one.
+ */
+export function keepAssetRefs<T>(value: T, allowed: ReadonlySet<string>): T {
+  const walk = (node: Json): Json => {
+    if (Array.isArray(node)) return node.map(walk);
+    if (typeof node !== 'object' || node === null) return node;
+    return Object.fromEntries(
+      Object.entries(node)
+        .filter(([key, child]) => !(ASSET_KEYS.has(key) && !allowed.has(String(child))))
+        .map(([key, child]) => [key, walk(child)]),
+    );
+  };
+  return walk(value) as T;
+}
+
 function strip(value: Json, id: string): Json {
   if (Array.isArray(value)) return value.map((item) => strip(item, id));
   if (typeof value !== 'object' || value === null) return value;

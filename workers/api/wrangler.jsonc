@@ -3,10 +3,30 @@
   "name": "klinth-api",
   "main": "src/index.ts",
   "compatibility_date": "2026-10-01",
-  "observability": { "enabled": true },
+  "observability": {
+    "enabled": true,
+    // Invocation logs record request headers, which would include X-Gemini-Key.
+    // Only our own outcome lines (no keys, bodies or skill) are logged.
+    "logs": { "enabled": true, "invocation_logs": false },
+  },
   "vars": {
     "ALLOWED_ORIGINS": "http://localhost:5173",
+    // Stable free-tier model, verified 2026-11-04. Change here if Google retires it.
+    "GEMINI_MODEL": "gemini-3.6-flash",
+    // minimal | low | medium | high. Lowest thinking keeps the user's quota and waits small.
+    "GEMINI_THINKING_LEVEL": "minimal",
   },
-  // Phase 5 adds: KV namespace (private skill), Durable Object (rate limiter),
-  // rate limit binding (burst guard). Phase 6 adds GitHub OAuth vars.
+  // The private design skill, key "design-skill". Put it with:
+  //   npm run skill:local -w @klinth/api            (local dev)
+  //   npx wrangler kv key put design-skill --binding SKILL --path skill/skill.md --remote
+  // The id is filled in during Phase 8 (wrangler kv namespace create SKILL).
+  "kv_namespaces": [{ "binding": "SKILL", "id": "00000000000000000000000000000000" }],
+  // Exact hourly limit per IP (SQLite-backed, the only kind on the free plan).
+  "durable_objects": { "bindings": [{ "name": "RATE_LIMITER", "class_name": "RateLimiter" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["RateLimiter"] }],
+  // Short-window burst guard (approximate, per Cloudflare location).
+  "ratelimits": [
+    { "name": "BURST", "namespace_id": "1001", "simple": { "limit": 10, "period": 60 } },
+  ],
+  // Phase 6 adds GitHub OAuth vars.
 }

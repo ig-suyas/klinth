@@ -1,6 +1,8 @@
 import type { Asset, Section } from '@klinth/core';
 import { blockDefinitions } from '@klinth/templates';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
+import { AiPanel } from '../ai/AiPanel.tsx';
+import { useAi } from '../ai/store.ts';
 import { withAsset } from '../media/files.ts';
 import { setSectionProps, type Props } from '../state/sections.ts';
 import { currentPage, useEditor } from '../state/store.ts';
@@ -86,6 +88,8 @@ function SectionSettings({ section }: { section: Section }) {
   const notify = useEditor((s) => s.notify);
   const pageIndex = useEditor((s) => s.pageIndex);
   const { duplicate, remove } = useSectionActions();
+  const aiOpen = useAi((s) => s.panelFor === section.id);
+  const openPanel = useAi((s) => s.openPanel);
   const definition = blockDefinitions[section.type];
   const props: Props = section.props;
   const save = (next: Props, key: string, newAsset?: Asset) => {
@@ -98,11 +102,23 @@ function SectionSettings({ section }: { section: Section }) {
 
   return (
     <div className="space-y-5 p-4">
-      <header>
-        <p className="eyebrow">Section</p>
-        <h2 className="mt-1 font-display text-xl">{definition.label}</h2>
-        <p className="help">{definition.description}</p>
+      <header className="flex items-start gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="eyebrow">Section</p>
+          <h2 className="mt-1 font-display text-xl">{definition.label}</h2>
+          <p className="help">{definition.description}</p>
+        </div>
+        <button
+          type="button"
+          className="btn btn-line shrink-0 px-2.5"
+          aria-expanded={aiOpen}
+          onClick={() => openPanel(aiOpen ? null : section.id)}
+        >
+          <Icon name="sparkle" className="size-4 text-accent" />
+          Ask AI
+        </button>
       </header>
+      {aiOpen ? <AiPanel section={section} /> : null}
       <p className="rounded-lg bg-sunk px-3 py-2 text-xs leading-relaxed text-ink-soft">
         Tip: click any text in the preview to change it right there.
       </p>

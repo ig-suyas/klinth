@@ -1,6 +1,7 @@
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
 import { downloadProjectFile, downloadSiteZip } from '../lib/files.ts';
+import { useAi } from '../ai/store.ts';
 import { loadAssets } from '../lib/storage.ts';
 import { useLibrary } from '../media/files.ts';
 import { useEditor, type Device } from '../state/store.ts';
@@ -27,6 +28,7 @@ export function TopBar({ onExit }: { onExit: () => void }) {
   const undo = useEditor((s) => s.undo);
   const redo = useEditor((s) => s.redo);
   const openLibrary = useLibrary((s) => s.open);
+  const openAi = useAi((s) => s.openSettings);
   if (!project) return null;
 
   return (
@@ -102,6 +104,15 @@ export function TopBar({ onExit }: { onExit: () => void }) {
       >
         <Icon name="image" />
         <span className="max-xl:sr-only">Pictures and videos</span>
+      </button>
+      <button
+        type="button"
+        className="btn btn-quiet"
+        title="AI helper: your Gemini key"
+        onClick={() => openAi(true)}
+      >
+        <Icon name="sparkle" className="size-4 text-accent" />
+        <span className="max-xl:sr-only">AI helper</span>
       </button>
       <ExportMenu />
     </header>

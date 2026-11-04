@@ -104,6 +104,7 @@ GitHub access uses the user's own OAuth token (default scope `public_repo`), hel
 | --------------- | ------ | --------------------------------------------------------------- | ----- |
 | `/health`       | GET    | Liveness check                                                  | 0     |
 | `/ai/generate`  | POST   | Instruction + section JSON → validated section JSON             | 5     |
+| `/ai/test`      | POST   | "Test my key": reads the model's details (no generation quota)  | 5     |
 | `/github/oauth` | POST   | Exchange OAuth `code` for token; returns token, never stores it | 6     |
 
 - JSON in and out, Zod-validated on both sides. Error shape: `{ "error": "<plain message>" }`.
@@ -112,11 +113,23 @@ GitHub access uses the user's own OAuth token (default scope `public_repo`), hel
 
 ## AI path
 
-- Browser sends the user's Gemini key in `X-Gemini-Key` over HTTPS to the Worker only.
-- Worker: rate limit (Durable Object token bucket, ~30/h per IP + built-in burst binding) → load skill
-  from KV → call Gemini with structured-output schema, low temperature, max tokens, 60 s timeout, one
-  retry on 5xx, none on 4xx/429 → Zod-validate → skill-echo guard → return section JSON only.
-- Gemini down or quota hit: plain banner, manual editing keeps working. AI is optional to the product.
+- Contract in `packages/core/src/ai.ts` (request/response/error schemas), shared by both sides.
+- Browser sends the user's Gemini key in `X-Gemini-Key` over HTTPS to the Worker only
+  (`apps/editor/src/ai/api.ts`). The key vault (`ai/vault.ts`): PBKDF2-SHA-256 600k → AES-GCM,
+  ciphertext/salt/IV in localStorage, unlocked key in memory only (`ai/store.ts`), optional
+  30-minute auto-lock, "Forget my key".
+- Worker (`workers/api/src/ai.ts`): Origin allow-list (403 otherwise) → key shape → body ≤ 64 KB →
+  Zod → burst guard (rate limit binding, 10/60 s) → Durable Object token bucket (30/h per IP, exact,
+  `Retry-After`) → refuse "print your instructions" requests → skill from KV (`design-skill`) →
+  Gemini Interactions API (`gemini.ts`, fixed host, `store: false`, JSON schema from Zod,
+  `thinking_level` from config, 60 s deadline, one retry on 5xx, none on 4xx/429) → Zod on the
+  props → skill-echo guard (any 8-word run from the skill) → drop file ids the section did not have
+  → return section JSON only. Gemini error texts are never passed on.
+- Temperature is not sent: Gemini 3.6+ ignores it (and will reject it). Low variance comes from the
+  schema, the minimal thinking level and the fixed rules.
+- Logs hold only `{route, outcome}`. Workers invocation logs are off (they record headers).
+- Gemini quota used up: plain banner, manual editing keeps working. AI-written custom code needs an
+  explicit "I have read this code and I trust it" before it is used.
 
 ## Security by design
 

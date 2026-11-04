@@ -2,101 +2,106 @@
 
 ## Phase status
 
-| Phase                        | Status                    |
-| ---------------------------- | ------------------------- |
-| 0 Scaffold and architecture  | done                      |
-| 1 Core engine                | done (reviewed, hardened) |
-| 2 Blocks and templates       | done                      |
-| 3 Editor UI                  | done                      |
-| 4 Media, embeds, custom code | done                      |
-| 5 AI Worker, key vault, AI   | not started               |
-| 6 GitHub connect, export     | not started               |
-| 7 Hardening                  | not started               |
-| 8 Deploy, launch, push       | not started               |
+| Phase                        | Status                                |
+| ---------------------------- | ------------------------------------- |
+| 0 Scaffold and architecture  | done                                  |
+| 1 Core engine                | done (reviewed, hardened)             |
+| 2 Blocks and templates       | done                                  |
+| 3 Editor UI                  | done                                  |
+| 4 Media, embeds, custom code | done                                  |
+| 5 AI Worker, key vault, AI   | done (owner to review the skill text) |
+| 6 GitHub connect, export     | not started                           |
+| 7 Hardening                  | not started                           |
+| 8 Deploy, launch, push       | not started                           |
 
 ## 1. Current state
 
-Phase 4 done. Pictures: upload (JPG/PNG/WebP/GIF, checked by first bytes; SVG refused), resized to
-2000 px wide and compressed to WebP in the browser (small GIFs kept to stay animated). Videos:
-MP4/WebM only, hard cap 25 MiB with a "use YouTube or Vimeo" hint. "Pictures and videos" window
-(top bar, also the picker from the inspector): upload, drag and drop, size, "used in N places",
-delete with confirm + Undo, repo-size warning over 60 MB. Video block: YouTube/Vimeo link (strict
-id parsing, embed code refused with its own message) rendered as a click-to-load facade that
-falls back to a plain link, or an uploaded `<video>`. Custom code block with trust notice, 200 KB
-limit; inline on export, nested `sandbox="allow-scripts"` frame in the preview. `npm run check`
-and `npm run build` green: 390 unit tests (core 303, templates 27, editor 58, api 2). `npm run
-e2e`: 5 Playwright tests green (media flow incl. exported site opened from disk, sandbox attack).
+Phase 5 done. Key vault (PBKDF2-SHA-256 600k → AES-GCM, only ciphertext/salt/IV in localStorage,
+key in memory only, optional 30 min auto-lock, Forget, Test my key, honest note). "Remember" can be
+unticked to keep the key for the tab only. AI helper: sparkle button on every section row and
+"Ask AI" in the inspector open an inline panel ("What do you want?", idea chips, Stop, Undo
+notice). AI-written custom code needs "I have read this code and I trust it". Quota banner over
+the preview. "AI helper" window in the top bar. Worker `/ai/generate` and `/ai/test` with Origin
+check, 64 KB cap, Zod, burst guard + Durable Object bucket (30/h per IP, `Retry-After`),
+extraction refusal, skill from KV, Gemini Interactions API, Zod on output, skill-echo guard, file-id
+filter. `npm run check` and `npm run build` green: 453 unit tests (core 308, templates 27, editor
+75, api 43). `npm run e2e`: 6 Playwright tests green (new `e2e/ai.spec.ts`, Worker mocked). Also
+checked by hand: editor in the browser → local `wrangler dev` Worker (real DO, rate limit binding,
+local KV) → live Gemini with a made-up key → plain "key not accepted" message; logs show only
+`{route, outcome}`.
+
+**Skill:** a distilled draft (about 570 words, under 2,500 tokens) is at
+`workers/api/skill/skill.md` (git-ignored). **Owner must review it** and replace it with their own
+text if they want. Local KV: `npm run skill:local -w @klinth/api`.
 
 **Remote:** `origin` = `github.com/ig-suyas/klinth`. Only Phase 0 is pushed; later commits are local.
 
 ## 2. Goal
 
-Next: Phase 5 (key vault, `/ai/generate` Worker with the private skill from KV, rate limiter, AI
-panel, quota banner, "Test my key"). Overall: free, no-login site builder exporting plain HTML
+Next: Phase 6 (GitHub OAuth exchange in the Worker, browser-side repo push via Git Data API,
+optional Pages, ZIP polish, re-import). Overall: free, no-login site builder exporting plain HTML
 repos at ₹0.
 
 ## 3. Files
 
-- `packages/core/src/embed.ts` : `parseVideoUrl` (YouTube/Vimeo id only), player/page URLs
-- `packages/core/src/media.ts` : `MAX_VIDEO_BYTES`, `REPO_WARN_BYTES`, `assetUsage`,
-  `removeAsset`, `sectionAssetIds`, `formatBytes`
-- `packages/core/src/render-blocks.ts` : video facade/file, custom code; `preview` option marks
-  files `data-k-asset` (no src) and sandboxes code. `site-assets.ts`: video CSS, facade loader JS
-- `apps/editor/src/media/process.ts` : sniffing, resize/compress, video checks (pure + canvas)
-- `apps/editor/src/media/files.ts` : Blob cache, `uploadFile`, `useAssetUrl`, `useLibrary` store
-- `apps/editor/src/media/MediaLibrary.tsx` : "Pictures and videos" window and picker
-- `apps/editor/src/inspector/MediaFields.tsx` : picture (+ description), video, code fields
-- `apps/editor/src/lib/storage.ts` : `loadAsset`, `pruneAssets` (unused files older than 1 day)
-- `apps/editor/src/preview/bridge.ts` : receives `assets` Blobs, fits code frames, capture click
-- `apps/editor/e2e/media.spec.ts` : media/embed/export flow and sandbox attack test
-- Earlier: `state/store.ts`, `state/sections.ts`, `preview/document.ts`, `inspector/fields.ts`,
-  `panels/*`, `ui/*`, `e2e/editor.spec.ts`; `.claude/launch.json` (untracked)
+- `packages/core/src/ai.ts` : shared AI contract (request/response/error schemas, limits, header)
+- `packages/core/src/media.ts` : `keepAssetRefs` (drops file ids the AI invented)
+- `workers/api/src/ai.ts` : `/ai/generate`, `/ai/test` handlers, rate-limit wiring, outcome logs
+- `workers/api/src/gemini.ts` : Interactions API call, retries, error mapping, Zod→Gemini schema
+- `workers/api/src/prompt.ts` : public fixed rules + private skill + section input
+- `workers/api/src/guard.ts` : extraction refusal, 8-word skill-echo guard
+- `workers/api/src/rate-limit.ts` : pure token bucket + `RateLimiter` Durable Object
+- `workers/api/src/http.ts` : CORS, JSON helpers, plain messages and statuses per error code
+- `workers/api/wrangler.jsonc` : vars (model, thinking), KV (placeholder id), DO + migration, BURST
+- `apps/editor/src/ai/vault.ts`, `store.ts`, `api.ts` : vault, in-memory key state, Worker client
+- `apps/editor/src/ai/KeyForms.tsx`, `AiSettings.tsx`, `AiPanel.tsx`, `QuotaBanner.tsx` : UI
+- `apps/editor/e2e/ai.spec.ts` : key → ask → unlock after reload → quota banner → forget
+- `.claude/launch.json` (untracked) : now also `api` (wrangler dev on 8787)
 
 ## 4. What worked
 
-- Playwright uses the installed Chrome locally (`channel: 'chrome'`, no browser download); CI runs
-  `npx playwright install --with-deps chromium` then `npm run e2e`.
-- Desktop preview renders at 1280 px and is scaled down to fit (1440 px window: scale 0.59).
-- Preview reloads `srcdoc` 120 ms after a change, restores scroll, and turns off the scroll reveal
-  after the first load so edits do not flicker.
-- Field specs are checked against schemas by tests (every prop shown or listed as later/unused,
-  choices equal enum options, new list items valid). The tests caught hero `intro` (not rendered,
-  now hidden) and new links defaulting to an invalid `https://` (now empty).
-- Links keep an invalid draft locally and only save valid addresses (`javascript:` never saved).
-- Preview files: the editor posts Blobs to the frame on `ready`; the opaque-origin frame makes its
-  own `blob:` URLs. Works in Chrome; avoids huge data URLs in `srcdoc` on every keystroke.
-- Picking a new upload adds the asset and sets the prop in one `change` (one undo step). Binaries
-  stay in IndexedDB until a later open prunes unused ones, so Undo after delete works.
-- Bridge click handler runs in the capture phase and the site script skips `defaultPrevented`
-  clicks, so the preview never loads YouTube/Vimeo players (they fail inside the sandbox anyway).
-- Sandbox test proves: editor DOM, preview DOM, localStorage and cookies blocked; fake `edit`
-  messages from code are ignored (editor checks `event.source`).
+- Verified 2026-11-04 (official docs, now under aistudio.google.com): stable free models
+  `gemini-3.6-flash`, `gemini-3.5-flash-lite`, `gemini-3.1-flash-lite`; Pro models are paid-only
+  since 2026-04-01; `gemini-2.5-flash` routes to 3.5-flash-lite from 2026-12-01. Free RPM/RPD are
+  only shown per project in AI Studio (not published). RPD resets at midnight Pacific.
+- Google recommends the Interactions API (`POST /v1beta/interactions`, `Api-Revision: 2026-05-20`,
+  `x-goog-api-key`, `system_instruction`, `response_format{mime_type,schema}`,
+  `generation_config{max_output_tokens,thinking_level}`, `store:false`). Output text is in
+  `steps[type=model_output].content[type=text].text`; `status` `incomplete` = cut off.
+- Gemini 3.6+ ignores `temperature` and will reject it later, so it is not sent (prompt said "low
+  temperature"; this is the replacement). `minimal` thinking works on 3.6 Flash and 3.5 Flash-Lite,
+  not on 3.8 Flash (change `GEMINI_THINKING_LEVEL` with the model).
+- Live check: a bad key returns **400 INVALID_ARGUMENT, reason API_KEY_INVALID** (old Google error
+  format, sometimes wrapped in an array), not the documented 401. Mapping matches both formats;
+  429 with `PerDay`/`quota_exceeded` → quota banner, `PerMinute`/`rate_limit_exceeded` → "busy".
+- Cloudflare free (verified 2026-11-04): Workers 100k req/day, 10 ms CPU, 50 subrequests, no wall
+  limit on fetch; DO 100k req/day, SQLite only (`new_sqlite_classes`), 5 GB; KV 100k reads/day,
+  1k writes/day, 25 MiB values, `cacheTtl` min 30 s; rate limit binding period 10 or 60 s
+  (approximate, per location), needs wrangler ≥ 4.36.
+- Classic fetch-style Durable Object (no `cloudflare:workers` import) keeps plain Vitest working;
+  tests drive the real `RateLimiter` class with in-memory storage.
+- `wrangler deploy --dry-run` bundles fine: 816 KiB / 134 KiB gzip.
+- Workers invocation logs are turned off in `wrangler.jsonc`: they would record request headers
+  (the key). Our own logs are `{route, outcome}` only; tests spy on every console method.
 
 ## 5. What didn't work
 
-- Playwright does not map clicks through CSS transforms on iframes, so clicks in the scaled preview
-  miss. E2E runs at a 2000 px wide viewport (no scaling). Real users are not affected.
-- Clicking inside the preview from the Claude browser pane needs coordinate clicks, which need a
-  screenshot (owner rule: none). Use Playwright for anything inside the frame.
-- Writing ` `-style escapes through the Write/Edit tools turns them into raw characters; use
-  `String.fromCharCode` instead (see `scriptJson` in `preview/document.ts`).
-- Python edits on Windows write CRLF; run Prettier after them.
-- jsdom never fires `loadedmetadata`; video tests use fake timers for the 5 s fallback.
-- Playwright clicked the old section's inspector while it faded out (AnimatePresence `wait`), so
-  an upload went to the wrong section. Tests now wait for the new panel. A very fast real user
-  could hit the same 180 ms window; consider `inert` on the exiting panel.
+- The Interactions docs say 401 for a bad key; the live API said 400. Trust live checks.
+- `getByLabel('Your Gemini key')` matched the form too (same aria-label); forms now use other
+  names. `getByLabel('Heading')` also matches "Text under the heading"; use `exact: true`.
+- jsdom has no `crypto.subtle`; vault tests run with `// @vitest-environment node`.
 
 ## 6. What is still left to do
 
-1. Phase 5: AI-generated custom code must need an explicit confirm (3.4). Verify Cloudflare free
-   limits and a current free-tier Gemini model first.
-2. Phase 6: a re-imported project file has no media bytes (export then says a file is missing).
-   Decide: include `assets/` when re-importing a repo, or ask to re-upload. Unused files are
-   still exported (the library shows "Not used yet").
-3. Phase 7: editor CSP must allow inline `<style>`/`<script>` in the `srcdoc` frame plus `blob:`
-   images/media; consider a separate preview origin. Bundle is 599 kB (191 kB gzip): split Motion/
-   Zod or lazy-load. Storage checks in a real browser: quota, eviction, private mode. Lighthouse
-   was not re-run after the video CSS/JS (small); re-run on both templates.
-4. Item-level inline editing (project titles, quotes) is inspector-only.
-5. Props changed without a version bump (no users yet). After launch, any prop change needs a
-   migration. `stash@{0}` (old Phase 2 WIP) can be dropped.
+1. **Owner:** review `workers/api/skill/skill.md` (or send your own text). It is never committed.
+2. Phase 6: re-imported project files have no media bytes (decide: include `assets/` on re-import
+   or ask to re-upload). Unused files are still exported.
+3. Phase 7: editor CSP must allow `connect-src` to the Worker plus the srcdoc/blob needs; bundle is
+   620 kB (196 kB gzip), split Motion/Zod or lazy-load the AI panel; consider Turnstile if abuse
+   appears. `wrangler tail` still shows headers to the owner (owner-only, short-lived). Lighthouse
+   re-run on both templates. Inspector exit animation window (see Phase 4 note: `inert`).
+4. Phase 8: create the KV namespace and replace the placeholder id in `wrangler.jsonc`; set
+   `ALLOWED_ORIGINS` to the Pages URL; put the skill with `--remote`; set `VITE_API_BASE_URL` to the
+   Worker's https URL. Re-check the Gemini model is still stable and free.
+5. Item-level inline editing is inspector-only. Props changed without version bumps (no users yet).
+   `stash@{0}` (old Phase 2 WIP) can be dropped.
