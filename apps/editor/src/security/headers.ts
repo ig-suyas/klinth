@@ -12,8 +12,11 @@ export const PREVIEW_PATH = '/preview.html';
  */
 const PREVIEW_PATHS: readonly string[] = [PREVIEW_PATH, '/preview'];
 
-/** Pages that point to hashed build files (Pages also serves `/x.html` as `/x`). */
-const HTML_PATHS: readonly string[] = ['/', '/index.html', ...PREVIEW_PATHS];
+/** The editor page, which points to hashed build files (the preview pages are covered below). */
+const EDITOR_HTML_PATHS: readonly string[] = ['/', '/index.html'];
+
+/** The HTML names the current build's hashed files, so browsers must always ask for it again. */
+const NO_CACHE = { 'Cache-Control': 'no-cache' } as const;
 
 export type HeaderMap = Readonly<Record<string, string>>;
 
@@ -113,14 +116,18 @@ export function pagesHeadersFile(apiBaseUrl: string | undefined): string {
   const preview = headersFor(PREVIEW_PATH, apiBaseUrl);
   const own = { 'Content-Security-Policy': preview['Content-Security-Policy'] ?? '' };
   const frame = { 'X-Frame-Options': preview['X-Frame-Options'] ?? '' };
+  // Each path gets exactly one block: Cloudflare Pages lets a second block for
+  // the same path replace the first, which dropped the preview's own policy.
   return [
     block('/*', editor),
     ...PREVIEW_PATHS.map((path) =>
-      block(path, { ...own, ...frame }, ['Content-Security-Policy', 'X-Frame-Options']),
+      block(path, { ...own, ...frame, ...NO_CACHE }, [
+        'Content-Security-Policy',
+        'X-Frame-Options',
+      ]),
     ),
-    // The HTML names the hashed files of the current build, so browsers must
-    // always ask for it again; the hashed files themselves never change.
-    ...HTML_PATHS.map((path) => block(path, { 'Cache-Control': 'no-cache' })),
+    ...EDITOR_HTML_PATHS.map((path) => block(path, NO_CACHE)),
+    // Hashed files never change.
     block('/assets/*', { 'Cache-Control': 'public, max-age=31536000, immutable' }),
   ].join('\n');
 }

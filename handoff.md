@@ -470,6 +470,11 @@ repos at ₹0.
 
 ## 5. What didn't work
 
+- `_headers`: a second block for a path that already has one (`/preview` + `Cache-Control`)
+  replaced the first on Pages, so `/preview` got the editor CSP (`frame-ancestors 'none'`) and the
+  live preview was blocked after deploy e3ab8fd3. One block per path now (unit test checks it).
+  `vite preview` sends headers per path, so e2e cannot catch `_headers` mistakes.
+
 - `wrangler pages project create` without `--force` ran Workers "autoconfig": added
   `@cloudflare/vite-plugin` + `wrangler.jsonc` to the editor, rewrote `preview`/`deploy` scripts and
   deployed a stray Worker `klinth`. All reverted, stray Worker deleted, and the leftover

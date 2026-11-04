@@ -68,10 +68,16 @@ describe('pagesHeadersFile', () => {
   });
 
   it('never lets the HTML be cached long; hashed files are immutable', () => {
+    const blocks = file.split('\n\n').map((b) => b.trim().split('\n'));
     for (const path of ['/', '/index.html', '/preview.html', '/preview']) {
-      expect(file).toContain(`\n${path}\n  Cache-Control: no-cache\n`);
+      expect(blocks.find(([p]) => p === path)).toContain('  Cache-Control: no-cache');
     }
     expect(file).toContain('/assets/*\n  Cache-Control: public, max-age=31536000, immutable');
+  });
+
+  it('lists each path once (Pages lets a later block for a path replace an earlier one)', () => {
+    const paths = file.split('\n').filter((line) => line.startsWith('/'));
+    expect(new Set(paths).size).toBe(paths.length);
   });
 
   it('writes one header per line under each path', () => {
