@@ -95,7 +95,7 @@ move, nudges to the edge, undo x4 back to flow and redo, export ZIP; don't ask a
 edit, resize, z-order, phone stacking, return with confirm; reordering the list never asks).
 `App.test.tsx` load budgets raised to 15 s (the lazy screens took 5 s+ only when all 28 files run
 in parallel; 0.4 s alone). Totals: 838 unit (core 522, templates 46, editor 214, api 56), 37 e2e
-(`--workers=1`, all pass).
+(`--workers=1`, all pass). Pushed and deployed (see Remote below).
 
 **6F Part 1 (hidden free canvas: data model, renderer, exporter): schema version 5.** No editor
 UI yet. Concept: free placement is not a menu option; in Part 2 it appears only when the owner
@@ -491,7 +491,9 @@ editor 77, api 43) and 6 e2e (ZIP holds real WOFF2 files; preview frame has Frau
 per block, rhythm, custom code rules. Examples are kept under 8 words so the echo guard never blocks
 them. **Owner should review it.** Local KV: `npm run skill:local -w @klinth/api`.
 
-**Remote:** `origin` = `github.com/ig-suyas/klinth`. `main` is pushed (through 6D).
+**Remote:** `origin` = `github.com/ig-suyas/klinth`. `main` is pushed (through 6F Part 2,
+62f962a). Editor deployed 2026-11-05 with `npm run deploy:editor` (deployment 0f91ead0, production
+`klinth.pages.dev`; smoke-checked: 200, preview keeps its own policy, new code served).
 
 ## 2. Goal
 
