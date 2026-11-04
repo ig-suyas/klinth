@@ -1,7 +1,7 @@
 import { templates, type TemplateInfo } from '@klinth/templates';
 import { motion, useReducedMotion } from 'motion/react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { importProjectFile } from './lib/files.ts';
+import { importAnyFile, type ImportedProject } from './lib/files.ts';
 import { deleteProject, listProjects, type ProjectSummary } from './lib/storage.ts';
 import { useFontUrls } from './lib/fonts.ts';
 import { buildPreviewDocument } from './preview/document.ts';
@@ -9,7 +9,7 @@ import { Icon } from './ui/Icon.tsx';
 import { blankProject, type Project } from '@klinth/core';
 
 interface StartScreenProps {
-  onCreate: (project: Project) => Promise<void>;
+  onCreate: (project: Project, imported?: Omit<ImportedProject, 'project'>) => Promise<void>;
   onOpen: (id: string) => Promise<void>;
 }
 
@@ -113,19 +113,23 @@ export function StartScreen({ onCreate, onOpen }: StartScreenProps) {
               onClick={() => fileInput.current?.click()}
             >
               <Icon name="upload" />
-              Open a project file
+              Open a project file or site ZIP
             </button>
             <input
               ref={fileInput}
               type="file"
-              accept=".json,application/json"
+              accept=".json,application/json,.zip,application/zip"
               className="sr-only"
               tabIndex={-1}
               aria-hidden="true"
               onChange={(e) => {
                 const file = e.target.files?.[0];
                 e.target.value = '';
-                if (file) void run(async () => onCreate(await importProjectFile(file)));
+                if (!file) return;
+                void run(async () => {
+                  const { project, ...imported } = await importAnyFile(file);
+                  await onCreate(project, imported);
+                });
               }}
             />
           </div>

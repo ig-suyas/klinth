@@ -15,6 +15,10 @@
     "GEMINI_MODEL": "gemini-3.6-flash",
     // minimal | low | medium | high. Lowest thinking keeps the user's quota and waits small.
     "GEMINI_THINKING_LEVEL": "minimal",
+    // GitHub OAuth app id (public). Filled in during Phase 8. The secret is set with
+    //   npx wrangler secret put GITHUB_CLIENT_SECRET      (production)
+    //   workers/api/.dev.vars                             (local, git-ignored)
+    "GITHUB_CLIENT_ID": "",
   },
   // The private design skill, key "design-skill". Put it with:
   //   npm run skill:local -w @klinth/api            (local dev)
@@ -28,5 +32,4 @@
   "ratelimits": [
     { "name": "BURST", "namespace_id": "1001", "simple": { "limit": 10, "period": 60 } },
   ],
-  // Phase 6 adds GitHub OAuth vars.
 }

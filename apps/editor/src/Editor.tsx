@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { AiSettings, useAutoLock } from './ai/AiSettings.tsx';
 import { QuotaBanner } from './ai/QuotaBanner.tsx';
+import { GitHubDialog } from './github/GitHubDialog.tsx';
 import { Inspector } from './inspector/Inspector.tsx';
 import { MediaLibrary } from './media/MediaLibrary.tsx';
 import { PagesPanel } from './panels/PagesPanel.tsx';
@@ -66,6 +67,7 @@ export function Editor({ onExit }: { onExit: () => void }) {
       <Tour />
       <MediaLibrary />
       <AiSettings />
+      <GitHubDialog />
       <NoticeBar />
     </div>
   );

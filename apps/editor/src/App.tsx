@@ -2,8 +2,8 @@ import type { Project } from '@klinth/core';
 import { Component, useEffect, useState, type ReactNode } from 'react';
 import { Editor } from './Editor.tsx';
 import { StartScreen } from './StartScreen.tsx';
-import { downloadProjectFile } from './lib/files.ts';
-import { loadProject, saveProject } from './lib/storage.ts';
+import { downloadProjectFile, missingFilesNote, type ImportedProject } from './lib/files.ts';
+import { loadProject, saveAsset, saveProject } from './lib/storage.ts';
 import { useEditor } from './state/store.ts';
 
 const LAST_KEY = 'klinth:last-project';
@@ -40,12 +40,16 @@ export function App() {
     setScreen('editor');
   };
 
-  const create = async (project: Project) => {
+  const create = async (project: Project, imported?: Omit<ImportedProject, 'project'>) => {
     const id = crypto.randomUUID();
+    // Media first: the project is only listed once every file it needs is stored.
+    for (const [assetId, data] of imported?.assets ?? []) await saveAsset(id, assetId, data);
     const revision = await saveProject(id, project, 0);
     open(id, project, revision);
     remember(id);
     setScreen('editor');
+    const note = missingFilesNote(imported?.missing ?? []);
+    if (note) useEditor.getState().notify(note);
   };
 
   // Returning visitors go straight back to what they were working on.

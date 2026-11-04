@@ -2,6 +2,7 @@ import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
 import { downloadProjectFile, downloadSiteZip } from '../lib/files.ts';
 import { useAi } from '../ai/store.ts';
+import { useGitHub } from '../github/oauth.ts';
 import { loadAssets } from '../lib/storage.ts';
 import { useLibrary } from '../media/files.ts';
 import { useEditor, type Device } from '../state/store.ts';
@@ -235,6 +236,16 @@ function ExportMenu() {
               text="A ZIP with your finished site, ready to put online."
               disabled={busy}
               onClick={() => void downloadSite()}
+            />
+            <MenuItem
+              icon="globe"
+              title="Publish to GitHub"
+              text="Save the same files to a GitHub repository and get a free web address."
+              disabled={busy}
+              onClick={() => {
+                setOpen(false);
+                useGitHub.getState().openDialog(true);
+              }}
             />
             <MenuItem
               icon="file"

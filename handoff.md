@@ -11,11 +11,40 @@
 | 4 Media, embeds, custom code | done                                  |
 | 5 AI Worker, key vault, AI   | done (owner to review the skill text) |
 | 5.5 Blank start, multi-page  | done                                  |
-| 6 GitHub connect, export     | not started                           |
+| 6 GitHub connect, export     | done (live push needs owner's app)    |
 | 7 Hardening                  | not started                           |
 | 8 Deploy, launch, push       | not started                           |
 
 ## 1. Current state
+
+**Phase 6 (GitHub, export polish):** Export menu has "Publish to GitHub". Dialog: repo name
+(suggested from the title, remembered per project in localStorage, name only), New / "One I
+published before", "Turn on GitHub Pages" (on by default, off for private), "Make private".
+Scope is `public_repo`, or `repo` only when Pages or private is chosen (Pages API needs `repo`).
+Sign-in: OAuth + PKCE S256 + random state in a popup opened inside the click; callback page
+`public/github-callback.html` (+ `.js`, no inline script) sends `{code,state}` over a same-origin
+`BroadcastChannel('klinth-github')` (works even if GitHub's COOP cuts `window.opener`). Worker
+`GET /github/config` (public client id or null) and `POST /github/oauth` (Origin check, burst guard,
+Zod, redirect must be `<allowed origin>/github-callback.html`, fixed upstream, 15 s timeout, logs
+`{route,outcome}` only). Token: zustand memory only; gone on reload; "Disconnect" button.
+Push (`github/api.ts`): create repo with `auto_init` (Git Data API can't write to an empty repo) or
+update one that already has `.klinth/project.json` (refuses other repos); local Git blob SHA-1 per
+file; unchanged files reuse the existing sha, text goes inline in the tree, binaries/empty files
+via `/git/blobs` one at a time (returned sha must match); tree without `base_tree` (stale files
+removed); commit; ref PATCH `force:false`; then reads the tree back and requires every path+sha to
+equal the local set (proves push == ZIP); Pages POST (409 = already on). Plain errors: signed out
+(401, clears session), name taken (offers "Update that repository instead"), not found, not Klinth,
+slow down (403 rate limit / 429 / retry-after), offline, mismatch, Stop (AbortSignal, branch only
+moves at the end). ZIP polish: unused uploads are left out of the files _and_ the exported
+project.json (`exportedProject`); README adds "Change your site later" and a folder guide.
+Re-import: "Open a project file or site ZIP" (ZIP detected by `PK` bytes, not name). `readSiteZip`
+reads only `.klinth/project.json` + `assets/*` (also inside one top folder, e.g. GitHub's
+"Download ZIP"), size caps checked before unpacking, media saved before the project; a project
+file alone shows "n pictures or videos were not included. Upload again…". Tests: 550 unit (core
+360, templates 27, editor 109, api 54) and 9 e2e (new `e2e/github.spec.ts`: popup sign-in → push →
+Pages → pushed files == ZIP bytes → token absent from localStorage/sessionStorage/IndexedDB and the
+project → gone after reload; ZIP re-import round-trip is byte-identical).
+**Not yet done:** a live push to real GitHub (needs the owner's OAuth app, see section 6).
 
 **Phase 5.5 (blank start, pages):** "Start blank" card next to the two templates (`blankProject()`
 in core: one empty home page, default theme). New "Pages" panel above Sections: switch, add (asks
@@ -67,12 +96,21 @@ them. **Owner should review it.** Local KV: `npm run skill:local -w @klinth/api`
 
 ## 2. Goal
 
-Next: Phase 6 (GitHub OAuth exchange in the Worker, browser-side repo push via Git Data API,
-optional Pages, ZIP polish, re-import). Overall: free, no-login site builder exporting plain HTML
+Next: Phase 7 (hardening). Before it, optionally the owner's live GitHub push test (section 6). Overall: free, no-login site builder exporting plain HTML
 repos at ₹0.
 
 ## 3. Files
 
+- `workers/api/src/github.ts` (+ test) : `/github/config`, `/github/oauth` code→token exchange
+- `workers/api/.dev.vars.example` : local GitHub app id/secret names
+- `apps/editor/src/github/oauth.ts` (+ test) : PKCE, popup, BroadcastChannel, memory-only session
+- `apps/editor/src/github/api.ts` (+ test with a fake GitHub keeping real blob ids) : push, Pages
+- `apps/editor/src/github/GitHubDialog.tsx` : publish dialog (form, progress, done)
+- `apps/editor/public/github-callback.html`, `.js` : OAuth callback page
+- `apps/editor/src/lib/files.ts` : `exportFiles` (one list for ZIP and push), `importAnyFile`
+- `packages/core/src/site-zip.ts` (+ test) : `readSiteZip`; `export.ts` : `exportedProject`,
+  `siteFileBytes`, README text
+- `apps/editor/e2e/github.spec.ts` : push and ZIP re-import end to end
 - `packages/core/src/ai.ts` : shared AI contract (request/response/error schemas, limits, header)
 - `packages/core/src/media.ts` : `keepAssetRefs` (drops file ids the AI invented)
 - `workers/api/src/ai.ts` : `/ai/generate`, `/ai/test` handlers, rate-limit wiring, outcome logs
@@ -97,6 +135,12 @@ repos at ₹0.
 
 ## 4. What worked
 
+- Verified 2026-11-04 (docs.github.com, GitHub changelog 2025-07-14): OAuth apps support PKCE,
+  S256 only, not required. `POST /repos/{o}/{r}/pages` needs the `repo` scope for OAuth tokens.
+  API version header `2022-11-28` (2026-03-10 also exists; ours is still supported). GitHub asks
+  apps not to send content-creating requests in parallel, so blobs go one by one.
+- Push uploads few blobs: text files go inline in the tree, and re-publishing reuses unchanged
+  files by local Git sha (an unchanged republish makes zero blob calls and no commit).
 - Verified 2026-11-04 (official docs, now under aistudio.google.com): stable free models
   `gemini-3.6-flash`, `gemini-3.5-flash-lite`, `gemini-3.1-flash-lite`; Pro models are paid-only
   since 2026-04-01; `gemini-2.5-flash` routes to 3.5-flash-lite from 2026-12-01. Free RPM/RPD are
@@ -123,6 +167,8 @@ repos at ₹0.
 
 ## 5. What didn't work
 
+- Detecting a ZIP by file name failed for Playwright downloads (no extension); now by `PK` bytes.
+- Python `open(...,'w')` on Windows wrote CRLF; use `newline=''` or run Prettier after.
 - The Interactions docs say 401 for a bad key; the live API said 400. Trust live checks.
 - `getByLabel('Your Gemini key')` matched the form too (same aria-label); forms now use other
   names. `getByLabel('Heading')` also matches "Text under the heading"; use `exact: true`.
@@ -131,10 +177,13 @@ repos at ₹0.
 ## 6. What is still left to do
 
 1. **Owner:** review `workers/api/skill/skill.md` (or send your own text). It is never committed.
-2. Phase 6: GitHub push is not built yet; it must push the `buildExport` file list as is (up to 50
-   pages, the same path checks as the ZIP). Re-imported project files have no media bytes (decide: include `assets/` on re-import
-   or ask to re-upload). Unused files are still exported.
-3. Phase 7: editor CSP must allow `connect-src` to the Worker, `font-src 'self' data:` (preview
+2. **Owner (live GitHub test, Phase 6 "done when"):** create a GitHub OAuth app (Settings →
+   Developer settings → OAuth Apps → New): homepage `http://localhost:5173`, callback
+   `http://localhost:5173/github-callback.html`. Put its id and a new secret in
+   `workers/api/.dev.vars` (copy `.dev.vars.example`), run `npm run dev:api` and `npm run dev`,
+   then Export → Publish to GitHub with a throwaway name. Delete the test repo afterwards.
+   Production needs a second app (or updated URLs) with the Pages address in Phase 8.
+3. Phase 7: editor CSP must allow `connect-src` to the Worker and `https://api.github.com`, `font-src 'self' data:` (preview
    fonts are data: URLs) plus the srcdoc/blob needs; bundle is 633 kB (201 kB gzip), split Motion/Zod or lazy-load the AI panel; consider Turnstile if abuse
    appears. `wrangler tail` still shows headers to the owner (owner-only, short-lived). Lighthouse
    re-run on both templates. Inspector exit animation window (see Phase 4 note: `inert`).

@@ -49,7 +49,14 @@ export {
   serializeProject,
 } from './project-file.ts';
 export { assetPath, pagePath, renderSite, type RenderOptions, type SiteFile } from './render.ts';
-export { buildExport, buildZip } from './export.ts';
+export {
+  assertSafePaths,
+  buildExport,
+  buildZip,
+  exportedProject,
+  siteFileBytes,
+} from './export.ts';
+export { MAX_SITE_ZIP_BYTES, readSiteZip, type SiteZipContents } from './site-zip.ts';
 export { PAGE_LINK, linkedSlug, pageFile } from './links.ts';
 export {
   addPage,
