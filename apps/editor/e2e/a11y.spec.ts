@@ -23,7 +23,7 @@ test('the start screen has no serious accessibility problems', async ({ page }) 
   expect(await problems(page)).toEqual([]);
 });
 
-for (const template of ['Personal portfolio', 'Small business']) {
+for (const template of ['Personal portfolio', 'Small business', 'Creative studio']) {
   test(`the editor with the ${template} template has no serious accessibility problems`, async ({
     page,
   }) => {

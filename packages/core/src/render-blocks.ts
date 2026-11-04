@@ -111,8 +111,23 @@ const has = (html: string, className: string): string => (html ? ` ${className}`
 
 // ---- Blocks ----
 
+/**
+ * Poster headline: each line sits in its own mask so it can rise into view.
+ * The space between lines keeps the words apart for screen readers and search.
+ */
+function posterHeading(text: string | undefined, level: number, attrs: string): string {
+  const rows = (text ?? '')
+    .split(/\r?\n/)
+    .map((row) => row.trim())
+    .filter(Boolean);
+  if (rows.length === 0) return '';
+  const inner = rows.map((row) => `<span class="line"><span>${esc(row)}</span></span>`).join(' ');
+  return `<h${level} class="display"${attrs}>${inner}</h${level}>`;
+}
+
 function hero(p: BlockProps<'hero'>, ctx: BlockCtx): string {
   const layout = p.layout ?? 'editorial';
+  if (layout === 'poster') return posterHero(p, ctx);
   const media = img(p, ctx);
   const actions = (p.buttons ?? [])
     .map((b, i) => link(b, i === 0 ? 'button' : 'button button-ghost'))
@@ -126,6 +141,28 @@ function hero(p: BlockProps<'hero'>, ctx: BlockCtx): string {
     paras(p.subheading, 'lede', field(ctx, 'subheading')) +
     (actions ? `<div class="actions">${actions}</div>` : '');
   return `<div class="hero hero-${layout}${has(media, 'has-media')}"><div class="hero-text">${text}</div>${
+    media ? `<div class="hero-media">${media}</div>` : ''
+  }</div>`;
+}
+
+function posterHero(p: BlockProps<'hero'>, ctx: BlockCtx): string {
+  const media = img(p, ctx);
+  const actions = (p.buttons ?? [])
+    .map((b, i) => link(b, i === 0 ? 'button' : 'button button-ghost'))
+    .join('');
+  const top =
+    (p.eyebrow ? `<p class="eyebrow"${field(ctx, 'eyebrow')}>${esc(p.eyebrow)}</p>` : '') +
+    (p.status
+      ? `<p class="status"><span class="dot" aria-hidden="true"></span>${esc(p.status)}</p>`
+      : '');
+  const foot =
+    paras(p.subheading, 'lede', field(ctx, 'subheading')) +
+    (actions ? `<div class="actions">${actions}</div>` : '');
+  return `<div class="hero hero-poster${has(media, 'has-media')}">${top ? `<div class="poster-top">${top}</div>` : ''}${posterHeading(
+    p.heading,
+    ctx.level,
+    field(ctx, 'heading'),
+  )}<div class="poster-rule" aria-hidden="true"></div>${foot ? `<div class="poster-foot">${foot}</div>` : ''}${
     media ? `<div class="hero-media">${media}</div>` : ''
   }</div>`;
 }

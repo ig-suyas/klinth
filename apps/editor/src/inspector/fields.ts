@@ -80,7 +80,12 @@ export const blockFields: { readonly [T in BlockType]: readonly FieldSpec[] } = 
       kind: 'choice',
       key: 'layout',
       label: 'Layout',
-      options: { editorial: 'Editorial', centered: 'Centered', split: 'Text beside picture' },
+      options: {
+        editorial: 'Editorial',
+        centered: 'Centered',
+        split: 'Text beside picture',
+        poster: 'Poster',
+      },
     },
     {
       kind: 'line',

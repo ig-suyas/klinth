@@ -68,7 +68,7 @@ export const blockPropSchemas = {
     .object({
       ...headFields,
       ...imageFields,
-      layout: z.enum(['editorial', 'centered', 'split']).optional(),
+      layout: z.enum(['editorial', 'centered', 'split', 'poster']).optional(),
       subheading: optText(600),
       /** A small status line, for example "Open for new projects". */
       status: optLine(80),

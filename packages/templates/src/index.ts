@@ -1,9 +1,10 @@
 /**
- * @klinth/templates: the two starter templates and the block definitions.
+ * @klinth/templates: the three starter templates and the block definitions.
  */
 import type { Project } from '@klinth/core';
 import { createLanding } from './landing.ts';
 import { createPortfolio } from './portfolio.ts';
+import { createStudio } from './studio.ts';
 
 export { blockDefinitions, type BlockDefinition } from './blocks.ts';
 
@@ -27,6 +28,12 @@ export const templates: readonly TemplateInfo[] = [
     name: 'Small business or link page',
     description: 'One clear page for your business, or all your links in one place.',
     create: createLanding,
+  },
+  {
+    id: 'studio',
+    name: 'Creative studio',
+    description: 'Big, confident type for a studio, agency or collective.',
+    create: createStudio,
   },
 ];
 

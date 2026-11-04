@@ -23,10 +23,17 @@ const attrs = (html: string, name: string): string[] =>
   [...html.matchAll(new RegExp(`\\s${name}="([^"]*)"`, 'g'))].map((m) => m[1] ?? '');
 
 describe('templates', () => {
-  it('ships exactly two templates with unique ids', () => {
-    expect(templates.map((t) => t.id)).toEqual(['portfolio', 'landing']);
+  it('ships exactly three templates with unique ids', () => {
+    expect(templates.map((t) => t.id)).toEqual(['portfolio', 'landing', 'studio']);
+    expect(getTemplate('studio')?.name).toBe('Creative studio');
     expect(getTemplate('landing')?.name).toBe('Small business or link page');
     expect(getTemplate('nope')).toBeUndefined();
+  });
+
+  it('use their own heading font and corner shape', () => {
+    const themes = templates.map((t) => t.create().theme);
+    expect(new Set(themes.map((t) => t.fonts.heading)).size).toBe(themes.length);
+    expect(new Set(themes.map((t) => t.radius)).size).toBe(themes.length);
   });
 
   it('look clearly different from each other', () => {
@@ -67,7 +74,8 @@ describe.each(templates)('$name template', (template) => {
   it('exports a complete repository', () => {
     const out = buildExport(project, new Map(), TEST_FONTS);
     const fonts = themeFonts(project.theme).map(fontPath);
-    expect(fonts).toHaveLength(2);
+    // The studio template uses system fonts only, so it ships no font files.
+    expect(fonts).toHaveLength(template.id === 'studio' ? 0 : 2);
     expect(out.map((f) => f.path).sort()).toEqual(
       [
         '.klinth/project.json',
@@ -75,7 +83,7 @@ describe.each(templates)('$name template', (template) => {
         'README.md',
         'css/site.css',
         'favicon.svg',
-        'fonts/LICENSE.txt',
+        ...(fonts.length > 0 ? ['fonts/LICENSE.txt'] : []),
         ...fonts,
         'index.html',
         'js/site.js',
@@ -145,6 +153,48 @@ describe.each(templates)('$name template', (template) => {
     for (const file of files) {
       await expect(file.content).toMatchFileSnapshot(`./__snapshots__/${template.id}/${file.path}`);
     }
+  });
+});
+
+describe('Creative studio template', () => {
+  const project = getTemplate('studio')?.create();
+  if (!project) throw new Error('studio missing');
+  const page = renderSite(project).find((f) => f.path === 'index.html')?.content as string;
+  const sheet = renderSite(project).find((f) => f.path === 'css/site.css')?.content as string;
+
+  it('opens with a poster headline split into masked lines', () => {
+    expect(page).toContain('<div class="hero hero-poster">');
+    const h1 = /<h1 class="display"[^>]*>(.*?)<\/h1>/.exec(page)?.[1] ?? '';
+    expect(h1.match(/<span class="line">/g)?.length).toBeGreaterThanOrEqual(3);
+    // Words on different lines stay separate words for screen readers and search.
+    const words = h1
+      .replace(/<[^>]+>/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    expect(words).toBe('We make brands that speak clearly.');
+    expect(page).toContain('<div class="poster-rule" aria-hidden="true"></div>');
+  });
+
+  it('uses system fonts only, sharp corners and roomy spacing', () => {
+    expect(themeFonts(project.theme)).toEqual([]);
+    expect(project.theme.radius).toBe(0);
+    expect(project.theme.spacing).toBeGreaterThan(8);
+  });
+
+  it('only animates the headline when the visitor has not asked for less motion', () => {
+    const calm = sheet.lastIndexOf('@media (prefers-reduced-motion:no-preference){\n');
+    const lineUp = sheet.indexOf('.hero-poster .line>span{animation');
+    expect(calm).toBeGreaterThan(-1);
+    expect(lineUp).toBeGreaterThan(calm);
+    expect(lineUp).toBeLessThan(sheet.indexOf('@media (prefers-reduced-motion:reduce)'));
+    // Transform only: the text is never hidden with opacity, so it paints at once.
+    expect(sheet).toMatch(/@keyframes line-up\{from\{transform:translateY\(105%\)\}\}/);
+  });
+
+  it('makes no invented reviews or numbers', () => {
+    const sections = project.pages.flatMap((p) => p.sections.map((s) => s.type));
+    expect(sections).not.toContain('testimonials');
+    expect(page).not.toMatch(/\d+\s*(\+|%|clients|projects delivered)/i);
   });
 });
 

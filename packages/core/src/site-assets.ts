@@ -52,6 +52,7 @@ body,.block,.site-footer{--fg:var(--color-text);--muted:var(--color-muted);--lin
 .header-pill .bar{pointer-events:auto;width:calc(100% - 1.5rem);max-width:64rem;min-height:3.5rem;padding:0 .5rem 0 1.5rem;background:var(--color-surface);border:1px solid var(--line);border-radius:999px;box-shadow:0 18px 40px -28px rgb(0 0 0 / .45)}
 .header-pill .nav-links{gap:.25rem 1.25rem}
 .header-pill .nav:not(.has-menu){padding-right:1rem}
+@media (max-width:47.99rem){.header-pill .bar{gap:1rem;padding-left:1.125rem}.header-pill .nav-links{gap:.25rem .875rem}.header-pill .nav:not(.has-menu){padding-right:.625rem}}
 .header-centered{position:relative}
 .header-centered .bar{flex-direction:column;justify-content:center;gap:.25rem;min-height:0;padding-block:1.25rem .5rem}
 .header-centered .brand{max-width:100%;font-size:clamp(1.5rem,1.1rem + 1.4vw,2.25rem)}
@@ -99,6 +100,19 @@ h2.display{font-size:clamp(2.4rem,1.4rem + 4.6vw,6rem)}
 .hero-split.has-media{grid-template-columns:1.1fr .9fr;align-items:center}
 .hero-split .display{font-size:clamp(2.8rem,1.4rem + 5vw,6.5rem)}
 }
+
+/* ---- Poster hero: one big headline that rises line by line ---- */
+.hero-poster{display:grid;gap:calc(var(--space)*4);align-items:start}
+.poster-top{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:1rem 2rem}
+.hero-poster .display{max-width:none;font-size:clamp(3.25rem,.9rem + 10.6vw,12.5rem);line-height:.86;letter-spacing:calc(var(--heading-tracking) - .015em);hyphens:auto}
+.hero-poster .line{display:block;overflow:hidden;padding-block:.04em .1em;margin-block:-.04em -.1em}
+.hero-poster .line>span{display:inline-block}
+.hero-poster .line:nth-child(even){padding-left:clamp(1.5rem,9vw,10rem)}
+.poster-rule{height:2px;background:var(--link);transform-origin:0 50%}
+.poster-foot{display:grid;gap:calc(var(--space)*3);align-items:end}
+.poster-foot .actions{margin-top:0}
+.hero-poster .hero-media img{aspect-ratio:16/9}
+@media (min-width:48rem){.poster-foot{grid-template-columns:minmax(0,34rem) auto;justify-content:space-between}}
 
 /* ---- About, text and picture ---- */
 .about,.split{display:grid;gap:clamp(2.5rem,6vw,6rem);align-items:start}
@@ -206,6 +220,11 @@ a.linkbtn:hover .arrow{transform:translateX(4px)}
 
 /* ---- Motion (only when the visitor has not asked for less) ---- */
 @media (prefers-reduced-motion:no-preference){
+.hero-poster .line>span{animation:line-up .9s cubic-bezier(.2,.7,.2,1) both}
+.hero-poster .line:nth-child(2)>span{animation-delay:.07s}.hero-poster .line:nth-child(3)>span{animation-delay:.14s}.hero-poster .line:nth-child(4)>span{animation-delay:.21s}.hero-poster .line:nth-child(n+5)>span{animation-delay:.28s}
+.poster-rule{animation:draw 1.2s cubic-bezier(.65,0,.35,1) .3s both}
+@keyframes line-up{from{transform:translateY(105%)}}
+@keyframes draw{from{transform:scaleX(0)}}
 .reveal{opacity:0;transform:translateY(12px);transition:opacity .7s cubic-bezier(.2,.7,.2,1),transform .7s cubic-bezier(.2,.7,.2,1)}
 .reveal.is-visible{opacity:1;transform:none}
 .reveal-mask{clip-path:inset(0 0 100% 0);transition:clip-path 1.1s cubic-bezier(.65,0,.35,1)}

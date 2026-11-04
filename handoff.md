@@ -14,7 +14,7 @@
 | 6 GitHub connect, export      | done (live push needs owner's app)    |
 | 7 Hardening                   | done                                  |
 | 8 Deploy, launch, push        | done (push waits for owner's go)      |
-| 6A Blank, pages, styles, code | in progress (parts 1-2 of 4 done)     |
+| 6A Blank, pages, styles, code | in progress (parts 1-3 of 4 done)     |
 
 ## 1. Current state
 
@@ -38,6 +38,21 @@ the export), roundness and spacing kept. Editor: "Ready-made looks" grid (`aria-
 "Header style" radio group at the top of Site style (`inspector/ThemePanel.tsx`). Tests: new
 `core/src/styles.test.ts` (styles, presets, contrast, migration, round trip),
 `editor/src/inspector/ThemePanel.test.tsx`, and every template x style x preset in templates tests.
+
+Part 3 (third template, /frontend; owner picked: bold typographic, headline line reveal, bone +
+ink + cobalt): `packages/templates/src/studio.ts`, "Creative studio" ("Field & Form", a two-person
+Lisbon studio; placeholder copy, no reviews or invented numbers). Theme `#f2f0eb/#e4e1d9/#0c0c0d/
+#57544c/#1f3fe0`, system `grotesk` + `system-sans` (no font files), radius 0, spacing 10, minimal
+header. New hero layout **`poster`** (core `blocks.ts` enum, `render-blocks.ts` `posterHero`,
+editor option "Poster"): each heading line in a `.line` mask (spaces between keep words apart for
+screen readers), accent rule, lede + actions row. Motion: lines rise with a stagger (transform only)
+and the rule draws in, both inside `prefers-reduced-motion: no-preference`. Start screen grid is now
+2 columns (3 templates + blank). Checked: Lighthouse 13 mobile on all 3 exports = 100 / 100 / 100 /
+100 (LCP 1.0-1.5 s, CLS <= 0.001); no horizontal overflow at 320/375/768/1440 for every template x
+header style (DOM measurements); pill header tightened on phones (68 px from 375 px; at 320 px the
+links wrap, same as the top bar). axe e2e now includes the studio template.
+**e2e note:** the full suite with default workers had 4 timing failures on this laptop (lost clicks
+under load); all pass with `npx playwright test --workers=1`.
 
 **Phase 8 (deploy):** Live, free plan. Editor: **https://klinth.pages.dev** (classic Cloudflare Pages
 project `klinth`, prod branch `main`). Worker: **https://klinth-api.klinth-api.workers.dev**

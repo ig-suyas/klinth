@@ -85,7 +85,7 @@ export function StartScreen({ onCreate, onOpen }: StartScreenProps) {
           <motion.h2 {...rise(3)} id="pick" className="eyebrow">
             Start from a design
           </motion.h2>
-          <ul className="mt-4 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          <ul className="mt-4 grid gap-6 md:grid-cols-2">
             {templates.map((template, i) => (
               <motion.li key={template.id} {...rise(4 + i)}>
                 <TemplateCard
