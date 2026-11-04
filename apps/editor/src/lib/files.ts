@@ -1,4 +1,6 @@
 import {
+  MAX_PROJECT_FILE_BYTES,
+  ProjectError,
   buildExport,
   buildZip,
   parseProjectFile,
@@ -44,5 +46,9 @@ export function downloadSiteZip(project: Project, assets: ReadonlyMap<string, Ui
 
 /** Reads a project file the user picked. Throws ProjectError with a plain message. */
 export async function importProjectFile(file: Blob): Promise<Project> {
+  // Check the byte size first so a huge file is never read into memory.
+  if (file.size > MAX_PROJECT_FILE_BYTES) {
+    throw new ProjectError('This project file is too large (over 5 MB).');
+  }
   return parseProjectFile(await file.text());
 }

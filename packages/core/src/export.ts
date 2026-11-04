@@ -50,13 +50,43 @@ export function buildExport(
   ];
 }
 
-/** Packs files into a ZIP archive. */
+/** A relative path of plain segments: no `..`, no leading `/`, no backslashes or drive letters. */
+const SAFE_SEGMENT = /^[A-Za-z0-9_-][A-Za-z0-9_.-]*$|^\.[A-Za-z0-9_-]+$/;
+
+function assertSafePaths(files: readonly SiteFile[]): void {
+  const seen = new Set<string>();
+  for (const { path } of files) {
+    const segments = path.split('/');
+    if (!segments.every((s) => SAFE_SEGMENT.test(s) && !s.includes('..'))) {
+      throw new ProjectError(`The export has an unsafe file name: ${path}`);
+    }
+    // Case-insensitive: Windows and macOS treat `A.html` and `a.html` as one file.
+    const key = path.toLowerCase();
+    if (seen.has(key)) throw new ProjectError(`The export has two files named ${path}`);
+    seen.add(key);
+  }
+}
+
+/**
+ * DOS timestamps in ZIP files are written from *local* time fields, so the date
+ * is built from local parts on every call: any time zone writes the same bytes.
+ */
+const fixedMtime = (): Date => new Date(2020, 0, 1, 0, 0, 0);
+/** Unix "made by" with a regular file, mode rw-r--r--. */
+const UNIX = 3;
+const FILE_ATTRS = 0o100644 << 16;
+
+/** Packs files into a ZIP archive. Same files in give the same bytes out. */
 export function buildZip(files: readonly SiteFile[]): Uint8Array {
+  assertSafePaths(files);
+  const sorted = [...files].sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
+  const mtime = fixedMtime();
   const tree: Zippable = {};
-  for (const file of files) {
+  for (const file of sorted) {
+    const isText = typeof file.content === 'string';
     const data = typeof file.content === 'string' ? strToU8(file.content) : file.content;
     // Media is already compressed; storing it avoids wasted work.
-    tree[file.path] = [data, { level: typeof file.content === 'string' ? 6 : 0 }];
+    tree[file.path] = [data, { level: isText ? 6 : 0, mtime, os: UNIX, attrs: FILE_ATTRS }];
   }
-  return zipSync(tree, { mtime: new Date('2020-01-01T00:00:00Z') });
+  return zipSync(tree, { mtime, os: UNIX, attrs: FILE_ATTRS });
 }

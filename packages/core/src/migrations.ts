@@ -25,7 +25,7 @@ export function runMigrations(
   if (!isRecord(input)) throw new ProjectError('This is not a Klinth project file.');
   let data = input;
   let version = data.schemaVersion;
-  if (typeof version !== 'number' || !Number.isInteger(version) || version < 1) {
+  if (typeof version !== 'number' || !Number.isInteger(version) || version < 0) {
     throw new ProjectError('This project file has no valid version.');
   }
   if (version > target) {
@@ -36,14 +36,55 @@ export function runMigrations(
   while (version < target) {
     const step = migrations[version];
     if (!step) throw new ProjectError(`Cannot upgrade a project from version ${version}.`);
-    data = { ...step(data), schemaVersion: version + 1 };
+    let next: unknown;
+    try {
+      next = step(data);
+    } catch {
+      throw new ProjectError(`This project could not be upgraded from version ${version}.`);
+    }
+    if (!isRecord(next)) {
+      throw new ProjectError(`This project could not be upgraded from version ${version}.`);
+    }
+    data = { ...next, schemaVersion: version + 1 };
     version += 1;
   }
   return data;
 }
 
+/** Deepest nesting a real project needs is about 8; leave headroom. */
+export const MAX_DEPTH = 16;
+
+/**
+ * Zod silently drops a `__proto__` field instead of rejecting it, so such
+ * keys are refused here, before validation, together with the other two
+ * names that can reach object prototypes.
+ */
+const UNSAFE_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
+/**
+ * Rejects data nested deeper than MAX_DEPTH or using prototype keys. Walks
+ * without recursion so hostile input cannot overflow the stack.
+ */
+export function assertPlainJson(value: unknown): void {
+  const stack: [unknown, number][] = [[value, 0]];
+  while (stack.length > 0) {
+    const [current, depth] = stack.pop() as [unknown, number];
+    if (typeof current !== 'object' || current === null) continue;
+    if (depth + 1 > MAX_DEPTH) {
+      throw new ProjectError('This project file is too deeply nested to be a Klinth project.');
+    }
+    for (const [key, child] of Object.entries(current)) {
+      if (UNSAFE_KEYS.has(key)) {
+        throw new ProjectError(`This project file uses a field name that is not allowed (${key}).`);
+      }
+      stack.push([child, depth + 1]);
+    }
+  }
+}
+
 /** Upgrades any older project to the current version and validates it. */
 export function migrateProject(input: unknown): Project {
+  assertPlainJson(input);
   const data = runMigrations(input, SCHEMA_VERSION, MIGRATIONS);
   const result = projectSchema.safeParse(data);
   if (!result.success) {

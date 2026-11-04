@@ -6,9 +6,22 @@
 
 export * from './schema.ts';
 export * from './tokens.ts';
-export { escapeHtml, safeUrl } from './html.ts';
-export { MIGRATIONS, ProjectError, migrateProject, runMigrations } from './migrations.ts';
-export { containsSecret, parseProjectFile, serializeProject } from './project-file.ts';
+export { escapeHtml, hasControlChar, safeUrl } from './html.ts';
+export {
+  MAX_DEPTH,
+  MIGRATIONS,
+  ProjectError,
+  assertPlainJson,
+  migrateProject,
+  runMigrations,
+} from './migrations.ts';
+export {
+  MAX_PROJECT_FILE_BYTES,
+  assertNoSecrets,
+  containsSecret,
+  parseProjectFile,
+  serializeProject,
+} from './project-file.ts';
 export { assetPath, pagePath, renderSite, type SiteFile } from './render.ts';
 export { buildExport, buildZip } from './export.ts';
 export { sampleProject } from './sample.ts';
