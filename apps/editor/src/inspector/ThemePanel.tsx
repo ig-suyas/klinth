@@ -11,6 +11,7 @@ import {
 import { useId, useState } from 'react';
 import { useEditor } from '../state/store.ts';
 import { Icon } from '../ui/Icon.tsx';
+import { SiteCodePanel } from './SiteCodePanel.tsx';
 
 type ColorKey = keyof Theme['colors'];
 
@@ -332,6 +333,8 @@ export function ThemePanel() {
           onChange={(spacing) => setTheme({ spacing }, 'spacing')}
         />
       </section>
+
+      <SiteCodePanel />
     </div>
   );
 }

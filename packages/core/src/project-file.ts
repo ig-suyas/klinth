@@ -6,6 +6,13 @@ const SECRET_VALUES: RegExp[] = [
   /AIza[0-9A-Za-z_-]{35}/, // Google / Gemini API key (39 chars)
   /\bgh[pousr]_[A-Za-z0-9]{36,}/, // GitHub classic, OAuth, user, server and refresh tokens
   /\bgithub_pat_[A-Za-z0-9_]{22,}/, // GitHub fine-grained token
+  // Pasted custom code is where secrets slip in most, so common formats are refused too.
+  /\b[sr]k_live_[0-9A-Za-z]{20,}/, // Stripe secret and restricted keys (pk_live_ is public)
+  /\bsk-ant-[A-Za-z0-9_-]{20,}/, // Anthropic
+  /\bsk-(?:proj-|svcacct-)?[A-Za-z0-9_-]{32,}/, // OpenAI
+  /\b(?:AKIA|ASIA)[0-9A-Z]{16}\b/, // AWS access key id
+  /\bxox[abposr]-[A-Za-z0-9-]{10,}/, // Slack
+  /-----BEGIN (?:[A-Z]+ )*PRIVATE KEY-----/, // PEM private keys
 ];
 
 /**

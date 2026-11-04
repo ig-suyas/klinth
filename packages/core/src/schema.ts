@@ -23,6 +23,37 @@ const assetId = id.refine((v) => !DEVICE_NAME.test(v), 'This file id is reserved
 
 const isUnique = (values: string[]): boolean => new Set(values).size === values.length;
 
+/** Most site-wide CSS, and separately JavaScript, one site can carry (UTF-8 bytes, about 200 KB). */
+export const MAX_SITE_CODE_BYTES = 200_000;
+
+/** Length of `text` in UTF-8 bytes, the size it has in the exported file. */
+export function utf8Length(text: string): number {
+  let bytes = 0;
+  for (let i = 0; i < text.length; i += 1) {
+    const unit = text.charCodeAt(i);
+    if (unit < 0x80) bytes += 1;
+    else if (unit < 0x800) bytes += 2;
+    else if (unit >= 0xd800 && unit <= 0xdbff && (text.charCodeAt(i + 1) & 0xfc00) === 0xdc00) {
+      bytes += 4;
+      i += 1;
+    } else bytes += 3;
+  }
+  return bytes;
+}
+
+const siteCodeText = z
+  .string()
+  .max(MAX_SITE_CODE_BYTES, 'Keep custom code under 200 KB')
+  .refine((v) => utf8Length(v) <= MAX_SITE_CODE_BYTES, 'Keep custom code under 200 KB')
+  .optional();
+
+/**
+ * Code the owner pasted for every page: CSS in the head, JavaScript at the end
+ * of the body. Exported as separate files, never inline; the editor runs it
+ * only inside the sandboxed preview frame.
+ */
+export const siteCodeSchema = z.object({ css: siteCodeText, js: siteCodeText }).strict();
+
 const sectionOf = <T extends BlockType>(type: T) =>
   z.object({ id, type: z.literal(type), props: blockPropSchemas[type] }).strict();
 
@@ -97,6 +128,7 @@ export const projectSchema = z
       })
       .strict(),
     theme: themeSchema,
+    siteCode: siteCodeSchema.optional(),
     pages: z
       .array(pageSchema)
       .min(1)
@@ -126,3 +158,4 @@ export type SectionOf<T extends BlockType> = Extract<Section, { type: T }>;
 export type Page = z.infer<typeof pageSchema>;
 export type Asset = z.infer<typeof assetSchema>;
 export type Project = z.infer<typeof projectSchema>;
+export type SiteCode = z.infer<typeof siteCodeSchema>;

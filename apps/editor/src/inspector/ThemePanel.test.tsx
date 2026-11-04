@@ -33,6 +33,32 @@ describe('site style panel', () => {
     expect(project()?.theme.preset).toBeUndefined();
   });
 
+  it('edits site-wide CSS and JavaScript behind a trust notice', () => {
+    render(<ThemePanel />);
+    const area = screen.getByRole('region', { name: 'Custom code for every page' });
+    expect(area).toHaveTextContent(
+      'This code runs on your published site. Only paste code you trust.',
+    );
+    fireEvent.change(within(area).getByLabelText(/Custom CSS/), {
+      target: { value: 'h1 { letter-spacing: 0 }' },
+    });
+    fireEvent.change(within(area).getByLabelText(/Custom JavaScript/), {
+      target: { value: 'console.log(1);' },
+    });
+    expect(project()?.siteCode).toEqual({ css: 'h1 { letter-spacing: 0 }', js: 'console.log(1);' });
+    expect(area).toHaveTextContent('24 bytes of 200 KB');
+  });
+
+  it('refuses site-wide code over about 200 KB and says why', () => {
+    render(<ThemePanel />);
+    const area = screen.getByRole('region', { name: 'Custom code for every page' });
+    fireEvent.change(within(area).getByLabelText(/Custom JavaScript/), {
+      target: { value: 'a'.repeat(200_001) },
+    });
+    expect(project()?.siteCode?.js ?? '').toBe('');
+    expect(within(area).getByRole('alert')).toHaveTextContent('Keep custom code under 200 KB');
+  });
+
   it('changes the header style with keyboard-friendly radio buttons', () => {
     render(<ThemePanel />);
     const group = screen.getByRole('group', { name: 'Header style' });

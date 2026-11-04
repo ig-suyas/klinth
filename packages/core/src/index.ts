@@ -55,7 +55,16 @@ export {
   parseProjectFile,
   serializeProject,
 } from './project-file.ts';
-export { assetPath, pagePath, renderSite, type RenderOptions, type SiteFile } from './render.ts';
+export {
+  CUSTOM_CSS_PATH,
+  CUSTOM_JS_PATH,
+  assetPath,
+  pagePath,
+  renderSite,
+  siteCode,
+  type RenderOptions,
+  type SiteFile,
+} from './render.ts';
 export {
   assertSafePaths,
   buildExport,

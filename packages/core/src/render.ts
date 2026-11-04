@@ -65,6 +65,19 @@ function renderHeader(project: Project, page: Page): string {
 
 const MONOGRAM_PATH = 'favicon.svg';
 
+/** Where the site-wide custom code is exported. Separate files, so nothing is ever inlined. */
+export const CUSTOM_CSS_PATH = 'css/custom.css';
+export const CUSTOM_JS_PATH = 'js/custom.js';
+
+/** The site-wide CSS and JavaScript, each '' when there is none. */
+export function siteCode(project: Project): { css: string; js: string } {
+  const css = project.siteCode?.css ?? '';
+  const js = project.siteCode?.js ?? '';
+  return { css: css.trim() ? css : '', js: js.trim() ? js : '' };
+}
+
+const withNewline = (code: string): string => (code.endsWith('\n') ? code : `${code}\n`);
+
 function faviconAsset(project: Project, assets: ReadonlyMap<string, Asset>): Asset | undefined {
   const asset = project.meta.favicon ? assets.get(project.meta.favicon) : undefined;
   return asset?.kind === 'image' ? asset : undefined;
@@ -109,6 +122,7 @@ function renderPage(
 ): string {
   const editable = options.editable === true;
   const { meta } = project;
+  const code = siteCode(project);
   const title = page.slug === '' ? meta.title : `${page.title} | ${meta.title}`;
   const favicon = faviconAsset(project, assets);
   const icon = favicon ? assetPath(favicon) : MONOGRAM_PATH;
@@ -147,7 +161,7 @@ function renderPage(
 <link rel="icon" href="${esc(icon)}">
 <meta name="theme-color" content="${esc(project.theme.colors.background)}">
 ${preloadFonts(project, options)}<link rel="stylesheet" href="css/site.css">
-<script src="js/site.js" defer></script>
+${code.css ? `<link rel="stylesheet" href="${CUSTOM_CSS_PATH}">\n` : ''}<script src="js/site.js" defer></script>
 </head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
@@ -155,7 +169,7 @@ ${renderHeader(project, page)}
 <main id="main">
 ${body}
 </main>
-${footer ? `<footer class="site-footer">${footer}</footer>\n` : ''}</body>
+${footer ? `<footer class="site-footer">${footer}</footer>\n` : ''}${code.js ? `<script src="${CUSTOM_JS_PATH}"></script>\n` : ''}</body>
 </html>
 `;
 }
@@ -168,6 +182,7 @@ ${footer ? `<footer class="site-footer">${footer}</footer>\n` : ''}</body>
 export function renderSite(project: Project, options: RenderOptions = {}): SiteFile[] {
   const assets = new Map(project.assets.map((a) => [a.id, a]));
   const fonts = themeFonts(project.theme);
+  const code = siteCode(project);
   return [
     ...project.pages.map((page) => ({
       path: pagePath(page),
@@ -179,6 +194,8 @@ export function renderSite(project: Project, options: RenderOptions = {}): SiteF
       content: (options.preview ? '' : fontFaceCss(fonts)) + themeToCss(project.theme) + SITE_CSS,
     },
     { path: 'js/site.js', content: SITE_JS },
+    ...(code.css ? [{ path: CUSTOM_CSS_PATH, content: withNewline(code.css) }] : []),
+    ...(code.js ? [{ path: CUSTOM_JS_PATH, content: withNewline(code.js) }] : []),
     ...(faviconAsset(project, assets) ? [] : [{ path: MONOGRAM_PATH, content: monogram(project) }]),
     ...(fonts.length > 0 ? [{ path: `fonts/LICENSE.txt`, content: fontLicense(fonts) }] : []),
   ];

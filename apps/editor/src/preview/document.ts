@@ -1,4 +1,13 @@
-import { fontFaceCss, pagePath, renderSite, themeFonts, type Project } from '@klinth/core';
+import {
+  CUSTOM_CSS_PATH,
+  CUSTOM_JS_PATH,
+  fontFaceCss,
+  pagePath,
+  renderSite,
+  siteCode,
+  themeFonts,
+  type Project,
+} from '@klinth/core';
 import { z } from 'zod';
 import { BRIDGE_CSS, BRIDGE_JS, CALM_CSS, PREVIEW_CSS } from './bridge.ts';
 
@@ -33,6 +42,29 @@ function scriptJson(value: unknown): string {
 
 const BACKSLASH = String.fromCharCode(92);
 
+/**
+ * Pasted CSS for an inline `<style>`. Every `<` becomes the CSS escape `\3c `
+ * (same character inside CSS strings, never markup), so it cannot end the element.
+ */
+const styleText = (css: string): string => css.replace(/</g, () => `${BACKSLASH}3c `);
+
+/**
+ * The owner's site-wide code, live only in the interactive preview: that page
+ * runs in the shell's inner frame, sandboxed without same-origin. Thumbnails
+ * (script-free, editor policy) never get it. The JavaScript travels as a JSON
+ * string and runs as a script element, so `</script>` inside it is harmless.
+ */
+function previewSiteCode(project: Project, interactive: boolean): { css: string; js: string } {
+  const code = siteCode(project);
+  if (!interactive) return { css: '', js: '' };
+  return {
+    css: code.css ? `<style data-k-site-css>${styleText(code.css)}</style>\n` : '',
+    js: code.js
+      ? `<script data-k-site-js>(function(){var s=document.createElement('script');s.textContent=${scriptJson(code.js)};document.body.appendChild(s);})();</script>\n`
+      : '',
+  };
+}
+
 function fileText(files: ReturnType<typeof renderSite>, path: string): string {
   const file = files.find((f) => f.path === path);
   return typeof file?.content === 'string' ? file.content : '';
@@ -54,6 +86,7 @@ export function buildPreviewDocument(
   const files = renderSite(project, { editable: options.interactive, preview: true });
   const css = fileText(files, 'css/site.css');
   const js = fileText(files, 'js/site.js');
+  const custom = previewSiteCode(project, options.interactive);
   const extraCss =
     previewFontCss(project, options.fontUrls) +
     PREVIEW_CSS +
@@ -76,6 +109,8 @@ export function buildPreviewDocument(
         '<link rel="stylesheet" href="css/site.css">',
         () => `<style>${css}${extraCss}</style>`,
       )
+      .replace(`<link rel="stylesheet" href="${CUSTOM_CSS_PATH}">\n`, () => custom.css)
+      .replace(`<script src="${CUSTOM_JS_PATH}"></script>\n`, () => custom.js)
       .replace('<script src="js/site.js" defer></script>', () => '')
       // Thumbnails run no scripts at all (their frame forbids them).
       .replace('</body>', () =>

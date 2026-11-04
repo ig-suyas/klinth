@@ -14,7 +14,7 @@
 | 6 GitHub connect, export      | done (live push needs owner's app)    |
 | 7 Hardening                   | done                                  |
 | 8 Deploy, launch, push        | done (push waits for owner's go)      |
-| 6A Blank, pages, styles, code | in progress (parts 1-3 of 4 done)     |
+| 6A Blank, pages, styles, code | done (all 4 parts)                    |
 
 ## 1. Current state
 
@@ -53,6 +53,25 @@ header style (DOM measurements); pill header tightened on phones (68 px from 375
 links wrap, same as the top bar). axe e2e now includes the studio template.
 **e2e note:** the full suite with default workers had 4 timing failures on this laptop (lost clicks
 under load); all pass with `npx playwright test --workers=1`.
+
+Part 4 (site-wide custom code): optional `project.siteCode {css?, js?}` (strict; each at most
+200,000 UTF-8 bytes via `utf8Length`, `MAX_SITE_CODE_BYTES`; still schema version 2, no file had
+it before). Export writes `css/custom.css` (linked right after `css/site.css`) and `js/custom.js`
+(`<script>` at the end of `<body>`) on every page, only when non-blank; never inline; README
+mentions them. Preview (`preview/document.ts`): interactive frame only, CSS inline with every `<`
+turned into the CSS escape `c `, JS carried as a JSON string and run as a script element (so
+`</style>` / `</script>` cannot break out); thumbnails get none. It runs in the shell's inner
+frame (`sandbox="allow-scripts"`, no same-origin; tested from source and in e2e: `window.top.document`
+is blocked). Editor: "Custom code for every page" at the bottom of Site style
+(`inspector/SiteCodePanel.tsx`) with the trust notice, byte counter, refusal over 200 KB.
+Key/token guard (`project-file.ts`) now also refuses Stripe `sk_live_`/`rk_live_`, Anthropic,
+OpenAI, AWS `AKIA`/`ASIA`, Slack `xox?-` and PEM private keys (blocks save, project file and
+import). Import limit unchanged (5 MB fits 2 x 200 KB; tested). Tests: core `site-code.test.ts`,
+editor `preview/site-code.test.ts`, ThemePanel tests, and the 6A Playwright test
+`e2e/site-style.spec.ts` (blank -> section -> second page -> pill header -> Midnight -> site-wide
+CSS/JS -> export: code files exist and are linked from both pages, `.klinth/project.json` v2).
+Totals: 635 unit (core 399, templates 46, editor 134, api 56), 18 e2e (all pass with
+`--workers=1`). Nothing pushed; the deployed editor is not updated (run `npm run deploy:editor`).
 
 **Phase 8 (deploy):** Live, free plan. Editor: **https://klinth.pages.dev** (classic Cloudflare Pages
 project `klinth`, prod branch `main`). Worker: **https://klinth-api.klinth-api.workers.dev**

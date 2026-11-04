@@ -2,11 +2,13 @@ import { strToU8, zipSync, type Zippable } from 'fflate';
 import { assetUsage } from './media.ts';
 import { serializeProject } from './project-file.ts';
 import { fontPath, themeFonts } from './fonts.ts';
-import { assetPath, renderSite, type SiteFile } from './render.ts';
+import { assetPath, renderSite, siteCode, type SiteFile } from './render.ts';
 import type { Project } from './schema.ts';
 import { ProjectError } from './migrations.ts';
 
 function hasCustomCode(project: Project): boolean {
+  const code = siteCode(project);
+  if (code.css || code.js) return true;
   return project.pages.some((page) =>
     page.sections.some((s) => s.type === 'customCode' && (s.props.code ?? '').trim() !== ''),
   );
@@ -45,8 +47,8 @@ ${
   hasCustomCode(project)
     ? `## About your custom code
 
-This site contains code you pasted into a Custom code section. It runs exactly as pasted, so
-only keep code you trust. Because of it, the site does not set a strict Content-Security-Policy.
+This site contains code you pasted into the editor: a Custom code section, or site-wide code in
+\`css/custom.css\` and \`js/custom.js\`. It runs exactly as pasted, so only keep code you trust. Because of it, the site does not set a strict Content-Security-Policy.
 
 `
     : ''
