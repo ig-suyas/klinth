@@ -1,5 +1,6 @@
 import { sectionAssetIds } from '@klinth/core';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useFontUrls } from '../lib/fonts.ts';
 import { assetBlobs } from '../media/files.ts';
 import { setSectionProps, type Props } from '../state/sections.ts';
 import { useEditor, type Device } from '../state/store.ts';
@@ -31,6 +32,7 @@ export function Preview() {
   const shownPage = useRef(pageIndex);
   const area = useRef<HTMLDivElement>(null);
   const [space, setSpace] = useState({ width: 0, height: 0 });
+  const fontUrls = useFontUrls(project?.theme);
 
   useLayoutEffect(() => {
     const el = area.current;
@@ -56,10 +58,11 @@ export function Preview() {
         calm: loads.current > 1,
         scrollY: scrollY.current,
         selectedId: useEditor.getState().selectedId,
+        fontUrls,
       });
     }, PREVIEW_DELAY_MS);
     return () => clearTimeout(timer);
-  }, [project, pageIndex]);
+  }, [project, pageIndex, fontUrls]);
 
   // Messages from the frame. Checked by source and by schema; anything else is ignored.
   useEffect(() => {

@@ -15,6 +15,10 @@ const COLOR_LABELS: Record<ColorKey, { label: string; help: string }> = {
 };
 
 export const FONT_LABELS: Record<FontKey, string> = {
+  fraunces: 'Fraunces (soft serif)',
+  'instrument-sans': 'Instrument Sans',
+  bricolage: 'Bricolage (bold grotesk)',
+  figtree: 'Figtree (friendly sans)',
   'system-sans': 'Clean sans',
   'system-serif': 'Classic serif',
   'system-mono': 'Typewriter',

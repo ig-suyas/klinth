@@ -88,8 +88,12 @@ describe('AI panel', () => {
     const project = useEditor.getState().project;
     expect(project && serializeProject(project)).not.toContain(KEY);
 
-    act(() => useEditor.getState().undo());
+    expect(screen.getByText('Changed: Heading.')).toBeInTheDocument();
+
+    const panel = screen.getByRole('region', { name: 'AI helper' });
+    fireEvent.click(within(panel).getByRole('button', { name: 'Undo' }));
     expect(sectionOnPage(hero.id)?.props).toEqual(hero.props);
+    expect(await within(panel).findByLabelText('What do you want?')).toBeInTheDocument();
   });
 
   it('shows the quota banner when the Gemini limit is used up, and editing keeps working', async () => {

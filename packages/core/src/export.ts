@@ -1,5 +1,6 @@
 import { strToU8, zipSync, type Zippable } from 'fflate';
 import { serializeProject } from './project-file.ts';
+import { fontPath, themeFonts } from './fonts.ts';
 import { assetPath, renderSite, type SiteFile } from './render.ts';
 import type { Project } from './schema.ts';
 import { ProjectError } from './migrations.ts';
@@ -45,20 +46,28 @@ The file \`.klinth/project.json\` holds your project. Import it into Klinth on a
 
 /**
  * Builds every file of the exported repository (section 3.6).
- * `assetData` holds the binary of each asset by id.
+ * `assetData` holds the binary of each asset by id; `fontData` each bundled
+ * font file by file name (the editor loads them; core has no binaries).
  */
 export function buildExport(
   project: Project,
   assetData: ReadonlyMap<string, Uint8Array>,
+  fontData: ReadonlyMap<string, Uint8Array>,
 ): SiteFile[] {
   const assets = project.assets.map((asset) => {
     const data = assetData.get(asset.id);
     if (!data) throw new ProjectError(`The file "${asset.name}" is missing. Upload it again.`);
     return { path: assetPath(asset), content: data };
   });
+  const fonts = themeFonts(project.theme).map((font) => {
+    const data = fontData.get(font.file);
+    if (!data) throw new ProjectError(`The font "${font.family}" could not be loaded. Try again.`);
+    return { path: fontPath(font), content: data };
+  });
   return [
     ...renderSite(project),
     ...assets,
+    ...fonts,
     { path: 'README.md', content: exportReadme(project) },
     { path: '.nojekyll', content: '' },
     { path: '.klinth/project.json', content: serializeProject(project) },

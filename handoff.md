@@ -30,9 +30,21 @@ checked by hand: editor in the browser → local `wrangler dev` Worker (real DO,
 local KV) → live Gemini with a made-up key → plain "key not accepted" message; logs show only
 `{route, outcome}`.
 
-**Skill:** a distilled draft (about 570 words, under 2,500 tokens) is at
-`workers/api/skill/skill.md` (git-ignored). **Owner must review it** and replace it with their own
-text if they want. Local KV: `npm run skill:local -w @klinth/api`.
+**Design pass (after owner feedback, /frontend):** bundled open-license fonts (OFL, latin subset,
+self-hosted, no font host): portfolio Fraunces + Instrument Sans, business Bricolage Grotesque +
+Figtree, editor UI Fraunces + Instrument Sans. Exports add `fonts/*.woff2` (~60-70 KB per site),
+`fonts/LICENSE.txt` and a heading-font preload. The preview gets fonts as cached `data:` URLs (no
+flash on reload, works in the script-free thumbnails). Template header blur removed; scroll reveal
+is now a mask reveal for media plus a short fade for text. AI panel is an "ink" surface
+(`.surface-ink` swaps tokens) with a designed writing state, a result state listing what changed
+("Changed: Heading.") and inline Undo; how-it-works steps in the AI helper window. Measured: AI
+panel text contrast at least 8.4:1, fields 14:1. Tests now 460 unit (core 313, templates 27,
+editor 77, api 43) and 6 e2e (ZIP holds real WOFF2 files; preview frame has Fraunces loaded).
+
+**Skill:** rewritten to the /frontend standard (about 1,030 words, ~1,400 tokens) at
+`workers/api/skill/skill.md` (git-ignored): request reading, voice, lengths, truth rules, a playbook
+per block, rhythm, custom code rules. Examples are kept under 8 words so the echo guard never blocks
+them. **Owner should review it.** Local KV: `npm run skill:local -w @klinth/api`.
 
 **Remote:** `origin` = `github.com/ig-suyas/klinth`. Only Phase 0 is pushed; later commits are local.
 
@@ -56,6 +68,11 @@ repos at ₹0.
 - `apps/editor/src/ai/vault.ts`, `store.ts`, `api.ts` : vault, in-memory key state, Worker client
 - `apps/editor/src/ai/KeyForms.tsx`, `AiSettings.tsx`, `AiPanel.tsx`, `QuotaBanner.tsx` : UI
 - `apps/editor/e2e/ai.spec.ts` : key → ask → unlock after reload → quota banner → forget
+- `packages/core/src/fonts.ts`, `font-license.ts`, `test-fonts.ts` : bundled font list, @font-face,
+  OFL licence text, stand-in bytes for tests. `buildExport` now takes font bytes (3rd argument)
+- `apps/editor/src/lib/fonts.ts` : font URLs (fontsource packages), bytes for export, `data:` URLs
+  for the preview, `installEditorFonts` (FontFace API, no inline CSS)
+- `apps/editor/src/ai/changes.ts` : plain names of changed settings for the AI result
 - `.claude/launch.json` (untracked) : now also `api` (wrangler dev on 8787)
 
 ## 4. What worked
@@ -96,8 +113,8 @@ repos at ₹0.
 1. **Owner:** review `workers/api/skill/skill.md` (or send your own text). It is never committed.
 2. Phase 6: re-imported project files have no media bytes (decide: include `assets/` on re-import
    or ask to re-upload). Unused files are still exported.
-3. Phase 7: editor CSP must allow `connect-src` to the Worker plus the srcdoc/blob needs; bundle is
-   620 kB (196 kB gzip), split Motion/Zod or lazy-load the AI panel; consider Turnstile if abuse
+3. Phase 7: editor CSP must allow `connect-src` to the Worker, `font-src 'self' data:` (preview
+   fonts are data: URLs) plus the srcdoc/blob needs; bundle is 633 kB (201 kB gzip), split Motion/Zod or lazy-load the AI panel; consider Turnstile if abuse
    appears. `wrangler tail` still shows headers to the owner (owner-only, short-lived). Lighthouse
    re-run on both templates. Inspector exit animation window (see Phase 4 note: `inert`).
 4. Phase 8: create the KV namespace and replace the placeholder id in `wrangler.jsonc`; set

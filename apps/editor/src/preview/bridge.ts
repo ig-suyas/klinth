@@ -171,5 +171,6 @@ export const PREVIEW_CSS = `
 /** After the first load, reloads skip the scroll reveal so edits do not flicker. */
 export const CALM_CSS = `
 .reveal, .reveal.is-visible { opacity: 1 !important; transform: none !important; transition: none !important; }
+.reveal-mask, .reveal-mask img, .reveal-mask video { clip-path: none !important; transform: none !important; transition: none !important; }
 .status, .actions { animation: none !important; }
 `;

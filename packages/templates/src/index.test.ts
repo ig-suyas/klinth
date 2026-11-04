@@ -3,14 +3,17 @@ import {
   buildExport,
   buildZip,
   contrastRatio,
+  fontPath,
   migrateProject,
   parseProjectFile,
   renderSite,
   sectionSchema,
   serializeProject,
   themeContrastIssues,
+  themeFonts,
 } from '@klinth/core';
 import { describe, expect, it } from 'vitest';
+import { TEST_FONTS } from '../../core/src/test-fonts.ts';
 import { blockDefinitions, getTemplate, templates } from './index.ts';
 
 const attrs = (html: string, name: string): string[] =>
@@ -59,16 +62,22 @@ describe.each(templates)('$name template', (template) => {
   });
 
   it('exports a complete repository', () => {
-    const out = buildExport(project, new Map());
-    expect(out.map((f) => f.path).sort()).toEqual([
-      '.klinth/project.json',
-      '.nojekyll',
-      'README.md',
-      'css/site.css',
-      'favicon.svg',
-      'index.html',
-      'js/site.js',
-    ]);
+    const out = buildExport(project, new Map(), TEST_FONTS);
+    const fonts = themeFonts(project.theme).map(fontPath);
+    expect(fonts).toHaveLength(2);
+    expect(out.map((f) => f.path).sort()).toEqual(
+      [
+        '.klinth/project.json',
+        '.nojekyll',
+        'README.md',
+        'css/site.css',
+        'favicon.svg',
+        'fonts/LICENSE.txt',
+        ...fonts,
+        'index.html',
+        'js/site.js',
+      ].sort(),
+    );
     expect(buildZip(out).byteLength).toBeGreaterThan(1000);
   });
 
@@ -89,7 +98,10 @@ describe.each(templates)('$name template', (template) => {
 
   it('only links to its own sections, local files or https, mailto and tel', () => {
     const ids = new Set(attrs(html, 'id'));
-    const local = new Set(files.map((f) => f.path));
+    const local = new Set([
+      ...files.map((f) => f.path),
+      ...themeFonts(project.theme).map(fontPath),
+    ]);
     for (const href of attrs(html, 'href')) {
       if (href.startsWith('#')) expect(ids, href).toContain(href.slice(1));
       else if (!/^(https:\/\/|mailto:|tel:)/.test(href)) expect(local, href).toContain(href);

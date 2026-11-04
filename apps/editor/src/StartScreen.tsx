@@ -3,6 +3,7 @@ import { motion, useReducedMotion } from 'motion/react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { importProjectFile } from './lib/files.ts';
 import { deleteProject, listProjects, type ProjectSummary } from './lib/storage.ts';
+import { useFontUrls } from './lib/fonts.ts';
 import { buildPreviewDocument } from './preview/document.ts';
 import { Icon } from './ui/Icon.tsx';
 import type { Project } from '@klinth/core';
@@ -166,9 +167,11 @@ function TemplateCard({
   onPick: () => void;
 }) {
   // A still picture of the real template: no scripts run in this frame.
+  const project = useMemo(() => template.create(), [template]);
+  const fontUrls = useFontUrls(project.theme);
   const doc = useMemo(
-    () => buildPreviewDocument(template.create(), 0, { origin: '', interactive: false }),
-    [template],
+    () => buildPreviewDocument(project, 0, { origin: '', interactive: false, fontUrls }),
+    [project, fontUrls],
   );
   return (
     <button

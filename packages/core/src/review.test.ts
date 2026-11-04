@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion -- fixture indexes are known in tests */
 import { strFromU8, unzipSync } from 'fflate';
+import { TEST_FONTS } from './test-fonts.ts';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   MIGRATIONS,
@@ -339,13 +340,13 @@ describe('4. export paths', () => {
   it('names asset files by id, never by the uploaded file name', () => {
     const p = clone();
     p.assets[0]!.name = '../../evil\\..\\x.html';
-    const paths = buildExport(p, assetData).map((f) => f.path);
+    const paths = buildExport(p, assetData, TEST_FONTS).map((f) => f.path);
     expect(paths).toContain('assets/img1.webp');
     expect(paths.join('\n')).not.toContain('..');
   });
 
   it('every exported path is relative, clean and unique (case-insensitive)', () => {
-    const paths = buildExport(clone(), assetData).map((f) => f.path);
+    const paths = buildExport(clone(), assetData, TEST_FONTS).map((f) => f.path);
     for (const path of paths) {
       expect(path).toMatch(/^(\.?[a-z0-9_-]+\/)?\.?[A-Za-z0-9_-]+(\.[a-z0-9]+)?$/);
     }
@@ -415,7 +416,7 @@ describe('5. key and token guard', () => {
     const p = clone();
     loose(p.pages[0]!.sections[2]).items = [{ label: 'x', href: '#work', nested: [gemini] }];
     expect(() => serializeProject(p)).toThrow(/key or token/);
-    expect(() => buildExport(p, assetData)).toThrow(/key or token/);
+    expect(() => buildExport(p, assetData, TEST_FONTS)).toThrow(/key or token/);
   });
 
   it('blocks on import, by value and by name', () => {
@@ -532,30 +533,30 @@ describe('7. deterministic ZIP', () => {
   const zipOf = (files: SiteFile[]): Uint8Array => buildZip(files);
 
   it('gives byte-identical output for the same project, twice', () => {
-    const a = zipOf(buildExport(clone(), assetData));
-    const b = zipOf(buildExport(clone(), assetData));
+    const a = zipOf(buildExport(clone(), assetData, TEST_FONTS));
+    const b = zipOf(buildExport(clone(), assetData, TEST_FONTS));
     expect(sameBytes(a, b)).toBe(true);
   });
 
   it('does not depend on the machine time zone', () => {
     env.TZ = 'UTC';
-    const utc = zipOf(buildExport(clone(), assetData));
+    const utc = zipOf(buildExport(clone(), assetData, TEST_FONTS));
     env.TZ = 'Asia/Kolkata';
-    const ist = zipOf(buildExport(clone(), assetData));
+    const ist = zipOf(buildExport(clone(), assetData, TEST_FONTS));
     env.TZ = 'America/Los_Angeles';
-    const la = zipOf(buildExport(clone(), assetData));
+    const la = zipOf(buildExport(clone(), assetData, TEST_FONTS));
     expect(sameBytes(utc, ist)).toBe(true);
     expect(sameBytes(utc, la)).toBe(true);
   });
 
   it('does not depend on input file order', () => {
-    const files = buildExport(clone(), assetData);
+    const files = buildExport(clone(), assetData, TEST_FONTS);
     const reversed = [...files].reverse();
     expect(sameBytes(zipOf(files), zipOf(reversed))).toBe(true);
   });
 
   it('stores entries sorted, with fixed time and permissions', () => {
-    const zip = zipOf(buildExport(clone(), assetData));
+    const zip = zipOf(buildExport(clone(), assetData, TEST_FONTS));
     const names = Object.keys(unzipSync(zip));
     expect(names).toEqual([...names].sort());
     // Walk the central directory and check every entry header.
@@ -578,7 +579,7 @@ describe('7. deterministic ZIP', () => {
   });
 
   it('round-trips the project file through the ZIP', () => {
-    const out = unzipSync(zipOf(buildExport(clone(), assetData)));
+    const out = unzipSync(zipOf(buildExport(clone(), assetData, TEST_FONTS)));
     expect(parseProjectFile(strFromU8(out['.klinth/project.json']!))).toEqual(
       migrateProject(clone()),
     );
@@ -588,7 +589,7 @@ describe('7. deterministic ZIP', () => {
 // ---------------------------------------------------------------- 9. Offline
 
 describe('9. offline export', () => {
-  const files = buildExport(clone(), assetData);
+  const files = buildExport(clone(), assetData, TEST_FONTS);
   const paths = new Set(files.map((f) => f.path));
 
   it('every referenced local file exists, and nothing loads from the internet', () => {
@@ -613,7 +614,14 @@ describe('9. offline export', () => {
     }
     const css = html(files, 'css/site.css');
     const js = html(files, 'js/site.js');
-    expect(css).not.toMatch(/@import|url\(/);
+    expect(css).not.toMatch(/@import/);
+    // The only url() references are the bundled fonts, and each file is in the export.
+    const urls = [...css.matchAll(/url\(([^)]*)\)/g)].map((m) => m[1]!);
+    expect(urls.length).toBeGreaterThan(0);
+    for (const url of urls) {
+      expect(url).toMatch(/^\.\.\/fonts\/[a-z0-9-]+\.woff2$/);
+      expect(paths.has(url.slice(3)), url).toBe(true);
+    }
     const players = js.replace(
       /'https:\/\/(www\.youtube-nocookie\.com\/embed|player\.vimeo\.com\/video)\/'/g,
       '',

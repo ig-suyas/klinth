@@ -101,6 +101,27 @@ test('a non-coder picks a template, edits it and exports a site', async ({ page 
   expect(index).not.toContain('data-k-');
   expect(strFromU8(files['css/site.css'] ?? new Uint8Array())).toContain('--color-accent: #1d5f7a');
   expect(Object.keys(files)).toContain('.klinth/project.json');
+  // The site carries its own fonts (real WOFF2 files) and their licence.
+  for (const font of ['fraunces-latin-wght-normal', 'instrument-sans-latin-wght-normal']) {
+    const bytes = files[`fonts/${font}.woff2`] ?? new Uint8Array();
+    expect(strFromU8(bytes.slice(0, 4))).toBe('wOF2');
+    expect(bytes.byteLength).toBeGreaterThan(10_000);
+  }
+  expect(strFromU8(files['fonts/LICENSE.txt'] ?? new Uint8Array())).toContain('Open Font License');
+
+  // The preview frame renders with the bundled heading font, not a fallback.
+  const frame = page.frames().find((f) => f.url() === 'about:srcdoc');
+  await expect
+    .poll(
+      () =>
+        frame?.evaluate(async () => {
+          await document.fonts.ready;
+          return [...document.fonts].some(
+            (f) => f.family.replace(/"/g, '') === 'Fraunces' && f.status === 'loaded',
+          );
+        }) ?? false,
+    )
+    .toBe(true);
 });
 
 test('Escape cancels an in-place edit', async ({ page }) => {

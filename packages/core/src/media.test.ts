@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion -- fixture indexes are known in tests */
 import { strFromU8, unzipSync } from 'fflate';
+import { TEST_FONTS } from './test-fonts.ts';
 import { describe, expect, it } from 'vitest';
 import {
   MAX_VIDEO_BYTES,
@@ -195,9 +196,11 @@ describe('custom code', () => {
   it('runs as pasted on the exported site', () => {
     const page = html(renderSite(project()));
     expect(page).toContain(`<div class="custom-code">${CODE}</div>`);
-    const readme = buildExport(project(), new Map([['img1', new Uint8Array([1])]])).find(
-      (f) => f.path === 'README.md',
-    );
+    const readme = buildExport(
+      project(),
+      new Map([['img1', new Uint8Array([1])]]),
+      TEST_FONTS,
+    ).find((f) => f.path === 'README.md');
     expect(readme?.content).toContain('About your custom code');
   });
 
@@ -289,7 +292,7 @@ describe('files', () => {
       ['img2', new Uint8Array([3])],
       ['vid1', new Uint8Array([0, 0, 0, 24, 102, 116, 121, 112])],
     ]);
-    const zip = unzipSync(buildZip(buildExport(project(), data)));
+    const zip = unzipSync(buildZip(buildExport(project(), data, TEST_FONTS)));
     expect(Array.from(zip['assets/vid1.mp4'] ?? [])).toEqual(Array.from(data.get('vid1')!));
     expect(Array.from(zip['assets/img2.webp'] ?? [])).toEqual([3]);
     const page = strFromU8(zip['index.html']!);

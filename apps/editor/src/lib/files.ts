@@ -7,6 +7,7 @@ import {
   serializeProject,
   type Project,
 } from '@klinth/core';
+import { loadFontData } from './fonts.ts';
 
 /** Starts a browser download for in-memory bytes or text. */
 export function downloadFile(name: string, data: BlobPart, type: string): void {
@@ -35,8 +36,11 @@ export function downloadProjectFile(project: Project): void {
   );
 }
 
-export function downloadSiteZip(project: Project, assets: ReadonlyMap<string, Uint8Array>): void {
-  const zip = buildZip(buildExport(project, assets));
+export async function downloadSiteZip(
+  project: Project,
+  assets: ReadonlyMap<string, Uint8Array>,
+): Promise<void> {
+  const zip = buildZip(buildExport(project, assets, await loadFontData(project.theme)));
   downloadFile(
     `${fileSlug(project.meta.title)}.zip`,
     zip as Uint8Array<ArrayBuffer>,

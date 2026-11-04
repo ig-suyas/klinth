@@ -1,4 +1,4 @@
-import { pagePath, renderSite, type Project } from '@klinth/core';
+import { fontFaceCss, pagePath, renderSite, themeFonts, type Project } from '@klinth/core';
 import { z } from 'zod';
 import { BRIDGE_CSS, BRIDGE_JS, CALM_CSS, PREVIEW_CSS } from './bridge.ts';
 
@@ -11,6 +11,14 @@ export interface PreviewOptions {
   calm?: boolean;
   scrollY?: number;
   selectedId?: string | null;
+  /** `data:` addresses of the bundled fonts by file name (see lib/fonts.ts). */
+  fontUrls?: Readonly<Record<string, string>>;
+}
+
+/** `@font-face` rules for the fonts that are loaded; the rest use their fallbacks. */
+function previewFontCss(project: Project, urls: Readonly<Record<string, string>> = {}): string {
+  const fonts = themeFonts(project.theme).filter((f) => urls[f.file]);
+  return fontFaceCss(fonts, (f) => urls[f.file] ?? '');
 }
 
 /** Makes a JSON value safe to place inside an inline `<script>`. */
@@ -47,7 +55,10 @@ export function buildPreviewDocument(
   const css = fileText(files, 'css/site.css');
   const js = fileText(files, 'js/site.js');
   const extraCss =
-    PREVIEW_CSS + (options.interactive ? BRIDGE_CSS : '') + (options.calm ? CALM_CSS : '');
+    previewFontCss(project, options.fontUrls) +
+    PREVIEW_CSS +
+    (options.interactive ? BRIDGE_CSS : '') +
+    (options.calm ? CALM_CSS : '');
   const config = {
     origin: options.origin,
     scrollY: options.scrollY ?? 0,

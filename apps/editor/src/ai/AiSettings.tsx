@@ -69,12 +69,37 @@ function SettingsDialog() {
             <Icon name="close" />
           </button>
         </div>
+        <Steps />
         <KeyGate />
         <div className="mt-5 border-t border-line pt-4">
           <HonestNote />
         </div>
       </motion.div>
     </motion.div>
+  );
+}
+
+const STEPS = [
+  'Get a free key from Google AI Studio',
+  'Paste it here and lock it with a passphrase',
+  'Press the sparkle next to any section',
+];
+
+/** How it works, shown until a key is added. */
+function Steps() {
+  const hasKey = useAi((s) => s.key !== null || s.saved);
+  if (hasKey) return null;
+  return (
+    <ol className="mb-5 grid gap-2 rounded-xl bg-sunk p-3">
+      {STEPS.map((step, i) => (
+        <li key={step} className="flex items-center gap-3 text-sm">
+          <span className="grid size-6 shrink-0 place-items-center rounded-full bg-panel font-display text-xs ring-1 ring-line">
+            {i + 1}
+          </span>
+          {step}
+        </li>
+      ))}
+    </ol>
   );
 }
 

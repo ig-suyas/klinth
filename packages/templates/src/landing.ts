@@ -23,7 +23,7 @@ export function createLanding(): Project {
         accent: '#e8b65c',
         accentText: '#0f1f19',
       },
-      fonts: { heading: 'grotesk', body: 'system-sans' },
+      fonts: { heading: 'bricolage', body: 'figtree' },
       radius: 20,
       spacing: 8,
     },

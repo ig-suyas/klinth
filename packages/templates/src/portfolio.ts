@@ -23,7 +23,7 @@ export function createPortfolio(): Project {
         accent: '#ad3a15',
         accentText: '#fffaf2',
       },
-      fonts: { heading: 'didone', body: 'humanist' },
+      fonts: { heading: 'fraunces', body: 'instrument-sans' },
       radius: 4,
       spacing: 8,
     },

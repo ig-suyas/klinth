@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion -- fixture indexes are known in tests */
 import { strFromU8, unzipSync } from 'fflate';
+import { TEST_FONTS } from './test-fonts.ts';
 import { describe, expect, it } from 'vitest';
 import {
   MIGRATIONS,
@@ -158,7 +159,7 @@ describe('project file', () => {
 });
 
 describe('export', () => {
-  const files = buildExport(clone(), assetData);
+  const files = buildExport(clone(), assetData, TEST_FONTS);
   const paths = files.map((f) => f.path).sort();
 
   it('produces the repository layout', () => {
@@ -170,6 +171,9 @@ describe('export', () => {
         'about.html',
         'assets/img1.webp',
         'favicon.svg',
+        'fonts/LICENSE.txt',
+        'fonts/fraunces-latin-wght-normal.woff2',
+        'fonts/instrument-sans-latin-wght-normal.woff2',
         'css/site.css',
         'index.html',
         'js/site.js',
@@ -197,7 +201,7 @@ describe('export', () => {
   });
 
   it('fails clearly when an asset is missing', () => {
-    expect(() => buildExport(clone(), new Map())).toThrow(/river\.webp/);
+    expect(() => buildExport(clone(), new Map(), TEST_FONTS)).toThrow(/river\.webp/);
   });
 
   it('zips files that unzip identically, and re-imports the project', () => {
@@ -210,7 +214,7 @@ describe('export', () => {
   });
 
   it('is deterministic', () => {
-    expect(buildZip(files)).toEqual(buildZip(buildExport(clone(), assetData)));
+    expect(buildZip(files)).toEqual(buildZip(buildExport(clone(), assetData, TEST_FONTS)));
   });
 });
 

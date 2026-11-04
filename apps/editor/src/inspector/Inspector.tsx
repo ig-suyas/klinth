@@ -110,11 +110,11 @@ function SectionSettings({ section }: { section: Section }) {
         </div>
         <button
           type="button"
-          className="btn btn-line shrink-0 px-2.5"
+          className={`btn shrink-0 px-2.5 ${aiOpen ? 'btn-primary' : 'btn-line'}`}
           aria-expanded={aiOpen}
           onClick={() => openPanel(aiOpen ? null : section.id)}
         >
-          <Icon name="sparkle" className="size-4 text-accent" />
+          <Icon name="sparkle" className={`size-4 ${aiOpen ? '' : 'text-accent'}`} />
           Ask AI
         </button>
       </header>

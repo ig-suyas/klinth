@@ -33,7 +33,7 @@ body,.block,.site-footer{--fg:var(--color-text);--muted:var(--color-muted);--lin
 .bg-plain+.bg-plain{padding-top:0}
 
 /* ---- Header ---- */
-.site-header{position:sticky;top:0;z-index:10;background:color-mix(in srgb,var(--color-bg) 86%,transparent);-webkit-backdrop-filter:saturate(1.5) blur(14px);backdrop-filter:saturate(1.5) blur(14px);border-bottom:1px solid var(--line)}
+.site-header{position:sticky;top:0;z-index:10;background:var(--color-bg);border-bottom:1px solid var(--line)}
 .bar{display:flex;align-items:center;justify-content:space-between;gap:1.5rem;min-height:4.25rem}
 .brand{font-family:var(--font-heading);font-weight:var(--heading-weight);letter-spacing:var(--heading-tracking);font-size:1.25rem;color:var(--fg);text-decoration:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .nav{position:relative}
@@ -64,7 +64,7 @@ span.button{cursor:default}
 .block-hero{padding-block:clamp(calc(var(--space)*8),10vw,calc(var(--space)*16)) clamp(calc(var(--space)*9),12vw,calc(var(--space)*18))}
 .hero{display:grid;gap:clamp(2.5rem,6vw,5rem);align-items:end}
 .hero-text{display:grid;gap:calc(var(--space)*3);justify-items:start}
-.display{font-size:clamp(3.1rem,1.6rem + 7.4vw,9rem);line-height:.94;max-width:14ch}
+.display{font-size:clamp(3.1rem,1.6rem + 7.4vw,9rem);line-height:.94;letter-spacing:calc(var(--heading-tracking) - .01em);max-width:14ch}
 h2.display{font-size:clamp(2.4rem,1.4rem + 4.6vw,6rem)}
 .lede{max-width:36rem}
 .actions{display:flex;flex-wrap:wrap;gap:.75rem;margin-top:calc(var(--space)*1)}
@@ -188,8 +188,12 @@ a.linkbtn:hover .arrow{transform:translateX(4px)}
 
 /* ---- Motion (only when the visitor has not asked for less) ---- */
 @media (prefers-reduced-motion:no-preference){
-.reveal{opacity:0;transform:translateY(28px);transition:opacity .9s cubic-bezier(.2,.7,.2,1),transform .9s cubic-bezier(.2,.7,.2,1)}
+.reveal{opacity:0;transform:translateY(12px);transition:opacity .7s cubic-bezier(.2,.7,.2,1),transform .7s cubic-bezier(.2,.7,.2,1)}
 .reveal.is-visible{opacity:1;transform:none}
+.reveal-mask{clip-path:inset(0 0 100% 0);transition:clip-path 1.1s cubic-bezier(.65,0,.35,1)}
+.reveal-mask img,.reveal-mask video{transform:scale(1.06);transition:transform 1.4s cubic-bezier(.2,.7,.2,1)}
+.reveal-mask.is-visible{clip-path:inset(0)}
+.reveal-mask.is-visible img,.reveal-mask.is-visible video{transform:none}
 .status,.actions{animation:rise .9s cubic-bezier(.2,.7,.2,1) both}
 .actions{animation-delay:.12s}
 .dot{animation:pulse 2.4s ease-out infinite}
@@ -236,7 +240,9 @@ export const SITE_JS = `(function () {
   var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   if (reduce || !('IntersectionObserver' in window)) return;
   var groups = '.cards > li, .index > li, .quotes > figure, .gallery > li, .linklist > li, .facts > div';
-  var singles = '.head, .prose, .about-media, .split-media, .contact-details, .form, .video-frame, .video-file';
+  var singles = '.head, .prose, .contact-details, .form';
+  // Pictures and video open like a curtain instead of sliding in.
+  var media = '.about-media, .split-media, .video-frame, .video-file';
   var io = new IntersectionObserver(function (entries) {
     entries.forEach(function (e) {
       if (e.isIntersecting) { e.target.classList.add('is-visible'); io.unobserve(e.target); }
@@ -244,12 +250,12 @@ export const SITE_JS = `(function () {
   }, { rootMargin: '0px 0px -8% 0px' });
   var blocks = document.querySelectorAll('main > .block');
   for (var b = 1; b < blocks.length; b++) {
-    blocks[b].querySelectorAll(singles + ', ' + groups).forEach(function (el) {
+    blocks[b].querySelectorAll(singles + ', ' + groups + ', ' + media).forEach(function (el) {
       if (el.matches(groups)) {
         var index = Array.prototype.indexOf.call(el.parentNode.children, el);
-        el.style.transitionDelay = Math.min(index, 5) * 80 + 'ms';
+        el.style.transitionDelay = Math.min(index, 5) * 70 + 'ms';
       }
-      el.classList.add('reveal');
+      el.classList.add(el.matches(media) ? 'reveal-mask' : 'reveal');
       io.observe(el);
     });
   }

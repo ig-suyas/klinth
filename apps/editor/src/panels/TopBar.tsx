@@ -198,7 +198,7 @@ function ExportMenu() {
     run(async () => {
       const { projectId, project } = useEditor.getState();
       if (!projectId || !project) return;
-      downloadSiteZip(project, await loadAssets(projectId));
+      await downloadSiteZip(project, await loadAssets(projectId));
     });
   const downloadProject = () =>
     run(() => {

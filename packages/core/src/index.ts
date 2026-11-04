@@ -17,6 +17,15 @@ export {
 } from './blocks.ts';
 export * from './tokens.ts';
 export {
+  BUNDLED_FONTS,
+  FONTS_DIR,
+  fontFaceCss,
+  fontLicense,
+  fontPath,
+  themeFonts,
+  type FontFile,
+} from './fonts.ts';
+export {
   MIN_TEXT_CONTRAST,
   contrastRatio,
   mixSrgb,

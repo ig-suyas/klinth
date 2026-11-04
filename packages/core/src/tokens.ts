@@ -4,6 +4,15 @@ const hexColor = z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Use a color like #1a2b3c
 
 /** Font stacks are a closed list so nothing unsafe reaches CSS. */
 export const FONT_STACKS = {
+  // Bundled open-license fonts (see fonts.ts), with close system fallbacks.
+  fraunces:
+    '"Fraunces", "Iowan Old Style", "Palatino Linotype", "URW Palladio L", P052, Georgia, serif',
+  'instrument-sans':
+    '"Instrument Sans", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+  bricolage:
+    '"Bricolage Grotesque", "Segoe UI Variable Display", "Helvetica Neue", Arial, sans-serif',
+  figtree:
+    '"Figtree", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
   'system-sans':
     'system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
   'system-serif': 'Charter, "Bitstream Charter", "Sitka Text", Cambria, Georgia, serif',
@@ -23,6 +32,10 @@ export const FONT_STACKS = {
 
 /** Serif display faces look best light and loose; sans faces bold and tight. */
 const HEADING_STYLE: Record<FontKey, { weight: number; tracking: string }> = {
+  fraunces: { weight: 380, tracking: '-0.025em' },
+  'instrument-sans': { weight: 600, tracking: '-0.025em' },
+  bricolage: { weight: 700, tracking: '-0.035em' },
+  figtree: { weight: 700, tracking: '-0.025em' },
   'system-sans': { weight: 700, tracking: '-0.03em' },
   'system-serif': { weight: 400, tracking: '-0.015em' },
   'system-mono': { weight: 600, tracking: '-0.02em' },
@@ -68,7 +81,7 @@ export const defaultTheme: Theme = {
     accent: '#b13a0b',
     accentText: '#ffffff',
   },
-  fonts: { heading: 'didone', body: 'system-sans' },
+  fonts: { heading: 'fraunces', body: 'instrument-sans' },
   radius: 12,
   spacing: 8,
 };

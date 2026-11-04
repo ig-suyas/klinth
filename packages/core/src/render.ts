@@ -2,6 +2,7 @@ import { escapeHtml as esc } from './html.ts';
 import { assetPath, renderBlock, renderFooter, type BlockCtx } from './render-blocks.ts';
 import type { Asset, Page, Project, Section } from './schema.ts';
 import { SITE_CSS, SITE_JS } from './site-assets.ts';
+import { fontFaceCss, fontLicense, fontPath, themeFonts } from './fonts.ts';
 import { themeToCss } from './tokens.ts';
 
 export { assetPath };
@@ -89,6 +90,16 @@ export interface RenderOptions {
   preview?: boolean;
 }
 
+/** Preloads the heading font so the first big heading does not shift. Not in the preview. */
+function preloadFonts(project: Project, options: RenderOptions): string {
+  if (options.preview) return '';
+  const [first] = themeFonts(project.theme);
+  return first
+    ? `<link rel="preload" href="${esc(fontPath(first))}" as="font" type="font/woff2" crossorigin>
+`
+    : '';
+}
+
 function renderPage(
   project: Project,
   page: Page,
@@ -134,7 +145,7 @@ function renderPage(
 <title>${esc(title)}</title>${description}
 <link rel="icon" href="${esc(icon)}">
 <meta name="theme-color" content="${esc(project.theme.colors.background)}">
-<link rel="stylesheet" href="css/site.css">
+${preloadFonts(project, options)}<link rel="stylesheet" href="css/site.css">
 <script src="js/site.js" defer></script>
 </head>
 <body>
@@ -155,13 +166,19 @@ ${footer ? `<footer class="site-footer">${footer}</footer>\n` : ''}</body>
  */
 export function renderSite(project: Project, options: RenderOptions = {}): SiteFile[] {
   const assets = new Map(project.assets.map((a) => [a.id, a]));
+  const fonts = themeFonts(project.theme);
   return [
     ...project.pages.map((page) => ({
       path: pagePath(page),
       content: renderPage(project, page, assets, options),
     })),
-    { path: 'css/site.css', content: themeToCss(project.theme) + SITE_CSS },
+    // The preview loads fonts through the bridge (its frame has no files next to it).
+    {
+      path: 'css/site.css',
+      content: (options.preview ? '' : fontFaceCss(fonts)) + themeToCss(project.theme) + SITE_CSS,
+    },
     { path: 'js/site.js', content: SITE_JS },
     ...(faviconAsset(project, assets) ? [] : [{ path: MONOGRAM_PATH, content: monogram(project) }]),
+    ...(fonts.length > 0 ? [{ path: `fonts/LICENSE.txt`, content: fontLicense(fonts) }] : []),
   ];
 }
