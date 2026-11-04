@@ -1,0 +1,12 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "klinth-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  "observability": { "enabled": true },
+  "vars": {
+    "ALLOWED_ORIGINS": "http://localhost:5173",
+  },
+  // Phase 5 adds: KV namespace (private skill), Durable Object (rate limiter),
+  // rate limit binding (burst guard). Phase 6 adds GitHub OAuth vars.
+}

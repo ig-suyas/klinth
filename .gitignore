@@ -1,0 +1,36 @@
+# Dependencies and build output
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+
+# Local env and secrets (only .env.example is committed)
+.env
+.env.*
+!.env.example
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
+
+# Wrangler local state
+.wrangler/
+
+# Private AI design skill: lives in Workers KV only, never in git
+skill.md
+skill.private.md
+*.skill.md
+workers/api/skill/*
+!workers/api/skill/skill.example.md
+
+# Test output
+playwright-report/
+test-results/
+blob-report/
+
+# OS and editor
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.log
