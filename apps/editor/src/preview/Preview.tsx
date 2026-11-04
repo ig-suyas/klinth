@@ -51,6 +51,9 @@ export function Preview() {
   const area = useRef<HTMLDivElement>(null);
   const [space, setSpace] = useState({ width: 0, height: 0 });
   const fontUrls = useFontUrls(project?.theme);
+  /** "Preview animations" (or a newly picked animation): the next redraw plays them. */
+  const replay = useEditor((s) => s.animationReplay);
+  const shownReplay = useRef(replay);
 
   /** Hands the latest page to the shell, which shows it in a fresh inner frame. */
   const sendPage = (el: HTMLIFrameElement) =>
@@ -77,10 +80,12 @@ export function Preview() {
       if (shownPage.current !== pageIndex) scrollY.current = 0;
       shownPage.current = pageIndex;
       loads.current += 1;
+      const play = shownReplay.current !== replay;
+      shownReplay.current = replay;
       pending.current = buildPreviewDocument(project, pageIndex, {
         origin: window.location.origin,
         interactive: true,
-        calm: loads.current > 1,
+        calm: loads.current > 1 && !play,
         scrollY: scrollY.current,
         scrollTo: scrollTo.current,
         selectedId: useEditor.getState().selectedId,
@@ -91,7 +96,7 @@ export function Preview() {
       else if (!frame.current.getAttribute('src')) frame.current.setAttribute('src', PREVIEW_PATH);
     }, PREVIEW_DELAY_MS);
     return () => clearTimeout(timer);
-  }, [project, pageIndex, fontUrls]);
+  }, [project, pageIndex, fontUrls, replay]);
 
   // Messages from the frame. Checked by source and by schema; anything else is ignored.
   useEffect(() => {

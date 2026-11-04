@@ -226,6 +226,142 @@
   }
 }
 
+/* Animation picker: each choice shows a tiny sample of its motion on hover, focus or when picked. */
+.anim-demo {
+  position: relative;
+  flex: none;
+  width: 1.5rem;
+  height: 1.5rem;
+  margin-top: 0.125rem;
+  overflow: hidden;
+  border-radius: 0.375rem;
+  background: var(--color-sunk);
+}
+.anim-demo > span {
+  position: absolute;
+  inset: 0.3125rem;
+  border-radius: 0.1875rem;
+  background: var(--color-accent);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .anim-choice:is(:hover, :has(:checked), :has(:focus-visible)) .anim-demo > span {
+    animation: 1.6s cubic-bezier(0.2, 0.7, 0.2, 1) infinite both;
+  }
+  .anim-demo[data-preset='fade'] > span,
+  .anim-demo[data-preset='blurIn'] > span,
+  .anim-demo[data-preset='typewriter'] > span {
+    animation-name: demo-fade !important;
+  }
+  .anim-demo[data-preset='slideUp'] > span,
+  .anim-demo[data-preset='words'] > span,
+  .anim-demo[data-preset='letters'] > span {
+    animation-name: demo-up !important;
+  }
+  .anim-demo[data-preset='zoom'] > span {
+    animation-name: demo-zoom !important;
+  }
+  .anim-demo[data-preset='maskWipe'] > span {
+    animation-name: demo-wipe !important;
+  }
+  .anim-demo[data-preset='parallax'] > span,
+  .anim-demo[data-preset='lift'] > span {
+    animation-name: demo-lift !important;
+  }
+  .anim-demo[data-preset='tilt'] > span {
+    animation-name: demo-tilt !important;
+  }
+  .anim-demo[data-preset='glow'] > span {
+    animation-name: demo-glow !important;
+  }
+  .anim-demo[data-preset='marquee'] > span {
+    animation: demo-slide 1.6s linear infinite !important;
+  }
+  .anim-demo[data-preset='none'] > span {
+    animation: none !important;
+  }
+}
+@keyframes demo-fade {
+  0%,
+  20% {
+    opacity: 0;
+  }
+  60%,
+  100% {
+    opacity: 1;
+  }
+}
+@keyframes demo-up {
+  0%,
+  20% {
+    opacity: 0;
+    transform: translateY(70%);
+  }
+  60%,
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes demo-zoom {
+  0%,
+  20% {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  60%,
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes demo-wipe {
+  0%,
+  20% {
+    transform: scaleX(0);
+    transform-origin: 0 50%;
+  }
+  60%,
+  100% {
+    transform: none;
+    transform-origin: 0 50%;
+  }
+}
+@keyframes demo-lift {
+  0%,
+  100% {
+    transform: none;
+  }
+  50% {
+    transform: translateY(-25%);
+  }
+}
+@keyframes demo-tilt {
+  0%,
+  100% {
+    transform: none;
+  }
+  50% {
+    transform: perspective(3rem) rotateX(18deg) rotateY(-22deg);
+  }
+}
+@keyframes demo-glow {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+@keyframes demo-slide {
+  from {
+    transform: translateX(-120%);
+  }
+  to {
+    transform: translateX(120%);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

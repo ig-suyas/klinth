@@ -2,6 +2,7 @@ import type { BlockProps, LinkProps } from './blocks.ts';
 import { PROVIDER_NAME, embedPageUrl, embedPlayerUrl, parseVideoUrl } from './embed.ts';
 import { escapeHtml as esc, safeUrl } from './html.ts';
 import type { Asset, Section } from './schema.ts';
+import { splitAttrs, splitLines, splitText, type SplitMode } from './animation.ts';
 
 /** Per-section render context. */
 export interface BlockCtx {
@@ -17,6 +18,8 @@ export interface BlockCtx {
    * frame) and custom code runs in a nested sandboxed frame. Never set for exports.
    */
   preview?: boolean | undefined;
+  /** The section's heading appears word by word or letter by letter (see animation.ts). */
+  split?: SplitMode | undefined;
 }
 
 /** In the editor preview, names the prop an element shows so it can be edited in place. */
@@ -56,8 +59,18 @@ function paras(text: string | undefined, className = '', attrs = ''): string {
     .join('');
 }
 
-function heading(text: string | undefined, level: number, className: string, attrs = ''): string {
+function heading(
+  text: string | undefined,
+  level: number,
+  className: string,
+  attrs = '',
+  split?: SplitMode,
+): string {
   if (!text?.trim()) return '';
+  if (split) {
+    const pieces = splitText(text, split);
+    return `<h${level} class="${className}"${attrs}${splitAttrs(pieces)}>${pieces.html}</h${level}>`;
+  }
   return `<h${level} class="${className}"${attrs}>${lines(text)}</h${level}>`;
 }
 
@@ -102,7 +115,7 @@ interface HeadProps {
 function head(p: HeadProps, ctx: BlockCtx, className = 'head'): string {
   const parts =
     (p.eyebrow ? `<p class="eyebrow"${field(ctx, 'eyebrow')}>${esc(p.eyebrow)}</p>` : '') +
-    heading(p.heading, ctx.level, 'title', field(ctx, 'heading')) +
+    heading(p.heading, ctx.level, 'title', field(ctx, 'heading'), ctx.split) +
     paras(p.intro, 'intro', field(ctx, 'intro'));
   return parts ? `<div class="${className}">${parts}</div>` : '';
 }
@@ -115,14 +128,26 @@ const has = (html: string, className: string): string => (html ? ` ${className}`
  * Poster headline: each line sits in its own mask so it can rise into view.
  * The space between lines keeps the words apart for screen readers and search.
  */
-function posterHeading(text: string | undefined, level: number, attrs: string): string {
+function posterHeading(
+  text: string | undefined,
+  level: number,
+  attrs: string,
+  split?: SplitMode,
+): string {
   const rows = (text ?? '')
     .split(/\r?\n/)
     .map((row) => row.trim())
     .filter(Boolean);
   if (rows.length === 0) return '';
-  const inner = rows.map((row) => `<span class="line"><span>${esc(row)}</span></span>`).join(' ');
-  return `<h${level} class="display"${attrs}>${inner}</h${level}>`;
+  // A word or letter animation splits inside each line's mask.
+  const pieces = split ? splitLines(rows.join('\n'), split) : null;
+  const inner = rows
+    .map(
+      (row, i) =>
+        `<span class="line"><span>${pieces ? (pieces.lines[i] ?? '') : esc(row)}</span></span>`,
+    )
+    .join(' ');
+  return `<h${level} class="display"${attrs}${pieces ? splitAttrs(pieces) : ''}>${inner}</h${level}>`;
 }
 
 function hero(p: BlockProps<'hero'>, ctx: BlockCtx): string {
@@ -137,7 +162,7 @@ function hero(p: BlockProps<'hero'>, ctx: BlockCtx): string {
       ? `<p class="status"><span class="dot" aria-hidden="true"></span>${esc(p.status)}</p>`
       : '') +
     (p.eyebrow ? `<p class="eyebrow"${field(ctx, 'eyebrow')}>${esc(p.eyebrow)}</p>` : '') +
-    heading(p.heading, ctx.level, 'display', field(ctx, 'heading')) +
+    heading(p.heading, ctx.level, 'display', field(ctx, 'heading'), ctx.split) +
     paras(p.subheading, 'lede', field(ctx, 'subheading')) +
     (actions ? `<div class="actions">${actions}</div>` : '');
   return `<div class="hero hero-${layout}${has(media, 'has-media')}"><div class="hero-text">${text}</div>${
@@ -162,6 +187,7 @@ function posterHero(p: BlockProps<'hero'>, ctx: BlockCtx): string {
     p.heading,
     ctx.level,
     field(ctx, 'heading'),
+    ctx.split,
   )}<div class="poster-rule" aria-hidden="true"></div>${foot ? `<div class="poster-foot">${foot}</div>` : ''}${
     media ? `<div class="hero-media">${media}</div>` : ''
   }</div>`;

@@ -29,6 +29,8 @@ interface EditorState {
   lastAt: number;
   save: { status: SaveStatus; message?: string };
   notice: Notice | null;
+  /** Goes up by one each time the preview should play its animations again. */
+  animationReplay: number;
 
   open: (id: string, project: Project, revision: number) => void;
   close: () => void;
@@ -47,6 +49,8 @@ interface EditorState {
   setRevision: (revision: number) => void;
   notify: (text: string, undo?: boolean) => void;
   dismissNotice: () => void;
+  /** Redraws the preview with its animations playing (the "Preview animations" button). */
+  replayAnimations: () => void;
 }
 
 const initial = {
@@ -61,6 +65,7 @@ const initial = {
   lastAt: 0,
   save: { status: 'saved' as const },
   notice: null,
+  animationReplay: 0,
 };
 
 let noticeCount = 0;
@@ -143,6 +148,7 @@ export const useEditor = create<EditorState>()((set, get) => ({
     set({ notice: undo ? { id: noticeCount, text, undo } : { id: noticeCount, text } });
   },
   dismissNotice: () => set({ notice: null }),
+  replayAnimations: () => set((s) => ({ animationReplay: s.animationReplay + 1 })),
 }));
 
 /** The page being edited, if a project is open. */

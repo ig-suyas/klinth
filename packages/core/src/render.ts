@@ -13,6 +13,15 @@ import { fontFaceCss, fontLicense, fontPath, themeFonts } from './fonts.ts';
 import { themeToCss } from './tokens.ts';
 import { firstSectionBackground, headerCta, headerLayout, headerToCss } from './header.ts';
 import { headerShown, navLinkHref, sectionAnchor } from './nav.ts';
+import {
+  ANIM_CSS,
+  ANIM_CSS_PATH,
+  ANIM_JS,
+  ANIM_JS_PATH,
+  headingSplit,
+  pageAnimates,
+  sectionAnimationMarkup,
+} from './animation.ts';
 
 export { assetPath };
 
@@ -206,6 +215,7 @@ function renderPage(
   // Only when some pages hide the header do the others load its own files.
   const split = shown && headerMode(project) === 'some';
   const code = siteCode(project);
+  const animates = pageAnimates(page);
   const title = page.slug === '' ? meta.title : `${page.title} | ${meta.title}`;
   const favicon = faviconAsset(project, assets);
   const icon = favicon ? assetPath(favicon) : MONOGRAM_PATH;
@@ -225,10 +235,12 @@ function renderPage(
         first: i === 0,
         editable,
         preview: options.preview === true,
+        split: headingSplit(section.animation),
       };
       const bg = sectionBackground(section);
       const marker = editable ? ` data-k-section="${esc(section.id)}"` : '';
-      return `<section id="${esc(sectionAnchor(section))}" class="block block-${section.type} bg-${bg}"${marker}><div class="wrap">${renderBlock(section, ctx)}</div></section>`;
+      const anim = sectionAnimationMarkup(section.animation, i === 0);
+      return `<section id="${esc(sectionAnchor(section))}" class="block block-${section.type} bg-${bg}${anim.classes}"${marker}${anim.attrs}><div class="wrap">${renderBlock(section, ctx)}</div></section>`;
     })
     .join('\n');
   const footer = footers
@@ -244,8 +256,8 @@ function renderPage(
 <link rel="icon" href="${esc(icon)}">
 <meta name="theme-color" content="${esc(project.theme.colors.background)}">
 ${preloadFonts(project, options)}<link rel="stylesheet" href="css/site.css">
-${split ? `<link rel="stylesheet" href="${HEADER_CSS_PATH}">\n` : ''}${code.css ? `<link rel="stylesheet" href="${CUSTOM_CSS_PATH}">\n` : ''}<script src="js/site.js" defer></script>
-${split ? `<script src="${HEADER_JS_PATH}" defer></script>\n` : ''}</head>
+${animates ? `<link rel="stylesheet" href="${ANIM_CSS_PATH}">\n` : ''}${split ? `<link rel="stylesheet" href="${HEADER_CSS_PATH}">\n` : ''}${code.css ? `<link rel="stylesheet" href="${CUSTOM_CSS_PATH}">\n` : ''}<script src="js/site.js" defer></script>
+${animates ? `<script src="${ANIM_JS_PATH}" defer></script>\n` : ''}${split ? `<script src="${HEADER_JS_PATH}" defer></script>\n` : ''}</head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
 ${shown ? `${renderHeader(project, page, { assets, preview: options.preview === true, editable })}\n` : ''}<main id="main">
@@ -284,6 +296,12 @@ export function renderSite(project: Project, options: RenderOptions = {}): SiteF
       ? [
           { path: HEADER_CSS_PATH, content: headerToCss(project) + HEADER_CSS },
           { path: HEADER_JS_PATH, content: HEADER_JS },
+        ]
+      : []),
+    ...(project.pages.some(pageAnimates)
+      ? [
+          { path: ANIM_CSS_PATH, content: ANIM_CSS },
+          { path: ANIM_JS_PATH, content: ANIM_JS },
         ]
       : []),
     ...(code.css ? [{ path: CUSTOM_CSS_PATH, content: withNewline(code.css) }] : []),

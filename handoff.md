@@ -18,8 +18,53 @@
 | 6B Header polish              | done                                  |
 | 6C Editor fits the window     | done                                  |
 | 6D Header links, no header    | done                                  |
+| 6E Animations                 | done                                  |
 
 ## 1. Current state
+
+**6E (animations): schema version 4.** `MIGRATIONS[3]` changes nothing (older files have no
+animations; the bump stops older editors from dropping them). New optional `section.animation`
+(`packages/core/src/animation.ts`): strict object of parts `section heading media buttons cards
+video`, each `{preset, speed?: slow|normal|fast, delay?: whole ms 0-2000, repeat?: once|always}`.
+Presets: fade, slideUp, zoom, blurIn; words, letters, typewriter (heading); maskWipe; parallax
+(hero/about/textImage pictures only); marquee (gallery pictures or heading); lift, tilt, glow
+(hover: pictures, buttons, cards). `animationTargets(type)` / `animationPresets(type, part)` decide
+what fits; the page schema refuses a part the block lacks or a preset that does not fit, and more
+than `MAX_ANIMATED_SECTIONS` = 40 animated sections per page (new import limit; 5 MB and depth 16
+unchanged, animations nest 7 deep). Video: only the thumbnail (`.video-facade`) moves, never on
+hover; click-to-play unchanged; the player frame is never animated.
+Export: pages with an animation link `css/anim.css` (right after `site.css`) and
+`js/anim.js` (defer); projects without animations are byte-identical (no files, no tags). The
+`<section>` gets `k-anim`, `data-anim-<part>="<preset>"`, `data-k-enter` (parts that play on
+scroll), `data-k-again` (every time) and `style` vars (`--k-<part>-dur/-delay/-step`, all from
+fixed tables or clamped integers). The first section also gets `k-in-<part>`, so it plays on load
+with CSS only. `anim.js` hides later sections' parts (`k-wait-<part>`) and swaps to `k-in-<part>`
+via IntersectionObserver; does nothing with reduced motion or without IO. Text split happens at
+export (`splitText`/`splitLines`): heading gets `data-k-split aria-label="full text"`, each word
+piece is `aria-hidden`, words stay in the HTML; letters use `Intl.Segmenter` (emoji stay whole).
+Word reveal reuses the poster headline's `line-up` keyframes and mask idea; poster headings split
+inside each `.line`. The site's own scroll reveal steps aside where a chosen animation moves the
+same thing. All motion is inside `prefers-reduced-motion: no-preference`; only transform and
+opacity move, except blur-in (also `filter`), which is a plain fade at <= 37.5em. Parallax is off
+at <= 37.5em. Marquee: static row (scrollable without JS, scrollbar hidden), JS adds aria-hidden
+copies, a Pause/Play button (absolute, no layout shift), pauses on hover/focus.
+Editor: section settings end with an "Animation" panel (`inspector/AnimationPanel.tsx`): "What
+moves", preset cards with a small live sample (`.anim-demo` in `index.css`), Speed, "Wait before it
+starts" (0-2 s), "Play it" Once / Every time, "Preview animations". Pure edit
+`state/animation.ts` (`setSectionAnimation`, plain labels). Store `animationReplay` /
+`replayAnimations()`: the next preview redraw is not calm, so animations play (also after every
+pick). Calm redraws stop them (`CALM_CSS`). The bridge flattens a split heading (and drops marquee
+copies) before in-place editing so the text is saved once.
+Checked: Lighthouse 13 mobile with an animation on every section: landing 98/100/100/100,
+portfolio 98/100/100/100, studio 100/100/100/100, CLS 0.000 on all; with JS off and on at
+320/375/1280 nothing stays hidden and no horizontal overflow; marquee page: same height with JS
+on/off, copies aria-hidden, moves, Pause works, no overflow (a wrapper `min-width:0` fix was
+needed). Tests: core `animation.test.ts` (schema enums/ranges, fit per block, cap, migration,
+splitting, export files/markup, video, reduced-motion CSS), editor `state/animation.test.ts`,
+`inspector/AnimationPanel.test.tsx`, `preview/anim-script.test.ts` (jsdom: reduced motion, no IO,
+wait/in/again), e2e `animations.spec.ts` (3 animations, in-place edit of a split heading, replay,
+export; reduced-motion context). Version-pinned tests updated to 4 on purpose. Totals: 758 unit
+(core 486, templates 46, editor 170, api 56), 25 e2e (`--workers=1`). Not deployed.
 
 **6D (header links, removable header): schema version 3.** `MIGRATIONS[2]` sets
 `meta.headerEnabled: true` on old projects (absent also means on; `false` = no header). New:
@@ -276,6 +321,8 @@ repos at ₹0.
 
 ## 3. Files
 
+- `packages/core/src/animation.ts` (+ test) : animation schema, split text, `ANIM_CSS`, `ANIM_JS`
+- `apps/editor/src/inspector/AnimationPanel.tsx`, `state/animation.ts` : animation picker; `e2e/animations.spec.ts`
 - `packages/core/src/nav.ts` (+ `nav.test.ts`) : header links, section anchors, `headerShown`
 - `packages/core/src/site-assets.ts` : `SITE_CSS_BASE`/`HEADER_CSS`, `SITE_JS_BASE`/`HEADER_JS`
 - `apps/editor/src/state/header.ts` (+ test), `state/useHeaderActions.ts` : header edits, remove/add
@@ -391,7 +438,7 @@ repos at ₹0.
 
 ## 6. What is still left to do
 
-1. **Owner:** run `npm run deploy:editor` to put 6B and 6C live (the deployed editor is older).
+1. **Owner:** run `npm run deploy:editor` to put 6B-6E live (the deployed editor is older).
 2. **Owner:** review the live skill text (`workers/api/skill/skill.md`, then `skill:remote`); review
    Terms/Privacy with a lawyer; turn on 2FA for GitHub and Cloudflare; delete `klinth-test-site`.
 3. Optional: custom domain (README "Deploy" section lists the follow-up config changes); rename the

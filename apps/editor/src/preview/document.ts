@@ -1,4 +1,6 @@
 import {
+  ANIM_CSS_PATH,
+  ANIM_JS_PATH,
   CUSTOM_CSS_PATH,
   CUSTOM_JS_PATH,
   HEADER_CSS_PATH,
@@ -95,6 +97,9 @@ export function buildPreviewDocument(
   const headerJsTag = `<script src="${HEADER_JS_PATH}" defer></script>\n`;
   const headerJs = html.includes(headerJsTag) ? fileText(files, HEADER_JS_PATH) : '';
   const custom = previewSiteCode(project, options.interactive);
+  // Only on pages with an animation; their own files, inlined like the rest.
+  const animJsTag = `<script src="${ANIM_JS_PATH}" defer></script>\n`;
+  const animJs = html.includes(animJsTag) ? fileText(files, ANIM_JS_PATH) : '';
   const extraCss =
     previewFontCss(project, options.fontUrls) +
     PREVIEW_CSS +
@@ -124,13 +129,18 @@ export function buildPreviewDocument(
         () => `<style>${fileText(files, HEADER_CSS_PATH)}</style>\n`,
       )
       .replace(headerJsTag, () => '')
+      .replace(
+        `<link rel="stylesheet" href="${ANIM_CSS_PATH}">\n`,
+        () => `<style>${fileText(files, ANIM_CSS_PATH)}</style>\n`,
+      )
+      .replace(animJsTag, () => '')
       .replace(`<link rel="stylesheet" href="${CUSTOM_CSS_PATH}">\n`, () => custom.css)
       .replace(`<script src="${CUSTOM_JS_PATH}"></script>\n`, () => custom.js)
       .replace('<script src="js/site.js" defer></script>', () => '')
       // Thumbnails run no scripts at all (their frame forbids them).
       .replace('</body>', () =>
         options.interactive
-          ? `<script>${js}${headerJs ? `\n${headerJs}` : ''}</script>\n${bridge}</body>`
+          ? `<script>${js}${headerJs ? `\n${headerJs}` : ''}${animJs ? `\n${animJs}` : ''}</script>\n${bridge}</body>`
           : '</body>',
       )
   );

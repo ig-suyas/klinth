@@ -281,14 +281,14 @@ describe('schema version 3', () => {
     return { ...p, schemaVersion: 2 };
   };
 
-  it('is the current version', () => {
-    expect(SCHEMA_VERSION).toBe(3);
-    expect(Object.keys(MIGRATIONS)).toEqual(['1', '2']);
+  it('is upgraded past by version 4 (see animation.test.ts)', () => {
+    expect(SCHEMA_VERSION).toBe(4);
+    expect(Object.keys(MIGRATIONS)).toContain('2');
   });
 
   it('upgrades a version 2 project with the header on', () => {
     const upgraded = migrateProject(v2());
-    expect(upgraded.schemaVersion).toBe(3);
+    expect(upgraded.schemaVersion).toBe(SCHEMA_VERSION);
     expect(upgraded.meta.headerEnabled).toBe(true);
     expect(upgraded.pages).toEqual(clone().pages);
     expect(upgraded.pages.every((page) => page.hideHeader === undefined)).toBe(true);

@@ -144,7 +144,7 @@ test('header links work in the preview and the export, then the header is remove
     schemaVersion: number;
     meta: { headerEnabled: boolean };
   };
-  expect(saved.schemaVersion).toBe(3);
+  expect(saved.schemaVersion).toBe(4);
   expect(saved.meta.headerEnabled).toBe(false);
   await site.close();
 });

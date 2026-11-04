@@ -120,9 +120,27 @@ export const BRIDGE_JS = `(function () {
     }
   }
 
+  // Animated headings: marquee copies go, and words or letters split for the animation
+  // become plain lines again, so editing sees the text once and as typed.
+  function plainText(el) {
+    var copies = el.querySelectorAll('[data-k-clone]');
+    for (var i = 0; i < copies.length; i++) copies[i].remove();
+    if (!el.hasAttribute('data-k-split')) return;
+    var rows = el.innerText.replace(/\\u00a0/g, ' ').split('\\n');
+    el.removeAttribute('data-k-split');
+    el.removeAttribute('aria-label');
+    while (el.firstChild) el.removeChild(el.firstChild);
+    for (var r = 0; r < rows.length; r++) {
+      if (r) el.appendChild(document.createElement('br'));
+      el.appendChild(document.createTextNode(rows[r]));
+    }
+  }
+
   function startEditing(el, section) {
     var name = el.getAttribute('data-k-field');
-    editing = { el: el, section: section, field: name, original: el.cloneNode(true), before: fieldValue(section, name) };
+    var original = el.cloneNode(true);
+    plainText(el);
+    editing = { el: el, section: section, field: name, original: original, before: fieldValue(section, name) };
     el.setAttribute('contenteditable', 'plaintext-only');
     el.classList.add('k-editing');
     el.focus();
@@ -256,8 +274,15 @@ export const PREVIEW_CSS = `
 .code-empty { padding: 2.5rem 1rem; text-align: center; border: 1px dashed var(--line); border-radius: min(var(--radius), 12px); font: 500 14px/1.4 system-ui, sans-serif; color: var(--muted); }
 `;
 
-/** After the first load, reloads skip the scroll reveal so edits do not flicker. */
+/**
+ * After the first load, reloads skip the scroll reveal and the chosen animations
+ * so edits do not flicker. Marquees keep running; "Preview animations" plays the rest.
+ */
 export const CALM_CSS = `
+.k-anim *:not(.k-mq), .k-anim *::after { animation: none !important; }
+[class*="k-wait-"] * { opacity: 1 !important; }
+[class*="k-wait-"] .k-w > span { transform: none !important; }
+[class*="k-wait-"] *::after { transform: scaleX(0) !important; }
 .reveal, .reveal.is-visible { opacity: 1 !important; transform: none !important; transition: none !important; }
 .reveal-mask, .reveal-mask img, .reveal-mask video { clip-path: none !important; transform: none !important; transition: none !important; }
 .status, .actions { animation: none !important; }

@@ -17,6 +17,9 @@ export const MIGRATIONS: Readonly<Record<number, Migration>> = {
     ...data,
     meta: isRecord(data.meta) ? { headerEnabled: true, ...data.meta } : data.meta,
   }),
+  // 3 -> 4: sections can carry animation settings (optional). Older files have none, so
+  // nothing changes; the new version stops older editors from dropping the settings.
+  3: (data) => ({ ...data }),
 };
 
 export class ProjectError extends Error {

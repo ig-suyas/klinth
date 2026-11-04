@@ -8,6 +8,7 @@ import { setSectionProps, type Props } from '../state/sections.ts';
 import { currentPage, useEditor } from '../state/store.ts';
 import { useSectionActions } from '../state/useSectionActions.ts';
 import { Icon } from '../ui/Icon.tsx';
+import { AnimationPanel } from './AnimationPanel.tsx';
 import { Field } from './Fields.tsx';
 import { blockFields } from './fields.ts';
 import { ThemePanel } from './ThemePanel.tsx';
@@ -136,6 +137,7 @@ function SectionSettings({ section }: { section: Section }) {
           }
         />
       ))}
+      <AnimationPanel key={section.id} section={section} />
       <div className="flex gap-2 border-t border-line pt-4">
         <button type="button" className="btn btn-line flex-1" onClick={() => duplicate(section.id)}>
           <Icon name="copy" />

@@ -5,8 +5,14 @@ import { DEVICE_NAME, RESERVED_SLUGS, collectHrefs, linkedSlug } from './links.t
 import { themeSchema } from './tokens.ts';
 import { HEADER_STYLES, headerSchema } from './header.ts';
 import { MAX_NAV_LINKS, anchorSchema, navLinkSchema } from './nav.ts';
+import {
+  MAX_ANIMATED_SECTIONS,
+  animationProblem,
+  hasAnimation,
+  sectionAnimationSchema,
+} from './animation.ts';
 
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 4;
 
 export { HEADER_STYLES, type HeaderStyle } from './header.ts';
 
@@ -61,6 +67,8 @@ const sectionOf = <T extends BlockType>(type: T) =>
       type: z.literal(type),
       /** The section's id in the page, made from its title when a header link points to it. */
       anchor: anchorSchema.optional(),
+      /** Animation presets for the section and its parts (checked per block type on the page). */
+      animation: sectionAnimationSchema.optional(),
       props: blockPropSchemas[type],
     })
     .strict();
@@ -102,7 +110,19 @@ export const pageSchema = z
       .refine(
         (s) => isUnique(s.map((x) => (x.anchor ?? x.id).toLowerCase())),
         'Two sections on this page have the same link name',
-      ),
+      )
+      .superRefine((sections, ctx) => {
+        sections.forEach((section, i) => {
+          const problem = section.animation && animationProblem(section.type, section.animation);
+          if (problem) ctx.addIssue({ code: 'custom', path: [i, 'animation'], message: problem });
+        });
+        if (sections.filter((s) => hasAnimation(s.animation)).length > MAX_ANIMATED_SECTIONS) {
+          ctx.addIssue({
+            code: 'custom',
+            message: `A page can have up to ${MAX_ANIMATED_SECTIONS} animated sections`,
+          });
+        }
+      }),
   })
   .strict();
 

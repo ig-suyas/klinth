@@ -6,6 +6,37 @@
 
 export * from './schema.ts';
 export {
+  ANIMATION_PRESETS,
+  ANIMATION_REPEATS,
+  ANIMATION_SPEEDS,
+  ANIMATION_TARGETS,
+  ANIM_CSS,
+  ANIM_CSS_PATH,
+  ANIM_JS,
+  ANIM_JS_PATH,
+  ENTRANCE_PRESETS,
+  HOVER_PRESETS,
+  MAX_ANIMATED_SECTIONS,
+  MAX_ANIMATION_DELAY,
+  TEXT_PRESETS,
+  animationPresets,
+  animationSchema,
+  animationTargets,
+  hasAnimation,
+  isEntrance,
+  pageAnimates,
+  sectionAnimationSchema,
+  splitLines,
+  splitText,
+  type Animation,
+  type AnimationPreset,
+  type AnimationSpeed,
+  type AnimationTarget,
+  type SectionAnimation,
+  type SplitMode,
+} from './animation.ts';
+export { SITE_CSS } from './site-assets.ts';
+export {
   BACKGROUNDS,
   MAX_CUSTOM_CODE,
   blockPropSchemas,
