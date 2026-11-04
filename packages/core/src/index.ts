@@ -58,6 +58,8 @@ export {
 export {
   CUSTOM_CSS_PATH,
   CUSTOM_JS_PATH,
+  HEADER_CSS_PATH,
+  HEADER_JS_PATH,
   assetPath,
   pagePath,
   renderSite,
@@ -126,3 +128,20 @@ export {
   type HeaderLayout,
   type HeaderSettings,
 } from './header.ts';
+export {
+  MAX_NAV_LABEL,
+  MAX_NAV_LINKS,
+  RESERVED_ANCHORS,
+  anchorSchema,
+  automaticNavLinks,
+  ensureAnchor,
+  headerShown,
+  navLinkHref,
+  navLinkProblems,
+  navLinkSchema,
+  removeBrokenNavLinks,
+  sectionAnchor,
+  sectionTitleText,
+  uniqueAnchor,
+  type NavLink,
+} from './nav.ts';

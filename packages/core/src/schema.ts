@@ -4,8 +4,9 @@ import { MAX_VIDEO_BYTES } from './media.ts';
 import { DEVICE_NAME, RESERVED_SLUGS, collectHrefs, linkedSlug } from './links.ts';
 import { themeSchema } from './tokens.ts';
 import { HEADER_STYLES, headerSchema } from './header.ts';
+import { MAX_NAV_LINKS, anchorSchema, navLinkSchema } from './nav.ts';
 
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
 export { HEADER_STYLES, type HeaderStyle } from './header.ts';
 
@@ -54,7 +55,15 @@ const siteCodeText = z
 export const siteCodeSchema = z.object({ css: siteCodeText, js: siteCodeText }).strict();
 
 const sectionOf = <T extends BlockType>(type: T) =>
-  z.object({ id, type: z.literal(type), props: blockPropSchemas[type] }).strict();
+  z
+    .object({
+      id,
+      type: z.literal(type),
+      /** The section's id in the page, made from its title when a header link points to it. */
+      anchor: anchorSchema.optional(),
+      props: blockPropSchemas[type],
+    })
+    .strict();
 
 export const sectionSchema = z.discriminatedUnion('type', [
   sectionOf('hero'),
@@ -83,10 +92,17 @@ export const pageSchema = z
         'This page address is reserved',
       ),
     title: singleLine(120, 1),
+    /** Leaves the site header off this page only (for landing pages). */
+    hideHeader: z.boolean().optional(),
     sections: z
       .array(sectionSchema)
       .max(100)
-      .refine((s) => isUnique(s.map((x) => x.id)), 'Section ids must be unique on a page'),
+      .refine((s) => isUnique(s.map((x) => x.id)), 'Section ids must be unique on a page')
+      // The id each section gets in the page (its anchor, else its own id) must be unique too.
+      .refine(
+        (s) => isUnique(s.map((x) => (x.anchor ?? x.id).toLowerCase())),
+        'Two sections on this page have the same link name',
+      ),
   })
   .strict();
 
@@ -126,6 +142,17 @@ export const projectSchema = z
         headerStyle: z.enum(HEADER_STYLES).optional(),
         /** Header background, layout, button and logo; the style's own look when not set. */
         header: headerSchema.optional(),
+        /** The site header is shown unless this is false (set to true by the version 3 upgrade). */
+        headerEnabled: z.boolean().optional(),
+        /**
+         * Header links picked by the owner. Not set: pages, or the sections named
+         * for the menu, as before. Links to a deleted page or section are kept,
+         * flagged in the editor and left out of the export.
+         */
+        navLinks: z
+          .array(navLinkSchema)
+          .max(MAX_NAV_LINKS, `A header can have up to ${MAX_NAV_LINKS} links`)
+          .optional(),
       })
       .strict(),
     theme: themeSchema,

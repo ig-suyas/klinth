@@ -12,6 +12,11 @@ export const MIGRATIONS: Readonly<Record<number, Migration>> = {
     ...data,
     meta: isRecord(data.meta) ? { headerStyle: 'bar', ...data.meta } : data.meta,
   }),
+  // 2 -> 3: the header can be removed (site-wide or per page). Old sites keep it.
+  2: (data) => ({
+    ...data,
+    meta: isRecord(data.meta) ? { headerEnabled: true, ...data.meta } : data.meta,
+  }),
 };
 
 export class ProjectError extends Error {

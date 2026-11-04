@@ -1,10 +1,18 @@
 import { escapeHtml as esc } from './html.ts';
 import { assetPath, renderBlock, renderFooter, type BlockCtx } from './render-blocks.ts';
 import type { Asset, Page, Project, Section } from './schema.ts';
-import { SITE_CSS, SITE_JS } from './site-assets.ts';
+import {
+  HEADER_CSS,
+  HEADER_JS,
+  SITE_CSS,
+  SITE_CSS_BASE,
+  SITE_JS,
+  SITE_JS_BASE,
+} from './site-assets.ts';
 import { fontFaceCss, fontLicense, fontPath, themeFonts } from './fonts.ts';
 import { themeToCss } from './tokens.ts';
 import { firstSectionBackground, headerCta, headerLayout, headerToCss } from './header.ts';
+import { headerShown, navLinkHref, sectionAnchor } from './nav.ts';
 
 export { assetPath };
 
@@ -30,14 +38,25 @@ interface NavItem {
   current: boolean;
 }
 
-/** Pages when there are several (unless the menu is off); otherwise sections the user named for the menu. */
+/**
+ * The owner's chosen links (skipping any whose page or section is gone); without
+ * a choice, pages when there are several (unless the menu is off), otherwise
+ * sections the user named for the menu.
+ */
 function navItems(project: Project, page: Page): NavItem[] {
+  if (project.meta.navLinks) {
+    return project.meta.navLinks.flatMap((link) => {
+      const href = navLinkHref(project, link, page);
+      const current = link.target.kind === 'page' && link.target.page === page.slug;
+      return href ? [{ href, label: link.label, current }] : [];
+    });
+  }
   if (project.pages.length > 1 && project.meta.pageMenu !== false) {
     return project.pages.map((p) => ({ href: pagePath(p), label: p.title, current: p === page }));
   }
   return page.sections
     .filter((s) => s.type !== 'footer' && sectionNavLabel(s))
-    .map((s) => ({ href: `#${s.id}`, label: sectionNavLabel(s), current: false }));
+    .map((s) => ({ href: `#${sectionAnchor(s)}`, label: sectionNavLabel(s), current: false }));
 }
 
 /** Up to this many links stay visible on phones; more go behind a "Menu" button. */
@@ -79,6 +98,8 @@ function renderBrand(project: Project, home: string, ctx: HeaderCtx): string {
 interface HeaderCtx {
   assets: ReadonlyMap<string, Asset>;
   preview: boolean;
+  /** Editor preview: the header can be clicked to select it. */
+  editable: boolean;
 }
 
 function renderHeader(project: Project, page: Page, ctx: HeaderCtx): string {
@@ -108,10 +129,21 @@ function renderHeader(project: Project, page: Page, ctx: HeaderCtx): string {
   const home = project.pages.length > 1 ? 'index.html' : '#top';
   const style = project.meta.headerStyle ?? 'bar';
   const classes = `site-header header-${style}${headerClasses(project, page)}${cta ? ' has-cta' : ''}`;
-  return `<header class="${classes}" id="top"><div class="wrap bar">${renderBrand(project, home, ctx)}${nav}${button}</div></header>`;
+  const marker = ctx.editable ? ' data-k-header' : '';
+  return `<header class="${classes}" id="top"${marker}><div class="wrap bar">${renderBrand(project, home, ctx)}${nav}${button}</div></header>`;
 }
 
 const MONOGRAM_PATH = 'favicon.svg';
+
+/** Header rules and script, as separate files when only some pages show the header. */
+export const HEADER_CSS_PATH = 'css/header.css';
+export const HEADER_JS_PATH = 'js/header.js';
+
+/** Which pages show the header: all (one stylesheet as before), none, or some (split files). */
+function headerMode(project: Project): 'all' | 'none' | 'some' {
+  const shown = project.pages.filter((p) => headerShown(project, p)).length;
+  return shown === project.pages.length ? 'all' : shown === 0 ? 'none' : 'some';
+}
 
 /** Where the site-wide custom code is exported. Separate files, so nothing is ever inlined. */
 export const CUSTOM_CSS_PATH = 'css/custom.css';
@@ -170,6 +202,9 @@ function renderPage(
 ): string {
   const editable = options.editable === true;
   const { meta } = project;
+  const shown = headerShown(project, page);
+  // Only when some pages hide the header do the others load its own files.
+  const split = shown && headerMode(project) === 'some';
   const code = siteCode(project);
   const title = page.slug === '' ? meta.title : `${page.title} | ${meta.title}`;
   const favicon = faviconAsset(project, assets);
@@ -193,7 +228,7 @@ function renderPage(
       };
       const bg = sectionBackground(section);
       const marker = editable ? ` data-k-section="${esc(section.id)}"` : '';
-      return `<section id="${esc(section.id)}" class="block block-${section.type} bg-${bg}"${marker}><div class="wrap">${renderBlock(section, ctx)}</div></section>`;
+      return `<section id="${esc(sectionAnchor(section))}" class="block block-${section.type} bg-${bg}"${marker}><div class="wrap">${renderBlock(section, ctx)}</div></section>`;
     })
     .join('\n');
   const footer = footers
@@ -209,12 +244,11 @@ function renderPage(
 <link rel="icon" href="${esc(icon)}">
 <meta name="theme-color" content="${esc(project.theme.colors.background)}">
 ${preloadFonts(project, options)}<link rel="stylesheet" href="css/site.css">
-${code.css ? `<link rel="stylesheet" href="${CUSTOM_CSS_PATH}">\n` : ''}<script src="js/site.js" defer></script>
-</head>
+${split ? `<link rel="stylesheet" href="${HEADER_CSS_PATH}">\n` : ''}${code.css ? `<link rel="stylesheet" href="${CUSTOM_CSS_PATH}">\n` : ''}<script src="js/site.js" defer></script>
+${split ? `<script src="${HEADER_JS_PATH}" defer></script>\n` : ''}</head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
-${renderHeader(project, page, { assets, preview: options.preview === true })}
-<main id="main">
+${shown ? `${renderHeader(project, page, { assets, preview: options.preview === true, editable })}\n` : ''}<main id="main">
 ${body}
 </main>
 ${footer ? `<footer class="site-footer">${footer}</footer>\n` : ''}${code.js ? `<script src="${CUSTOM_JS_PATH}"></script>\n` : ''}</body>
@@ -231,6 +265,7 @@ export function renderSite(project: Project, options: RenderOptions = {}): SiteF
   const assets = new Map(project.assets.map((a) => [a.id, a]));
   const fonts = themeFonts(project.theme);
   const code = siteCode(project);
+  const mode = headerMode(project);
   return [
     ...project.pages.map((page) => ({
       path: pagePath(page),
@@ -242,10 +277,15 @@ export function renderSite(project: Project, options: RenderOptions = {}): SiteF
       content:
         (options.preview ? '' : fontFaceCss(fonts)) +
         themeToCss(project.theme) +
-        headerToCss(project) +
-        SITE_CSS,
+        (mode === 'all' ? headerToCss(project) + SITE_CSS : SITE_CSS_BASE),
     },
-    { path: 'js/site.js', content: SITE_JS },
+    { path: 'js/site.js', content: mode === 'all' ? SITE_JS : SITE_JS_BASE },
+    ...(mode === 'some'
+      ? [
+          { path: HEADER_CSS_PATH, content: headerToCss(project) + HEADER_CSS },
+          { path: HEADER_JS_PATH, content: HEADER_JS },
+        ]
+      : []),
     ...(code.css ? [{ path: CUSTOM_CSS_PATH, content: withNewline(code.css) }] : []),
     ...(code.js ? [{ path: CUSTOM_JS_PATH, content: withNewline(code.js) }] : []),
     ...(faviconAsset(project, assets) ? [] : [{ path: MONOGRAM_PATH, content: monogram(project) }]),

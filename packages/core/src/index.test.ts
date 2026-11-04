@@ -121,8 +121,8 @@ describe('schema and migrations', () => {
     };
     expect(runMigrations({ schemaVersion: 1 }, 3, steps)).toEqual({ schemaVersion: 3, a: 1, b: 2 });
     expect(() => runMigrations({ schemaVersion: 1 }, 3, {})).toThrow(/version 1/);
-    // Version 1 -> 2 is the only real step so far (see styles.test.ts).
-    expect(Object.keys(MIGRATIONS)).toEqual(['1']);
+    // Real steps: 1 -> 2 (styles.test.ts) and 2 -> 3 (nav.test.ts).
+    expect(Object.keys(MIGRATIONS)).toEqual(['1', '2']);
   });
 
   it('requires a home page with unique addresses', () => {
@@ -233,7 +233,9 @@ describe('editor preview markers', () => {
   });
 
   it('do not change anything else in the page', () => {
-    const stripped = html(true).replace(/ data-k-(section|field)="[^"]*"/g, '');
+    const stripped = html(true)
+      .replace(/ data-k-(section|field)="[^"]*"/g, '')
+      .replace(/ data-k-header/g, '');
     expect(stripped).toBe(html(false));
   });
 });

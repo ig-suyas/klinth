@@ -1,5 +1,6 @@
 import { DEVICE_NAME, PAGE_LINK, RESERVED_SLUGS, linkedSlug, mapHrefs, pageFile } from './links.ts';
 import { ProjectError } from './migrations.ts';
+import { relinkNavLinks } from './nav.ts';
 import { MAX_PAGES, SCHEMA_VERSION, type Page, type Project } from './schema.ts';
 import { defaultTheme } from './tokens.ts';
 
@@ -101,7 +102,7 @@ export function renamePage(project: Project, index: number, title: string): Proj
   if (slug === page.slug) return { ...project, pages };
   return {
     ...project,
-    meta: relinkMeta(project.meta, page.slug, slug),
+    meta: relinkNavLinks(relinkMeta(project.meta, page.slug, slug), page.slug, slug),
     pages: relink(pages, page.slug, slug),
   };
 }
@@ -137,7 +138,13 @@ export function movePage(project: Project, index: number, by: -1 | 1): Project {
 export function blankProject(): Project {
   return {
     schemaVersion: SCHEMA_VERSION,
-    meta: { title: 'My website', description: '', language: 'en', headerStyle: 'bar' },
+    meta: {
+      title: 'My website',
+      description: '',
+      language: 'en',
+      headerStyle: 'bar',
+      headerEnabled: true,
+    },
     theme: JSON.parse(JSON.stringify(defaultTheme)) as Project['theme'],
     pages: [{ slug: '', title: 'Home', sections: [] }],
     assets: [],

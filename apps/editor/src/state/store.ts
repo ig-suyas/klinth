@@ -1,4 +1,4 @@
-import { projectSchema, type Project } from '@klinth/core';
+import { headerShown, projectSchema, type Project } from '@klinth/core';
 import { create } from 'zustand';
 
 export type Device = 'desktop' | 'tablet' | 'phone';
@@ -65,9 +65,13 @@ const initial = {
 
 let noticeCount = 0;
 
-/** Keeps the selection pointing at a section that still exists. */
+/** Selection value for the site header (never a valid section id; see state/header.ts). */
+const HEADER_SELECTION = '#header';
+
+/** Keeps the selection pointing at a section (or a header) that still exists. */
 function keepSelection(project: Project, pageIndex: number, id: string | null): string | null {
   const page = project.pages[pageIndex];
+  if (id === HEADER_SELECTION) return page && headerShown(project, page) ? id : null;
   return id && page?.sections.some((s) => s.id === id) ? id : null;
 }
 

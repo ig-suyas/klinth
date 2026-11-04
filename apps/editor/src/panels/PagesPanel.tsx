@@ -125,7 +125,13 @@ export function PagesPanel() {
                         className="icon-btn size-7 hover:text-danger"
                         aria-label={`Delete ${page.title}`}
                         onClick={() => {
-                          if (run((p) => deletePage(p, i), `“${page.title}” page deleted.`)) {
+                          const linked = useEditor
+                            .getState()
+                            .project?.meta.navLinks?.some((l) => l.target.page === page.slug);
+                          const done = linked
+                            ? `“${page.title}” page deleted. Header links to it are hidden until you change them.`
+                            : `“${page.title}” page deleted.`;
+                          if (run((p) => deletePage(p, i), done)) {
                             setPage(pageIndex >= i ? pageIndex - 1 : pageIndex);
                           }
                         }}

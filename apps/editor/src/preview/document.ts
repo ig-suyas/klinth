@@ -1,6 +1,8 @@
 import {
   CUSTOM_CSS_PATH,
   CUSTOM_JS_PATH,
+  HEADER_CSS_PATH,
+  HEADER_JS_PATH,
   fontFaceCss,
   pagePath,
   renderSite,
@@ -20,6 +22,8 @@ export interface PreviewOptions {
   calm?: boolean;
   scrollY?: number;
   selectedId?: string | null;
+  /** Section anchor to show first (after following a header link from another page). */
+  scrollTo?: string | null;
   /** `data:` addresses of the bundled fonts by file name (see lib/fonts.ts). */
   fontUrls?: Readonly<Record<string, string>>;
 }
@@ -86,6 +90,10 @@ export function buildPreviewDocument(
   const files = renderSite(project, { editable: options.interactive, preview: true });
   const css = fileText(files, 'css/site.css');
   const js = fileText(files, 'js/site.js');
+  const html = fileText(files, pagePath(page));
+  // Only when some pages hide the header; inlined on the pages that show it.
+  const headerJsTag = `<script src="${HEADER_JS_PATH}" defer></script>\n`;
+  const headerJs = html.includes(headerJsTag) ? fileText(files, HEADER_JS_PATH) : '';
   const custom = previewSiteCode(project, options.interactive);
   const extraCss =
     previewFontCss(project, options.fontUrls) +
@@ -96,12 +104,14 @@ export function buildPreviewDocument(
     origin: options.origin,
     scrollY: options.scrollY ?? 0,
     selected: options.selectedId ?? null,
+    page: page.slug,
+    scrollTo: options.scrollTo ?? null,
   };
   const bridge = options.interactive
     ? `<script>window.__klinth=${scriptJson(config)};${BRIDGE_JS}</script>\n`
     : '';
   return (
-    fileText(files, pagePath(page))
+    html
       // The frame has no files next to it, so the favicon would only fail to load.
       .replace(/<link rel="icon" href="[^"]*">\n?/, '')
       // Function replacers: `$` in the inserted text must stay literal.
@@ -109,12 +119,19 @@ export function buildPreviewDocument(
         '<link rel="stylesheet" href="css/site.css">',
         () => `<style>${css}${extraCss}</style>`,
       )
+      .replace(
+        `<link rel="stylesheet" href="${HEADER_CSS_PATH}">\n`,
+        () => `<style>${fileText(files, HEADER_CSS_PATH)}</style>\n`,
+      )
+      .replace(headerJsTag, () => '')
       .replace(`<link rel="stylesheet" href="${CUSTOM_CSS_PATH}">\n`, () => custom.css)
       .replace(`<script src="${CUSTOM_JS_PATH}"></script>\n`, () => custom.js)
       .replace('<script src="js/site.js" defer></script>', () => '')
       // Thumbnails run no scripts at all (their frame forbids them).
       .replace('</body>', () =>
-        options.interactive ? `<script>${js}</script>\n${bridge}</body>` : '</body>',
+        options.interactive
+          ? `<script>${js}${headerJs ? `\n${headerJs}` : ''}</script>\n${bridge}</body>`
+          : '</body>',
       )
   );
 }
@@ -135,6 +152,23 @@ export const previewMessageSchema = z.discriminatedUnion('type', [
     id: z.string().max(64),
     field: z.enum(['eyebrow', 'heading', 'intro', 'subheading', 'body', 'caption', 'text']),
     value: z.string().max(10_000),
+  }),
+  /** The header was clicked (not one of its links). */
+  z.object({ source: z.literal('klinth-preview'), type: z.literal('header') }),
+  /** The "×" on the header toolbar. */
+  z.object({ source: z.literal('klinth-preview'), type: z.literal('removeHeader') }),
+  /** A header link to another page (and maybe a section on it): the preview switches page. */
+  z.object({
+    source: z.literal('klinth-preview'),
+    type: z.literal('navigate'),
+    page: z
+      .string()
+      .max(60)
+      .regex(/^([a-z0-9]+(-[a-z0-9]+)*)?$/),
+    anchor: z
+      .string()
+      .regex(/^[A-Za-z][\w-]{0,63}$/)
+      .optional(),
   }),
   z.object({
     source: z.literal('klinth-preview'),

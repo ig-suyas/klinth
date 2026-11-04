@@ -2,7 +2,9 @@ import { sectionAssetIds } from '@klinth/core';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useFontUrls } from '../lib/fonts.ts';
 import { assetBlobs } from '../media/files.ts';
+import { HEADER_ID } from '../state/header.ts';
 import { setSectionProps, type Props } from '../state/sections.ts';
+import { removeHeaderNow } from '../state/useHeaderActions.ts';
 import { useEditor, type Device } from '../state/store.ts';
 import { PREVIEW_PATH } from '../security/headers.ts';
 import { buildPreviewDocument, previewMessageSchema } from './document.ts';
@@ -44,6 +46,8 @@ export function Preview() {
   /** The shell has loaded and listens for pages. */
   const hostReady = useRef(false);
   const shownPage = useRef(pageIndex);
+  /** Section to show after a header link switched the page. */
+  const scrollTo = useRef<string | null>(null);
   const area = useRef<HTMLDivElement>(null);
   const [space, setSpace] = useState({ width: 0, height: 0 });
   const fontUrls = useFontUrls(project?.theme);
@@ -78,9 +82,11 @@ export function Preview() {
         interactive: true,
         calm: loads.current > 1,
         scrollY: scrollY.current,
+        scrollTo: scrollTo.current,
         selectedId: useEditor.getState().selectedId,
         fontUrls,
       });
+      scrollTo.current = null;
       if (hostReady.current) sendPage(frame.current);
       else if (!frame.current.getAttribute('src')) frame.current.setAttribute('src', PREVIEW_PATH);
     }, PREVIEW_DELAY_MS);
@@ -127,6 +133,19 @@ export function Preview() {
         case 'select':
           state.select(message.id);
           break;
+        case 'header':
+          state.select(HEADER_ID);
+          break;
+        case 'removeHeader':
+          removeHeaderNow();
+          break;
+        case 'navigate': {
+          const index = state.project?.pages.findIndex((p) => p.slug === message.page) ?? -1;
+          if (index < 0) break;
+          scrollTo.current = message.anchor ?? null;
+          state.setPage(index);
+          break;
+        }
         case 'edit': {
           const section = state.project?.pages[state.pageIndex]?.sections.find(
             (s) => s.id === message.id,

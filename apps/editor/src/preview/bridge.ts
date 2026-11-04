@@ -2,7 +2,8 @@
  * The small script that runs inside the sandboxed preview frame. It has no
  * access to the editor: it only talks to the editor (`window.top`; its direct
  * parent is the preview.html shell) through `postMessage`.
- * Sent to the editor: `ready`, `select`, `edit`, `scroll`. Received: `select`,
+ * Sent to the editor: `ready`, `select`, `edit`, `scroll`, `header` (header clicked),
+ * `removeHeader` and `navigate` (a header link to another page). Received: `select`,
  * and `assets` (uploaded files as Blobs, shown through this frame's own blob: addresses).
  * Custom code frames inside the page may only report their height.
  *
@@ -31,6 +32,65 @@ export const BRIDGE_JS = `(function () {
       all[i].classList.toggle('k-selected', on);
       if (on && scroll) all[i].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
     }
+    markHeader(id === HEADER);
+  }
+
+  // The header: click to select it; a small toolbar with "×" removes it (the editor can undo).
+  var HEADER = '#header';
+  var header = document.querySelector('[data-k-header]');
+  var toolbar = null;
+  function placeToolbar() {
+    if (!toolbar || toolbar.hidden || !header) return;
+    var box = header.getBoundingClientRect();
+    toolbar.style.top = Math.max(6, Math.round(box.bottom) + 6) + 'px';
+  }
+  function makeToolbar() {
+    var bar = document.createElement('div');
+    bar.className = 'k-toolbar';
+    bar.setAttribute('role', 'toolbar');
+    bar.setAttribute('aria-label', 'Header');
+    var name = document.createElement('span');
+    name.textContent = 'Header';
+    var remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'k-remove';
+    remove.title = 'Remove header';
+    remove.setAttribute('aria-label', 'Remove header');
+    remove.textContent = '\\u00d7';
+    remove.addEventListener('click', function () { send({ type: 'removeHeader' }); });
+    bar.appendChild(name);
+    bar.appendChild(remove);
+    document.body.appendChild(bar);
+    return bar;
+  }
+  function markHeader(on) {
+    if (!header) return;
+    header.classList.toggle('k-selected', on);
+    if (on && !toolbar) toolbar = makeToolbar();
+    if (toolbar) toolbar.hidden = !on;
+    placeToolbar();
+  }
+
+  // Header links never leave the preview: same-page sections scroll, other pages switch.
+  var SAME_PAGE = /^#([A-Za-z][\\w-]{0,63})$/;
+  var PAGE = /^(index|[a-z0-9]+(?:-[a-z0-9]+)*)\\.html(?:#([A-Za-z][\\w-]{0,63}))?$/;
+  function scrollToAnchor(id, smooth) {
+    var target = document.getElementById(id);
+    if (!target) return;
+    var still = !smooth || window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    var offset = parseFloat(window.getComputedStyle(document.documentElement).scrollPaddingTop) || 0;
+    var top = target.getBoundingClientRect().top + window.scrollY - offset;
+    window.scrollTo({ top: Math.max(0, top), behavior: still ? 'auto' : 'smooth' });
+  }
+  function follow(href) {
+    var same = SAME_PAGE.exec(href);
+    if (same) { scrollToAnchor(same[1], true); return; }
+    var page = PAGE.exec(href);
+    if (!page) return;
+    var slug = page[1] === 'index' ? '' : page[1];
+    if (slug !== cfg.page) { send({ type: 'navigate', page: slug, anchor: page[2] || undefined }); return; }
+    if (page[2]) scrollToAnchor(page[2], true);
+    else window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   function fieldValue(section, name) {
@@ -72,10 +132,26 @@ export const BRIDGE_JS = `(function () {
   // and leaves video players unloaded in the preview.
   document.addEventListener('click', function (e) {
     var target = e.target;
+    if (toolbar && toolbar.contains(target)) return;
+    var inHeader = header && header.contains(target);
+    // The header's Menu button still opens its panel, so its links can be tried.
+    if (inHeader && target.closest('summary')) return;
     // Links and buttons never navigate away from the preview.
     if (target.closest('a, button, summary')) e.preventDefault();
     if (editing && editing.el.contains(target)) return;
     stopEditing(true);
+    if (inHeader) {
+      var link = target.closest('a');
+      if (link) {
+        var menu = link.closest('details');
+        if (menu) menu.removeAttribute('open');
+        follow(link.getAttribute('href') || '');
+        return;
+      }
+      mark(HEADER, false);
+      send({ type: 'header' });
+      return;
+    }
     var section = sectionOf(target);
     if (!section) return;
     var id = section.getAttribute('data-k-section');
@@ -113,7 +189,9 @@ export const BRIDGE_JS = `(function () {
   window.addEventListener('scroll', function () {
     clearTimeout(scrollTimer);
     scrollTimer = setTimeout(function () { send({ type: 'scroll', y: Math.round(window.scrollY) }); }, 100);
+    placeToolbar();
   }, { passive: true });
+  window.addEventListener('resize', placeToolbar);
 
   function showAssets(items) {
     if (!items || !items.length) return;
@@ -146,7 +224,8 @@ export const BRIDGE_JS = `(function () {
     else if (e.data.type === 'assets') showAssets(e.data.items);
   });
 
-  if (cfg.scrollY) window.scrollTo(0, cfg.scrollY);
+  if (cfg.scrollTo) scrollToAnchor(cfg.scrollTo, false);
+  else if (cfg.scrollY) window.scrollTo(0, cfg.scrollY);
   if (selected) mark(selected, false);
   send({ type: 'ready' });
 })();
@@ -160,6 +239,14 @@ export const BRIDGE_CSS = `
 .k-selected [data-k-field] { cursor: text; }
 .k-selected [data-k-field]:hover { box-shadow: 0 0 0 2px rgba(194, 65, 12, 0.35); border-radius: 2px; }
 .k-editing { outline: 2px solid #c2410c; outline-offset: 4px; border-radius: 2px; cursor: text; }
+[data-k-header] { cursor: pointer; outline-offset: -2px; }
+[data-k-header]:hover { outline: 2px dashed rgba(194, 65, 12, 0.45); }
+[data-k-header].k-selected { outline: 2px solid #c2410c; }
+.k-toolbar { position: fixed; right: 12px; z-index: 2147483647; display: flex; align-items: center; gap: 6px; padding: 4px 4px 4px 10px; border-radius: 999px; background: #1d1b18; color: #fffdf8; font: 600 12px/1 system-ui, sans-serif; box-shadow: 0 6px 18px -6px rgba(0, 0, 0, .45); }
+.k-toolbar[hidden] { display: none; }
+.k-remove { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border: 0; border-radius: 999px; background: rgba(255, 253, 248, .16); color: inherit; font: 600 18px/1 system-ui, sans-serif; cursor: pointer; }
+.k-remove:hover { background: #b42318; }
+.k-remove:focus-visible { outline: 2px solid #fffdf8; outline-offset: 2px; }
 `;
 
 /** Preview-only pieces of the page (custom code box). Thumbnails get it too. */

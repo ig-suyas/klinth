@@ -13,6 +13,7 @@ export function createLanding(): Project {
       description:
         'Kiln & Crumb is a neighbourhood bakery on Church Street baking slow-fermented bread, pastries and good coffee every morning.',
       language: 'en',
+      headerEnabled: true,
     },
     theme: {
       colors: {

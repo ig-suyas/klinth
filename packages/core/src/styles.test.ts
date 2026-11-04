@@ -118,14 +118,14 @@ describe('schema version 2', () => {
     return { ...p, schemaVersion: 1 };
   };
 
-  it('is the current version', () => {
-    expect(SCHEMA_VERSION).toBe(2);
-    expect(Object.keys(MIGRATIONS)).toEqual(['1']);
+  it('has an upgrade step (version 3 is now current, see nav.test.ts)', () => {
+    expect(SCHEMA_VERSION).toBe(3);
+    expect(Object.keys(MIGRATIONS)).toContain('1');
   });
 
   it('upgrades a version 1 project to the top bar header', () => {
     const upgraded = migrateProject(v1());
-    expect(upgraded.schemaVersion).toBe(2);
+    expect(upgraded.schemaVersion).toBe(SCHEMA_VERSION);
     expect(upgraded.meta.headerStyle).toBe('bar');
     expect(upgraded.theme.preset).toBeUndefined();
     expect(upgraded.pages).toEqual(clone().pages);

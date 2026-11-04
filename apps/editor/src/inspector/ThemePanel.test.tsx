@@ -1,8 +1,14 @@
-import { THEME_PRESETS, blankProject } from '@klinth/core';
+import { THEME_PRESETS, addPage, blankProject } from '@klinth/core';
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { useEditor } from '../state/store.ts';
 import { ThemePanel } from './ThemePanel.tsx';
+
+/** The value, or a failed test when it is missing. */
+function must<T>(value: T | null | undefined): T {
+  if (value === null || value === undefined) throw new Error('missing value');
+  return value;
+}
 
 const project = () => useEditor.getState().project;
 
@@ -158,5 +164,64 @@ describe('header settings', () => {
     const logo = within(region()).getByRole('group', { name: 'Logo' });
     expect(within(logo).getByLabelText(/Site name as text/)).toBeChecked();
     expect(within(logo).getByRole('button', { name: /Pick a logo/ })).toBeInTheDocument();
+  });
+});
+
+describe('show or remove the header', () => {
+  const region = () => screen.getByRole('region', { name: 'Header' });
+  const twoPages = () =>
+    act(() => {
+      useEditor.getState().change((p) => addPage(p, 'About').project);
+    });
+
+  it('turns the header off, hides its settings and adds it back', () => {
+    render(<ThemePanel />);
+    const toggle = within(region()).getByRole('switch', { name: 'Show header' });
+    expect(toggle).toBeChecked();
+    fireEvent.click(toggle);
+    expect(project()?.meta.headerEnabled).toBe(false);
+    expect(useEditor.getState().notice?.text).toBe('Header removed.');
+    expect(useEditor.getState().notice?.undo).toBe(true);
+    expect(within(region()).queryByRole('group', { name: 'Header style' })).toBeNull();
+    expect(within(region()).queryByRole('group', { name: 'Header links' })).toBeNull();
+    fireEvent.click(within(region()).getByRole('button', { name: 'Add header back' }));
+    expect(project()?.meta.headerEnabled).toBe(true);
+    expect(within(region()).getByRole('group', { name: 'Header style' })).toBeInTheDocument();
+  });
+
+  it('warns a site with several pages that visitors lose the menu', () => {
+    twoPages();
+    render(<ThemePanel />);
+    fireEvent.click(within(region()).getByRole('switch', { name: 'Show header' }));
+    const note = "Without a header, visitors can't move between your pages unless you add links.";
+    expect(within(region()).getByRole('status')).toHaveTextContent(note);
+    expect(useEditor.getState().notice?.text).toContain(note);
+  });
+
+  it('hides the header on the current page only', () => {
+    twoPages();
+    act(() => useEditor.getState().setPage(1));
+    render(<ThemePanel />);
+    fireEvent.click(within(region()).getByLabelText(/Hide header on this page/));
+    expect(project()?.pages[1]?.hideHeader).toBe(true);
+    expect(project()?.pages[0]?.hideHeader).toBeUndefined();
+  });
+
+  it('adds header links from a list of pages and sections', () => {
+    twoPages();
+    render(<ThemePanel />);
+    const links = within(region()).getByRole('group', { name: 'Header links' });
+    fireEvent.click(within(links).getByRole('button', { name: 'Choose links myself' }));
+    expect(project()?.meta.navLinks?.map((l) => l.label)).toEqual(['Home', 'About']);
+    const add = within(region()).getByLabelText('Add a link to');
+    fireEvent.change(add, { target: { value: 'page:about' } });
+    expect(project()?.meta.navLinks?.at(-1)).toEqual({
+      label: 'About',
+      target: { kind: 'page', page: 'about' },
+    });
+    expect(project()?.meta.navLinks).toHaveLength(3);
+    const remove = within(region()).getAllByRole('button', { name: 'Remove link “About”' });
+    fireEvent.click(must(remove[1]));
+    expect(project()?.meta.navLinks?.map((l) => l.label)).toEqual(['Home', 'About']);
   });
 });

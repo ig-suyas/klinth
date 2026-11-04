@@ -4,7 +4,12 @@ import { defaultTheme } from './tokens.ts';
 /** A small hard-coded project used by tests and as a dev fixture. */
 export const sampleProject: Project = {
   schemaVersion: SCHEMA_VERSION,
-  meta: { title: 'Asha Rao', description: 'Designer and illustrator.', language: 'en' },
+  meta: {
+    title: 'Asha Rao',
+    description: 'Designer and illustrator.',
+    language: 'en',
+    headerEnabled: true,
+  },
   theme: defaultTheme,
   pages: [
     {

@@ -51,8 +51,23 @@ export function useSectionActions() {
     remove(sectionId: string) {
       const section = currentPage(useEditor.getState())?.sections.find((s) => s.id === sectionId);
       if (!section) return;
+      const page = currentPage(useEditor.getState());
+      const linked = useEditor
+        .getState()
+        .project?.meta.navLinks?.some(
+          (l) =>
+            l.target.kind === 'section' &&
+            l.target.section === sectionId &&
+            l.target.page === page?.slug,
+        );
       if (report(change((p) => deleteSection(p, pageIndex, sectionId)))) {
-        notify(`“${blockDefinitions[section.type].label}” deleted.`, true);
+        const name = blockDefinitions[section.type].label;
+        notify(
+          linked
+            ? `“${name}” deleted. Its header link is hidden until you point it somewhere else.`
+            : `“${name}” deleted.`,
+          true,
+        );
       }
     },
     move(sectionId: string, by: -1 | 1) {

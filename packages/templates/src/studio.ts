@@ -14,6 +14,7 @@ export function createStudio(): Project {
       description:
         'Field & Form is a two-person brand and web studio in Lisbon, working with independent shops, makers and cultural spaces.',
       language: 'en',
+      headerEnabled: true,
       headerStyle: 'minimal',
     },
     theme: {

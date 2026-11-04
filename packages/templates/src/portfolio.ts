@@ -13,6 +13,7 @@ export function createPortfolio(): Project {
       description:
         'Ira Sen is an independent designer who makes calm, useful brands, websites and apps for small teams.',
       language: 'en',
+      headerEnabled: true,
     },
     theme: {
       colors: {

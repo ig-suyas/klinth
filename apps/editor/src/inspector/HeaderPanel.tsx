@@ -17,7 +17,10 @@ import {
 } from '@klinth/core';
 import { useId, useState, type ReactNode } from 'react';
 import { useAssetUrl, useLibrary, withAsset } from '../media/files.ts';
+import { MULTI_PAGE_NOTE, setPageHeaderHidden } from '../state/header.ts';
 import { useEditor } from '../state/store.ts';
+import { addHeaderBackNow, removeHeaderNow } from '../state/useHeaderActions.ts';
+import { NavLinksPanel } from './NavLinksPanel.tsx';
 import { Icon } from '../ui/Icon.tsx';
 import { AddressField } from './Fields.tsx';
 
@@ -102,6 +105,7 @@ function Choices<T extends string>(props: {
 export function HeaderPanel() {
   const project = useEditor((s) => s.project);
   const change = useEditor((s) => s.change);
+  const pageIndex = useEditor((s) => s.pageIndex);
   const [problem, setProblem] = useState<string | null>(null);
   const id = useId();
   if (!project) return null;
@@ -120,9 +124,70 @@ export function HeaderPanel() {
   const issues = headerContrastIssues({ ...project, meta: { ...project.meta, header } });
   const colors = headerColors(project.theme, header);
   const showColor = header.background !== 'transparent';
+  const enabled = project.meta.headerEnabled !== false;
+  const page = project.pages[pageIndex];
+  const multi = project.pages.length > 1;
+
+  const toggle = (
+    <label className="flex items-center justify-between gap-3 text-[0.8125rem] font-semibold">
+      Show header
+      <input
+        type="checkbox"
+        role="switch"
+        className="peer sr-only"
+        checked={enabled}
+        onChange={(e) => (e.target.checked ? addHeaderBackNow() : removeHeaderNow())}
+      />
+      <span
+        aria-hidden="true"
+        className="relative h-6 w-10 shrink-0 rounded-full bg-line-strong transition-colors peer-checked:bg-accent peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-accent after:absolute after:top-0.5 after:left-0.5 after:size-5 after:rounded-full after:bg-white after:shadow after:transition-transform peer-checked:after:translate-x-4"
+      />
+    </label>
+  );
+
+  if (!enabled) {
+    return (
+      <div className="space-y-3">
+        {toggle}
+        <p className="help">Your site has no header now. Its settings are kept.</p>
+        {multi ? (
+          <p
+            role="status"
+            className="rounded-lg border border-[#e6c9a8] bg-[#fdf4e7] p-3 text-xs leading-relaxed"
+          >
+            {MULTI_PAGE_NOTE}
+          </p>
+        ) : null}
+        <button type="button" className="btn btn-primary w-full" onClick={addHeaderBackNow}>
+          <Icon name="plus" />
+          Add header back
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
+      {toggle}
+      {page ? (
+        <label className="flex items-start gap-2 text-[0.8125rem]">
+          <input
+            type="checkbox"
+            className="mt-0.5 accent-accent"
+            checked={page.hideHeader === true}
+            onChange={(e) =>
+              setProblem(change((p) => setPageHeaderHidden(p, pageIndex, e.target.checked)))
+            }
+          />
+          <span>
+            <span className="block font-semibold">Hide header on this page</span>
+            <span className="block text-[0.6875rem] text-ink-soft">
+              Only on “{page.title}”. Good for landing pages.
+            </span>
+          </span>
+        </label>
+      ) : null}
+      {page?.hideHeader && multi ? <p className="help">{MULTI_PAGE_NOTE}</p> : null}
       <Choices
         legend="Header style"
         name="header-style"
@@ -246,6 +311,8 @@ export function HeaderPanel() {
           </span>
         </span>
       </label>
+
+      <NavLinksPanel />
 
       <fieldset
         className="space-y-3 rounded-lg border border-line p-3"

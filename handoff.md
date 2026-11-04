@@ -17,8 +17,46 @@
 | 6A Blank, pages, styles, code | done (all 4 parts)                    |
 | 6B Header polish              | done                                  |
 | 6C Editor fits the window     | done                                  |
+| 6D Header links, no header    | done                                  |
 
 ## 1. Current state
+
+**6D (header links, removable header): schema version 3.** `MIGRATIONS[2]` sets
+`meta.headerEnabled: true` on old projects (absent also means on; `false` = no header). New:
+`page.hideHeader` (optional, per page), `section.anchor` (optional, `^[a-z][a-z0-9-]*$`, max 60,
+not `top main content header footer nav menu skip`; per page every rendered id, anchor or else the
+section id, is unique ignoring case) and `meta.navLinks` (optional, max `MAX_NAV_LINKS` = 20; each
+`{label<=40, target: {kind:'page', page:slug} | {kind:'section', page:slug, section:id}}`, closed
+union, no free-form href at all). Core `nav.ts`: `uniqueAnchor`, `ensureAnchor` (stores an anchor
+from the section title the first time a link targets it, rewrites `#oldId` / `page.html#oldId`
+links incl. the header CTA), `navLinkHref`, `navLinkProblems` / `removeBrokenNavLinks` (links to a
+deleted page or section stay in the project, are flagged in the panel with a "Remove" button and are
+left out of the export), `automaticNavLinks`, `headerShown`. `renamePage` updates link targets.
+Without `navLinks` the header shows the old automatic links. Export: header shown on all pages =
+same files as before (HTML and CSS byte-identical, snapshots: only `site.js` changed); shown on no
+page = no `<header>`, `site.css` is `SITE_CSS_BASE` (no header rules, no `scroll-padding-top`),
+`site.js` is `SITE_JS_BASE` (no menu/overlay/offset code), no header files; shown on some pages =
+those pages also link `css/header.css` (`HEADER_CSS` + header vars) and `js/header.js` (`HEADER_JS`).
+`site.js` now handles same-page `#` links: smooth (instant for reduced motion), offset =
+`scroll-padding-top` (set by `header.js` to the real sticky header height, 0 when not sticky or no
+header), `history.pushState` hash, focus moves to the section. Import limits: 20 links per header
+(file size 5 MB and depth 16 unchanged; nav links nest 5 deep). Editor: Site style > Header starts
+with a "Show header" switch (off: settings hidden, "Add header back" button, multi-page note
+"Without a header, visitors can't move between your pages unless you add links."), "Hide header on
+this page", and "Header links" (`inspector/NavLinksPanel.tsx`: "Choose links myself" turns the
+automatic links into a list; label, target dropdown grouped by page, move, remove, "Add a link
+to"). Preview: header has `data-k-header`; a click selects it (selection value `#header`, never a
+valid section id) and shows a floating toolbar with "×" (`Remove header`, built with DOM calls in
+the bridge); header links never navigate: `#x` scrolls the preview, another page sends `navigate`
+(slug and anchor checked by Zod) and the editor switches page and scrolls there. Removing is one undo
+step with notice "Header removed." + Undo (plus the multi-page note). Deleting a linked section or
+page says its header link is hidden. Duplicated sections drop the anchor. Pure edits in
+`state/header.ts`, actions in `state/useHeaderActions.ts`. Tests: core `nav.test.ts`, editor
+`state/header.test.ts`, ThemePanel "show or remove the header", e2e `header-links.spec.ts` (picks
+links, tries them in the preview, serves the exported ZIP through `page.route` and clicks every
+header link, removes the header from the toolbar, Undo, removes again, exports: no header markup,
+CSS or JS). Totals: 725 unit (core 467, templates 46, editor 156, api 56), 23 e2e
+(`--workers=1`). Not deployed (`npm run deploy:editor`).
 
 **6C (no page scrollbar in the editor):** cause was the visually hidden radio inputs (`sr-only`,
 `position:absolute`) in the Site style panel: no positioned ancestor inside the scrolling panel, so
@@ -229,7 +267,7 @@ editor 77, api 43) and 6 e2e (ZIP holds real WOFF2 files; preview frame has Frau
 per block, rhythm, custom code rules. Examples are kept under 8 words so the echo guard never blocks
 them. **Owner should review it.** Local KV: `npm run skill:local -w @klinth/api`.
 
-**Remote:** `origin` = `github.com/ig-suyas/klinth`. `main` is pushed (through 6C).
+**Remote:** `origin` = `github.com/ig-suyas/klinth`. `main` is pushed (through 6D).
 
 ## 2. Goal
 
@@ -237,6 +275,11 @@ All phases done; only the push to `github.com/ig-suyas/klinth` (public) waits fo
 repos at ₹0.
 
 ## 3. Files
+
+- `packages/core/src/nav.ts` (+ `nav.test.ts`) : header links, section anchors, `headerShown`
+- `packages/core/src/site-assets.ts` : `SITE_CSS_BASE`/`HEADER_CSS`, `SITE_JS_BASE`/`HEADER_JS`
+- `apps/editor/src/state/header.ts` (+ test), `state/useHeaderActions.ts` : header edits, remove/add
+- `apps/editor/src/inspector/NavLinksPanel.tsx` : header link picker; `e2e/header-links.spec.ts`
 
 - `workers/api/src/github.ts` (+ test) : `/github/config`, `/github/oauth` code→token exchange
 - `workers/api/.dev.vars.example` : local GitHub app id/secret names

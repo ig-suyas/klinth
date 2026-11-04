@@ -93,7 +93,9 @@ export function duplicateSection(
   const original = sections[index];
   if (!original) return undefined;
   const copyId = newSectionId(original.type, new Set(sections.map((s) => s.id)));
+  // The copy gets its own anchor later if a header link points to it; two equal ones are invalid.
   const copy = { ...structuredClone(original), id: copyId };
+  delete copy.anchor;
   return {
     id: copyId,
     project: withSections(project, pageIndex, (list) => [
