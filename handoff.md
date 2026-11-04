@@ -16,8 +16,23 @@
 | 8 Deploy, launch, push        | done (push waits for owner's go)      |
 | 6A Blank, pages, styles, code | done (all 4 parts)                    |
 | 6B Header polish              | done                                  |
+| 6C Editor fits the window     | done                                  |
 
 ## 1. Current state
+
+**6C (no page scrollbar in the editor):** cause was the visually hidden radio inputs (`sr-only`,
+`position:absolute`) in the Site style panel: no positioned ancestor inside the scrolling panel, so
+they were placed against the page and stretched the document (1226 px at 768 high) although the
+panel clipped them. Fix: the three scroll areas (`Inspector` panel, `SectionsPanel` list,
+`PagesPanel` list) are `relative`; the shell is `.editor-shell` (`height:100vh; height:100dvh`,
+`overflow-hidden`) in `index.css`; `html, body, #root` get `overflow:hidden`; the start screen's
+`<main>` is now `h-full` (it scrolls inside itself, as before visually). Exported sites unchanged
+(no core change). Checked by DOM measurement: 1366x600/650/700/768, 1280x600, 1024x768, 125% and
+150% zoom (as 1093x614, 911x512, 1280x720 CSS px) and tablets 1024x1366 / 768x1024: no page
+scroll, top bar and "Add a section" in view, right panel and section list reach their last item,
+preview scrolls its own page. Known, unchanged: below about 900 px wide the fixed side panels leave
+the preview a narrow column (144 px at 768) showing the page scaled to fit. Test:
+`e2e/layout.spec.ts` (1366x768, 1280x600, 1024x768). Totals: 685 unit, 22 e2e (`--workers=1`).
 
 **6B (header polish):** optional `meta.header` (`packages/core/src/header.ts`, still schema v2; without
 it the header HTML is byte-identical to before). Fields: `layout` full|floating (pill always floats),
@@ -214,7 +229,7 @@ editor 77, api 43) and 6 e2e (ZIP holds real WOFF2 files; preview frame has Frau
 per block, rhythm, custom code rules. Examples are kept under 8 words so the echo guard never blocks
 them. **Owner should review it.** Local KV: `npm run skill:local -w @klinth/api`.
 
-**Remote:** `origin` = `github.com/ig-suyas/klinth`. Only Phase 0 is pushed; later commits are local.
+**Remote:** `origin` = `github.com/ig-suyas/klinth`. `main` is pushed (through 6C).
 
 ## 2. Goal
 
@@ -333,7 +348,7 @@ repos at ₹0.
 
 ## 6. What is still left to do
 
-1. **Owner:** say "push" to push `main` to `github.com/ig-suyas/klinth` (public, as chosen).
+1. **Owner:** run `npm run deploy:editor` to put 6B and 6C live (the deployed editor is older).
 2. **Owner:** review the live skill text (`workers/api/skill/skill.md`, then `skill:remote`); review
    Terms/Privacy with a lawyer; turn on 2FA for GitHub and Cloudflare; delete `klinth-test-site`.
 3. Optional: custom domain (README "Deploy" section lists the follow-up config changes); rename the

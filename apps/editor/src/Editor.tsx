@@ -54,7 +54,7 @@ export function Editor({ onExit }: { onExit: () => void }) {
   }, []);
 
   return (
-    <div className="grid h-full grid-cols-[17rem_minmax(0,1fr)_20rem] grid-rows-[auto_minmax(0,1fr)] xl:grid-cols-[18rem_minmax(0,1fr)_22rem]">
+    <div className="editor-shell grid overflow-hidden grid-cols-[17rem_minmax(0,1fr)_20rem] grid-rows-[auto_minmax(0,1fr)] xl:grid-cols-[18rem_minmax(0,1fr)_22rem]">
       <TopBar onExit={onExit} />
       <div className="grid min-h-0 min-w-0 grid-cols-[minmax(0,1fr)] grid-rows-[auto_minmax(0,1fr)]">
         <PagesPanel />

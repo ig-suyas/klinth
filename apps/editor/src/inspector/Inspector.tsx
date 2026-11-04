@@ -35,7 +35,7 @@ export function Inspector() {
           Section
         </TabButton>
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto">
+      <div className="relative min-h-0 flex-1 overflow-y-auto">
         <AnimatePresence mode="wait" initial={false}>
           <motion.div
             key={section?.id ?? 'site'}

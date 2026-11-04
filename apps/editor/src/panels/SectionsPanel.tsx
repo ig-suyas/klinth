@@ -28,7 +28,7 @@ export function SectionsPanel() {
         <h2 className="text-sm font-semibold">Sections</h2>
         <span className="text-xs text-ink-soft">{sections.length}</span>
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto p-2">
+      <div className="relative min-h-0 flex-1 overflow-y-auto p-2">
         {sections.length === 0 ? (
           <p className="px-2 py-6 text-center text-sm text-ink-soft">
             This page is empty. Add your first section below.

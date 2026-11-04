@@ -56,7 +56,7 @@ export function PagesPanel() {
           {pages.length} of {MAX_PAGES}
         </span>
       </div>
-      <ul className="max-h-44 space-y-0.5 overflow-y-auto px-2" role="list">
+      <ul className="relative max-h-44 space-y-0.5 overflow-y-auto px-2" role="list">
         {pages.map((page, i) => (
           <li
             key={page.slug || '(home)'}

@@ -56,7 +56,7 @@ export function StartScreen({ onCreate, onOpen }: StartScreenProps) {
         };
 
   return (
-    <main className="min-h-full overflow-y-auto">
+    <main className="h-full overflow-y-auto">
       <div className="mx-auto max-w-[62rem] px-6 pt-14 pb-20">
         <motion.p {...rise(0)} className="font-display text-xl tracking-tight">
           Klinth

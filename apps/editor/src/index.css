@@ -32,10 +32,12 @@
 }
 
 @layer base {
+  /* The editor fits the window; only its panels and the preview scroll. */
   html,
   body,
   #root {
     height: 100%;
+    overflow: hidden;
   }
   body {
     background: var(--color-canvas);
@@ -58,6 +60,12 @@
 }
 
 @layer components {
+  /* Exactly the window's height: 100vh for older browsers, 100dvh where mobile bars resize it. */
+  .editor-shell {
+    height: 100vh;
+    height: 100dvh;
+  }
+
   .btn {
     display: inline-flex;
     align-items: center;
