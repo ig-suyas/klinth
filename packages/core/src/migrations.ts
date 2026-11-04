@@ -6,7 +6,13 @@ type Migration = (input: Record<string, unknown>) => Record<string, unknown>;
  * MIGRATIONS[n] upgrades a project from version n to n + 1.
  * Add an entry here every time SCHEMA_VERSION goes up.
  */
-export const MIGRATIONS: Readonly<Record<number, Migration>> = {};
+export const MIGRATIONS: Readonly<Record<number, Migration>> = {
+  // 1 -> 2: header styles and theme presets. Old sites keep the top bar.
+  1: (data) => ({
+    ...data,
+    meta: isRecord(data.meta) ? { headerStyle: 'bar', ...data.meta } : data.meta,
+  }),
+};
 
 export class ProjectError extends Error {
   override name = 'ProjectError';

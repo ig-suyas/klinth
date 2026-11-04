@@ -3,6 +3,9 @@ import {
   buildExport,
   buildZip,
   contrastRatio,
+  HEADER_STYLES,
+  THEME_PRESETS,
+  applyPreset,
   fontPath,
   migrateProject,
   parseProjectFile,
@@ -117,6 +120,24 @@ describe.each(templates)('$name template', (template) => {
     const labels = [...html.matchAll(/<a\b[^>]*>([^<]*)/g)].map((m) => m[1]?.trim().toLowerCase());
     for (const vague of ['click here', 'here', 'more', 'learn more', 'read more', 'link']) {
       expect(labels).not.toContain(vague);
+    }
+  });
+
+  it('supports every header style and theme preset', () => {
+    for (const headerStyle of HEADER_STYLES) {
+      for (const preset of THEME_PRESETS) {
+        const p = template.create();
+        p.meta.headerStyle = headerStyle;
+        p.theme = applyPreset(p.theme, preset.id);
+        expect(migrateProject(p), `${headerStyle} + ${preset.id}`).toEqual(p);
+        expect(themeContrastIssues(p.theme)).toEqual([]);
+        const page = renderSite(p).find((f) => f.path === 'index.html')?.content;
+        expect(page).toContain(`class="site-header header-${headerStyle}"`);
+        // System fonts only: the export carries no font files.
+        expect(buildExport(p, new Map(), TEST_FONTS).some((f) => f.path.startsWith('fonts/'))).toBe(
+          false,
+        );
+      }
     }
   });
 

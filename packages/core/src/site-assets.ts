@@ -46,6 +46,24 @@ body,.block,.site-footer{--fg:var(--color-text);--muted:var(--color-muted);--lin
 .menu-panel{position:absolute;right:0;top:calc(100% + .75rem);flex-direction:column;min-width:13rem;padding:.75rem 1.25rem;background:var(--color-bg);border:1px solid var(--line);border-radius:min(var(--radius),16px);box-shadow:0 24px 48px -24px rgb(0 0 0 / .35)}
 @media (max-width:47.99rem){.has-menu .nav-links{display:none}.has-menu .menu{display:block}.nav-links{gap:.25rem 1rem}}
 
+/* ---- Header styles (same markup, so keyboard and screen reader use is identical) ---- */
+.header-bar .bar{min-height:4.25rem}
+.header-pill{background:transparent;border-bottom:0;padding-top:.75rem;pointer-events:none}
+.header-pill .bar{pointer-events:auto;width:calc(100% - 1.5rem);max-width:64rem;min-height:3.5rem;padding:0 .5rem 0 1.5rem;background:var(--color-surface);border:1px solid var(--line);border-radius:999px;box-shadow:0 18px 40px -28px rgb(0 0 0 / .45)}
+.header-pill .nav-links{gap:.25rem 1.25rem}
+.header-pill .nav:not(.has-menu){padding-right:1rem}
+.header-centered{position:relative}
+.header-centered .bar{flex-direction:column;justify-content:center;gap:.25rem;min-height:0;padding-block:1.25rem .5rem}
+.header-centered .brand{max-width:100%;font-size:clamp(1.5rem,1.1rem + 1.4vw,2.25rem)}
+.header-centered .nav-links{justify-content:center}
+.header-centered .menu-panel{right:50%;transform:translateX(50%)}
+.header-centered .nav:not(.has-menu),.header-centered .menu{min-height:2.75rem}
+.header-minimal{position:relative;background:transparent;border-bottom:0}
+.header-minimal .bar{min-height:5rem}
+.header-minimal .brand{font-family:var(--font-body);font-weight:600;letter-spacing:0;font-size:1rem}
+.header-minimal .nav a{color:var(--muted);font-size:.875rem}
+.header-minimal .nav a:hover,.header-minimal .nav a[aria-current="page"]{color:var(--fg)}
+
 /* ---- Shared text ---- */
 .head{display:grid;gap:calc(var(--space)*2.5);max-width:46rem;margin-bottom:clamp(calc(var(--space)*5),6vw,calc(var(--space)*9))}
 .eyebrow{display:flex;align-items:center;gap:.75rem;font-family:var(--font-body);font-size:.8125rem;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}

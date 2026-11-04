@@ -17,6 +17,13 @@ export {
 } from './blocks.ts';
 export * from './tokens.ts';
 export {
+  PRESET_IDS,
+  THEME_PRESETS,
+  applyPreset,
+  type PresetId,
+  type ThemePreset,
+} from './presets.ts';
+export {
   BUNDLED_FONTS,
   FONTS_DIR,
   fontFaceCss,

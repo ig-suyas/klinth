@@ -59,7 +59,8 @@ function renderHeader(project: Project, page: Page): string {
     ? `<nav class="nav${collapse ? ' has-menu' : ''}" aria-label="Main"><ul class="nav-links" role="list">${list}</ul>${menu}</nav>`
     : '';
   const home = project.pages.length > 1 ? 'index.html' : '#top';
-  return `<header class="site-header" id="top"><div class="wrap bar"><a class="brand" href="${home}">${esc(project.meta.title)}</a>${nav}</div></header>`;
+  const style = project.meta.headerStyle ?? 'bar';
+  return `<header class="site-header header-${style}" id="top"><div class="wrap bar"><a class="brand" href="${home}">${esc(project.meta.title)}</a>${nav}</div></header>`;
 }
 
 const MONOGRAM_PATH = 'favicon.svg';

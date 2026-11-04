@@ -14,7 +14,7 @@
 | 6 GitHub connect, export      | done (live push needs owner's app)    |
 | 7 Hardening                   | done                                  |
 | 8 Deploy, launch, push        | done (push waits for owner's go)      |
-| 6A Blank, pages, styles, code | in progress (part 1 of 4 done)        |
+| 6A Blank, pages, styles, code | in progress (parts 1-2 of 4 done)     |
 
 ## 1. Current state
 
@@ -25,6 +25,19 @@ brief: "Start blank" card, Pages panel (add, rename, reorder, delete, cap 50, ho
 links follow renames, optional shared page menu, and ZIP / GitHub / project file with the same
 limits. Tests already cover slug safety and collisions, the 50-page cap, deleting the last page,
 renames keeping links, and multi-page export where every referenced file exists. No code change.
+
+Part 2 (header styles, theme presets): **schema version 2** (`MIGRATIONS[1]` sets
+`meta.headerStyle: 'bar'` on old projects). `meta.headerStyle` = `bar | pill | centered | minimal`
+(optional, renders as `header-<style>` on the same `<header>`/`<nav>`/`<details>` markup, so
+keyboard and screen reader use is unchanged; menu panel is absolute, so no layout jump; pill keeps a
+fixed bar height; centered and minimal are not sticky). `theme.preset` is an optional closed enum
+(informational: last preset applied; the editor drops it on a manual color/font edit). Presets in
+`packages/core/src/presets.ts` (`THEME_PRESETS`, `applyPreset`): 8 looks (gallery, midnight, meadow,
+terracotta, newsprint, harbor, velvet, sunbeam), colors + system font stacks only (no font files in
+the export), roundness and spacing kept. Editor: "Ready-made looks" grid (`aria-pressed`) and a
+"Header style" radio group at the top of Site style (`inspector/ThemePanel.tsx`). Tests: new
+`core/src/styles.test.ts` (styles, presets, contrast, migration, round trip),
+`editor/src/inspector/ThemePanel.test.tsx`, and every template x style x preset in templates tests.
 
 **Phase 8 (deploy):** Live, free plan. Editor: **https://klinth.pages.dev** (classic Cloudflare Pages
 project `klinth`, prod branch `main`). Worker: **https://klinth-api.klinth-api.workers.dev**

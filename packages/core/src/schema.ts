@@ -4,7 +4,11 @@ import { MAX_VIDEO_BYTES } from './media.ts';
 import { DEVICE_NAME, RESERVED_SLUGS, collectHrefs, linkedSlug } from './links.ts';
 import { themeSchema } from './tokens.ts';
 
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
+
+/** How the site header looks. `bar` is the original sticky top bar. */
+export const HEADER_STYLES = ['bar', 'pill', 'centered', 'minimal'] as const;
+export type HeaderStyle = (typeof HEADER_STYLES)[number];
 
 /** Block types in the order the editor lists them. */
 export const BLOCK_TYPES = Object.keys(blockPropSchemas) as BlockType[];
@@ -88,6 +92,8 @@ export const projectSchema = z
         favicon: id.optional(),
         /** Shared menu of pages in the header. Shown unless set to false. */
         pageMenu: z.boolean().optional(),
+        /** Header look; the top bar when not set. */
+        headerStyle: z.enum(HEADER_STYLES).optional(),
       })
       .strict(),
     theme: themeSchema,

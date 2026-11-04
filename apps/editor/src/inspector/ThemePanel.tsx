@@ -1,4 +1,13 @@
-import { FONT_STACKS, themeContrastIssues, type FontKey, type Theme } from '@klinth/core';
+import {
+  FONT_STACKS,
+  HEADER_STYLES,
+  THEME_PRESETS,
+  applyPreset,
+  themeContrastIssues,
+  type FontKey,
+  type HeaderStyle,
+  type Theme,
+} from '@klinth/core';
 import { useId, useState } from 'react';
 import { useEditor } from '../state/store.ts';
 import { Icon } from '../ui/Icon.tsx';
@@ -80,6 +89,20 @@ export const PALETTES: readonly { name: string; colors: Theme['colors'] }[] = [
 
 const HEX = /^#[0-9a-fA-F]{6}$/;
 
+export const HEADER_LABELS: Record<HeaderStyle, { label: string; help: string }> = {
+  bar: { label: 'Top bar', help: 'Name left, menu right, stays on top.' },
+  pill: { label: 'Floating pill', help: 'A rounded bar floating over the page.' },
+  centered: { label: 'Centered logo', help: 'Big name in the middle, menu below.' },
+  minimal: { label: 'Minimal', help: 'Small and quiet, no line under it.' },
+};
+
+/** A copy of the theme that no longer claims to be a preset (after a manual edit). */
+function withoutPreset(theme: Theme): Theme {
+  const next = { ...theme };
+  delete next.preset;
+  return next;
+}
+
 /** The site-wide look: name, colors, fonts, roundness and spacing. */
 export function ThemePanel() {
   const project = useEditor((s) => s.project);
@@ -89,7 +112,12 @@ export function ThemePanel() {
   const issues = themeContrastIssues(theme);
 
   const setTheme = (patch: Partial<Theme>, key: string) =>
-    change((p) => ({ ...p, theme: { ...p.theme, ...patch } }), `theme.${key}`);
+    change((p) => {
+      // Own colors or fonts mean the look is no longer exactly the preset.
+      const base = 'colors' in patch || 'fonts' in patch ? withoutPreset(p.theme) : p.theme;
+      return { ...p, theme: { ...base, ...patch } };
+    }, `theme.${key}`);
+  const headerStyle = meta.headerStyle ?? 'bar';
   const setColor = (key: ColorKey, value: string) =>
     setTheme({ colors: { ...theme.colors, [key]: value.toLowerCase() } }, `colors.${key}`);
 
@@ -123,6 +151,85 @@ export function ThemePanel() {
         />
       </section>
 
+      <section className="space-y-3" aria-labelledby="site-looks">
+        <h3 id="site-looks" className="text-sm font-semibold">
+          Ready-made looks
+        </h3>
+        <p className="help -mt-1.5">
+          Colors and fonts in one click. You can still change them below.
+        </p>
+        <div role="group" aria-label="Ready-made looks" className="grid grid-cols-2 gap-2">
+          {THEME_PRESETS.map((preset) => {
+            const active = theme.preset === preset.id;
+            return (
+              <button
+                key={preset.id}
+                type="button"
+                aria-pressed={active}
+                title={preset.description}
+                className="rounded-lg border border-line p-1.5 text-left hover:border-ink aria-pressed:border-ink aria-pressed:ring-1 aria-pressed:ring-ink"
+                onClick={() =>
+                  change((p) => ({ ...p, theme: applyPreset(p.theme, preset.id) }), 'theme.preset')
+                }
+              >
+                <span
+                  className="flex h-12 items-end justify-between gap-1 rounded-md px-2 pb-1.5"
+                  style={{ background: preset.colors.background, color: preset.colors.text }}
+                  aria-hidden="true"
+                >
+                  <span
+                    className="text-xl leading-none"
+                    style={{ fontFamily: FONT_STACKS[preset.fonts.heading] }}
+                  >
+                    Aa
+                  </span>
+                  <span className="flex gap-1">
+                    <span
+                      className="size-3 rounded-full"
+                      style={{ background: preset.colors.surface }}
+                    />
+                    <span
+                      className="size-3 rounded-full"
+                      style={{ background: preset.colors.accent }}
+                    />
+                  </span>
+                </span>
+                <span className="mt-1 block px-0.5 text-xs font-semibold">{preset.name}</span>
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
+      <fieldset className="space-y-2">
+        <legend className="text-sm font-semibold">Header style</legend>
+        <div className="grid grid-cols-2 gap-1.5">
+          {HEADER_STYLES.map((style) => (
+            <label
+              key={style}
+              className="cursor-pointer rounded-lg border border-line p-2 has-checked:border-ink has-checked:bg-sunk has-focus-visible:outline-2 has-focus-visible:outline-accent"
+            >
+              <input
+                type="radio"
+                className="sr-only"
+                name="header-style"
+                value={style}
+                checked={headerStyle === style}
+                onChange={() =>
+                  change((p) => ({ ...p, meta: { ...p.meta, headerStyle: style } }), 'meta.header')
+                }
+              />
+              <span className="block text-[0.8125rem] font-semibold">
+                {HEADER_LABELS[style].label}
+              </span>
+              <span className="block text-[0.6875rem] leading-snug text-ink-soft">
+                {HEADER_LABELS[style].help}
+              </span>
+            </label>
+          ))}
+        </div>
+      </fieldset>
+
       <section className="space-y-3" aria-labelledby="site-colors">
         <h3 id="site-colors" className="text-sm font-semibold">
           Colors
@@ -134,7 +241,10 @@ export function ThemePanel() {
               type="button"
               className="group rounded-lg border border-line p-1.5 text-[0.6875rem] font-medium hover:border-ink"
               onClick={() =>
-                change((p) => ({ ...p, theme: { ...p.theme, colors: palette.colors } }))
+                change((p) => ({
+                  ...p,
+                  theme: { ...withoutPreset(p.theme), colors: palette.colors },
+                }))
               }
             >
               <span

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { PRESET_IDS } from './presets.ts';
 
 const hexColor = z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Use a color like #1a2b3c');
 
@@ -67,6 +68,8 @@ export const themeSchema = z
     radius: z.number().int().min(0).max(48),
     /** Base spacing unit in px. */
     spacing: z.number().int().min(4).max(16),
+    /** The curated preset this theme was last set from (see presets.ts). Informational. */
+    preset: z.enum(PRESET_IDS).optional(),
   })
   .strict();
 

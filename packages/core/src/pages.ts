@@ -116,7 +116,7 @@ export function movePage(project: Project, index: number, by: -1 | 1): Project {
 export function blankProject(): Project {
   return {
     schemaVersion: SCHEMA_VERSION,
-    meta: { title: 'My website', description: '', language: 'en' },
+    meta: { title: 'My website', description: '', language: 'en', headerStyle: 'bar' },
     theme: JSON.parse(JSON.stringify(defaultTheme)) as Project['theme'],
     pages: [{ slug: '', title: 'Home', sections: [] }],
     assets: [],
