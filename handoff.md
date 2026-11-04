@@ -2,20 +2,29 @@
 
 ## Phase status
 
-| Phase                        | Status                                |
-| ---------------------------- | ------------------------------------- |
-| 0 Scaffold and architecture  | done                                  |
-| 1 Core engine                | done (reviewed, hardened)             |
-| 2 Blocks and templates       | done                                  |
-| 3 Editor UI                  | done                                  |
-| 4 Media, embeds, custom code | done                                  |
-| 5 AI Worker, key vault, AI   | done (owner to review the skill text) |
-| 5.5 Blank start, multi-page  | done                                  |
-| 6 GitHub connect, export     | done (live push needs owner's app)    |
-| 7 Hardening                  | done                                  |
-| 8 Deploy, launch, push       | done (push waits for owner's go)      |
+| Phase                         | Status                                |
+| ----------------------------- | ------------------------------------- |
+| 0 Scaffold and architecture   | done                                  |
+| 1 Core engine                 | done (reviewed, hardened)             |
+| 2 Blocks and templates        | done                                  |
+| 3 Editor UI                   | done                                  |
+| 4 Media, embeds, custom code  | done                                  |
+| 5 AI Worker, key vault, AI    | done (owner to review the skill text) |
+| 5.5 Blank start, multi-page   | done                                  |
+| 6 GitHub connect, export      | done (live push needs owner's app)    |
+| 7 Hardening                   | done                                  |
+| 8 Deploy, launch, push        | done (push waits for owner's go)      |
+| 6A Blank, pages, styles, code | in progress (part 1 of 4 done)        |
 
 ## 1. Current state
+
+**Mini-phase 6A (blank start, multi-page, styles, site-wide code):**
+Part 1 (blank start and multi-page) was already complete from Phase 5.5; re-checked against the 6A
+brief: "Start blank" card, Pages panel (add, rename, reorder, delete, cap 50, home always
+`index.html`, last page kept), safe unique slugs (reserved names, device names, case-insensitive),
+links follow renames, optional shared page menu, and ZIP / GitHub / project file with the same
+limits. Tests already cover slug safety and collisions, the 50-page cap, deleting the last page,
+renames keeping links, and multi-page export where every referenced file exists. No code change.
 
 **Phase 8 (deploy):** Live, free plan. Editor: **https://klinth.pages.dev** (classic Cloudflare Pages
 project `klinth`, prod branch `main`). Worker: **https://klinth-api.klinth-api.workers.dev**
