@@ -4,6 +4,7 @@ import type { Asset, Page, Project, Section } from './schema.ts';
 import { SITE_CSS, SITE_JS } from './site-assets.ts';
 import { fontFaceCss, fontLicense, fontPath, themeFonts } from './fonts.ts';
 import { themeToCss } from './tokens.ts';
+import { firstSectionBackground, headerCta, headerLayout, headerToCss } from './header.ts';
 
 export { assetPath };
 
@@ -42,25 +43,72 @@ function navItems(project: Project, page: Page): NavItem[] {
 /** Up to this many links stay visible on phones; more go behind a "Menu" button. */
 const INLINE_NAV_MAX = 3;
 
-function renderHeader(project: Project, page: Page): string {
+/** Header classes from the header settings; none when the project has no settings (old look). */
+function headerClasses(project: Project, page: Page): string {
+  const header = project.meta.header;
+  if (!header) return '';
+  const style = project.meta.headerStyle ?? 'bar';
+  const classes = [
+    'hdr',
+    `hdr-${headerLayout(style, header)}`,
+    `hdr-${header.background}`,
+    header.sticky ? 'hdr-sticky' : 'hdr-static',
+  ];
+  if (header.background === 'transparent') {
+    classes.push(`hdr-on-${firstSectionBackground(page.sections)}`);
+    // Starts see-through over the first section; site.js drops `is-top` once the page scrolls.
+    if (header.sticky) classes.push('is-top');
+  }
+  return ` ${classes.join(' ')}`;
+}
+
+function renderBrand(project: Project, home: string, ctx: HeaderCtx): string {
+  const logo = project.meta.header?.logo;
+  const asset = logo ? ctx.assets.get(logo.image) : undefined;
+  if (logo && asset?.kind === 'image') {
+    const src = ctx.preview
+      ? ` data-k-asset="${esc(asset.id)}"`
+      : ` src="${esc(assetPath(asset))}"`;
+    const size =
+      asset.width && asset.height ? ` width="${asset.width}" height="${asset.height}"` : '';
+    return `<a class="brand brand-logo" href="${home}"><img${src} alt="${esc(logo.imageAlt)}"${size} decoding="async"></a>`;
+  }
+  return `<a class="brand" href="${home}">${esc(project.meta.title)}</a>`;
+}
+
+interface HeaderCtx {
+  assets: ReadonlyMap<string, Asset>;
+  preview: boolean;
+}
+
+function renderHeader(project: Project, page: Page, ctx: HeaderCtx): string {
   const items = navItems(project, page);
+  const cta = project.meta.header ? headerCta(project.meta.header) : null;
   const list = items
     .map((item) => {
       const current = item.current ? ' aria-current="page"' : '';
       return `<li><a href="${esc(item.href)}"${current}>${esc(item.label)}</a></li>`;
     })
     .join('');
-  const collapse = items.length > INLINE_NAV_MAX;
+  // With a button, phones show it inside the menu so the bar never overflows.
+  const collapse = items.length > INLINE_NAV_MAX || (cta !== null && items.length > 0);
+  const ctaItem = cta
+    ? `<li class="menu-cta"><a class="button" href="${esc(cta.href)}">${esc(cta.label)}</a></li>`
+    : '';
   // A <details> menu works without JavaScript and causes no layout jump.
   const menu = collapse
-    ? `<details class="menu"><summary>Menu</summary><ul class="menu-panel" role="list">${list}</ul></details>`
+    ? `<details class="menu"><summary>Menu</summary><ul class="menu-panel" role="list">${list}${ctaItem}</ul></details>`
     : '';
   const nav = list
     ? `<nav class="nav${collapse ? ' has-menu' : ''}" aria-label="Main"><ul class="nav-links" role="list">${list}</ul>${menu}</nav>`
     : '';
+  const button = cta
+    ? `<a class="button header-cta" href="${esc(cta.href)}">${esc(cta.label)}</a>`
+    : '';
   const home = project.pages.length > 1 ? 'index.html' : '#top';
   const style = project.meta.headerStyle ?? 'bar';
-  return `<header class="site-header header-${style}" id="top"><div class="wrap bar"><a class="brand" href="${home}">${esc(project.meta.title)}</a>${nav}</div></header>`;
+  const classes = `site-header header-${style}${headerClasses(project, page)}${cta ? ' has-cta' : ''}`;
+  return `<header class="${classes}" id="top"><div class="wrap bar">${renderBrand(project, home, ctx)}${nav}${button}</div></header>`;
 }
 
 const MONOGRAM_PATH = 'favicon.svg';
@@ -165,7 +213,7 @@ ${code.css ? `<link rel="stylesheet" href="${CUSTOM_CSS_PATH}">\n` : ''}<script 
 </head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
-${renderHeader(project, page)}
+${renderHeader(project, page, { assets, preview: options.preview === true })}
 <main id="main">
 ${body}
 </main>
@@ -191,7 +239,11 @@ export function renderSite(project: Project, options: RenderOptions = {}): SiteF
     // The preview loads fonts through the bridge (its frame has no files next to it).
     {
       path: 'css/site.css',
-      content: (options.preview ? '' : fontFaceCss(fonts)) + themeToCss(project.theme) + SITE_CSS,
+      content:
+        (options.preview ? '' : fontFaceCss(fonts)) +
+        themeToCss(project.theme) +
+        headerToCss(project) +
+        SITE_CSS,
     },
     { path: 'js/site.js', content: SITE_JS },
     ...(code.css ? [{ path: CUSTOM_CSS_PATH, content: withNewline(code.css) }] : []),

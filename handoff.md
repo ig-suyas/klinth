@@ -15,8 +15,35 @@
 | 7 Hardening                   | done                                  |
 | 8 Deploy, launch, push        | done (push waits for owner's go)      |
 | 6A Blank, pages, styles, code | done (all 4 parts)                    |
+| 6B Header polish              | done                                  |
 
 ## 1. Current state
+
+**6B (header polish):** optional `meta.header` (`packages/core/src/header.ts`, still schema v2; without
+it the header HTML is byte-identical to before). Fields: `layout` full|floating (pill always floats),
+`background` solid|transparent|glass, `color` background|surface|accent|text|custom + `customColor`
+(`#rrggbb` only, written to `site.css` via `headerToCss`), `sticky`, `cta {label<=40, href}` (href
+through `safeUrl`, page links must exist, follows page rename/delete), `logo {image, imageAlt}`
+(must be an image asset; counts in `assetUsage`; `removeAsset` falls back to text). Rendering adds
+`hdr hdr-<layout> hdr-<background> hdr-sticky|static` (+ `hdr-on-<first section bg>` and `is-top` for
+transparent). Transparent overlays the first section (negative margin + matching transparent
+border-top on the first block) and takes that section's colors; when sticky, `site.js` drops
+`is-top` on scroll so it turns solid. Without JS a transparent sticky header stays see-through.
+Glass = 80% color + blur, solid fallback via `@supports not`. Transitions only inside
+`prefers-reduced-motion: no-preference`. Text color is picked for readability (custom: best of
+text/background/accentText); `headerContrastIssues` warns in the panel (glass checks worst case
+content behind; glass + accent usually warns, Lighthouse agreed: 4.2-4.5:1). CTA uses accent, or the
+header's own pair inverted when accent would blend in. Phones: with a CTA the links go into the Menu
+and the CTA sits at the bottom of the menu panel; with no links the CTA stays in the bar.
+Editor: `inspector/HeaderPanel.tsx`; Site style sections are now collapsible `<details>` (Header and
+Details open by default, open state remembered per device in localStorage `klinth.siteStyle.open`).
+Checked: Lighthouse 13 mobile 100/100/100/100 on all 3 templates, default and with a floating
+transparent header + CTA; 72 style x layout x background x template exports at 320/375/768/1440:
+no overflow, nothing past the edge, first heading not under the header, menu panel on screen.
+Tests: core `header.test.ts` (schema, unsafe CTA links, contrast, export per background), editor
+ThemePanel header tests, e2e `header.spec.ts`. Existing e2e updated to open folded sections; App and
+editor e2e waits made robust (cold lazy load, preview frame replaced on redraw). Totals: 685 unit
+(core 443, templates 46, editor 140, api 56), 19 e2e (`--workers=1`). Not pushed, not deployed.
 
 **Mini-phase 6A (blank start, multi-page, styles, site-wide code):**
 Part 1 (blank start and multi-page) was already complete from Phase 5.5; re-checked against the 6A

@@ -27,6 +27,7 @@ export function assetUsage(project: Project): Map<string, number> {
   const add = (id: string) => counts.set(id, (counts.get(id) ?? 0) + 1);
   for (const page of project.pages) for (const s of page.sections) visit(s.props, add);
   if (project.meta.favicon) add(project.meta.favicon);
+  if (project.meta.header?.logo) add(project.meta.header.logo.image);
   return counts;
 }
 
@@ -76,10 +77,17 @@ export function removeAsset(project: Project, id: string): Project {
     const images = section.props.images.filter((item) => item.image !== id);
     return { ...section, props: { ...section.props, images } };
   };
-  const { favicon, ...meta } = project.meta;
+  const { favicon, ...rest } = project.meta;
+  const meta = favicon === id ? rest : { ...project.meta };
+  // A removed logo picture means the header goes back to the site name.
+  if (meta.header?.logo?.image === id) {
+    const header = { ...meta.header };
+    delete header.logo;
+    meta.header = header;
+  }
   return {
     ...project,
-    meta: favicon === id ? meta : project.meta,
+    meta,
     pages: project.pages.map((page) => ({
       ...page,
       sections: page.sections.map((s) => strip(dropEmptyPictures(s), id) as Section),

@@ -42,16 +42,28 @@ export function uniqueSlug(title: string, taken: Iterable<string>): string {
 const cleanTitle = (title: string): string => title.replace(/\s+/g, ' ').trim().slice(0, MAX_TITLE);
 
 /** Points links at `from` to `to` instead (or removes them when `to` is null). */
+function relinkHref(href: string, from: string, to: string | null): string {
+  if (linkedSlug(href) !== from) return href;
+  if (to === null) return '';
+  const anchor = PAGE_LINK.exec(href.trim())?.[2] ?? '';
+  return `${pageFile(to)}${anchor}`;
+}
+
 function relink(pages: Page[], from: string, to: string | null): Page[] {
   return pages.map((page) => ({
     ...page,
-    sections: mapHrefs(page.sections, (href) => {
-      if (linkedSlug(href) !== from) return href;
-      if (to === null) return '';
-      const anchor = PAGE_LINK.exec(href.trim())?.[2] ?? '';
-      return `${pageFile(to)}${anchor}`;
-    }),
+    sections: mapHrefs(page.sections, (href) => relinkHref(href, from, to)),
   }));
+}
+
+/** The header button follows page renames and deletions too. */
+function relinkMeta(meta: Project['meta'], from: string, to: string | null): Project['meta'] {
+  const cta = meta.header?.cta;
+  if (!meta.header || !cta) return meta;
+  return {
+    ...meta,
+    header: { ...meta.header, cta: { ...cta, href: relinkHref(cta.href, from, to) } },
+  };
 }
 
 /** Adds an empty page at the end. */
@@ -86,7 +98,12 @@ export function renamePage(project: Project, index: number, title: string): Proj
   const others = project.pages.filter((_, i) => i !== index).map((p) => p.slug);
   const slug = slugify(name) === page.slug ? page.slug : uniqueSlug(name, others);
   const pages = project.pages.map((p, i) => (i === index ? { ...p, slug, title: name } : p));
-  return { ...project, pages: slug === page.slug ? pages : relink(pages, page.slug, slug) };
+  if (slug === page.slug) return { ...project, pages };
+  return {
+    ...project,
+    meta: relinkMeta(project.meta, page.slug, slug),
+    pages: relink(pages, page.slug, slug),
+  };
 }
 
 /** Deletes a page. Links to it are removed so the site never has broken links. */
@@ -96,7 +113,11 @@ export function deletePage(project: Project, index: number): Project {
   if (!page) return project;
   if (page.slug === '') throw new ProjectError('The home page cannot be deleted.');
   const pages = project.pages.filter((_, i) => i !== index);
-  return { ...project, pages: relink(pages, page.slug, null) };
+  return {
+    ...project,
+    meta: relinkMeta(project.meta, page.slug, null),
+    pages: relink(pages, page.slug, null),
+  };
 }
 
 /** Moves a page up (-1) or down (+1). The home page always stays first. */

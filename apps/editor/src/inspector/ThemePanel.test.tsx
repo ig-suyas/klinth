@@ -75,3 +75,88 @@ describe('site style panel', () => {
     expect(within(group).getByLabelText(/Floating pill/)).toBeChecked();
   });
 });
+
+describe('header settings', () => {
+  const header = () => project()?.meta.header;
+  const region = () => screen.getByRole('region', { name: 'Header' });
+
+  it('comes first, above the other collapsible sections', () => {
+    const { container } = render(<ThemePanel />);
+    const summaries = [...container.querySelectorAll('details > summary')].map((s) =>
+      s.textContent?.trim(),
+    );
+    expect(summaries).toEqual([
+      'Header',
+      'Details',
+      'Ready-made looks',
+      'Colors',
+      'Fonts',
+      'Shape and space',
+      'Custom code',
+    ]);
+    const details = container.querySelectorAll('details');
+    expect(details[0]).toHaveAttribute('open');
+    // The style picker is the first control in the header section.
+    const legends = [...region().querySelectorAll('legend')].map((l) => l.textContent);
+    expect(legends.slice(0, 4)).toEqual(['Header style', 'Layout', 'Background', 'Header color']);
+  });
+
+  it('picks layout, background, color and sticky', () => {
+    render(<ThemePanel />);
+    expect(header()).toBeUndefined();
+    fireEvent.click(
+      within(screen.getByRole('group', { name: 'Layout' })).getByLabelText(/^Floating/),
+    );
+    expect(header()?.layout).toBe('floating');
+    fireEvent.click(
+      within(screen.getByRole('group', { name: 'Background' })).getByLabelText(/^Glass/),
+    );
+    expect(header()?.background).toBe('glass');
+    fireEvent.click(
+      within(screen.getByRole('group', { name: 'Header color' })).getByLabelText(/^Accent/),
+    );
+    expect(header()?.color).toBe('accent');
+    fireEvent.click(within(region()).getByLabelText(/Stay at the top/));
+    expect(header()?.sticky).toBe(false);
+  });
+
+  it('keeps the pill floating', () => {
+    render(<ThemePanel />);
+    fireEvent.click(within(region()).getByLabelText(/Floating pill/));
+    expect(within(region()).getByLabelText(/^Full width/)).toBeDisabled();
+  });
+
+  it('takes a custom color and warns when header text is hard to read', () => {
+    render(<ThemePanel />);
+    fireEvent.click(within(region()).getByLabelText(/^Custom/));
+    fireEvent.change(within(region()).getByLabelText('Header custom color', { exact: true }), {
+      target: { value: '#7a7a7a' },
+    });
+    expect(header()?.color).toBe('custom');
+    expect(header()?.customColor).toBe('#7a7a7a');
+    expect(within(region()).getByRole('status')).toHaveTextContent(
+      'Header text may be hard to read',
+    );
+  });
+
+  it('refuses an unsafe button link and keeps a safe one', () => {
+    render(<ThemePanel />);
+    const button = within(region()).getByRole('group', { name: 'Button' });
+    fireEvent.change(within(button).getByLabelText('Button text'), {
+      target: { value: 'Book a call' },
+    });
+    const link = within(button).getByLabelText('Goes to');
+    fireEvent.change(link, { target: { value: 'javascript:alert(1)' } });
+    expect(header()?.cta?.href ?? '').toBe('');
+    expect(within(button).getByRole('alert')).toBeInTheDocument();
+    fireEvent.change(link, { target: { value: 'https://example.com/book' } });
+    expect(header()?.cta).toEqual({ label: 'Book a call', href: 'https://example.com/book' });
+  });
+
+  it('starts with a text logo', () => {
+    render(<ThemePanel />);
+    const logo = within(region()).getByRole('group', { name: 'Logo' });
+    expect(within(logo).getByLabelText(/Site name as text/)).toBeChecked();
+    expect(within(logo).getByRole('button', { name: /Pick a logo/ })).toBeInTheDocument();
+  });
+});

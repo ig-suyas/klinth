@@ -3,12 +3,11 @@ import { blockPropSchemas, singleLine, type BlockType } from './blocks.ts';
 import { MAX_VIDEO_BYTES } from './media.ts';
 import { DEVICE_NAME, RESERVED_SLUGS, collectHrefs, linkedSlug } from './links.ts';
 import { themeSchema } from './tokens.ts';
+import { HEADER_STYLES, headerSchema } from './header.ts';
 
 export const SCHEMA_VERSION = 2;
 
-/** How the site header looks. `bar` is the original sticky top bar. */
-export const HEADER_STYLES = ['bar', 'pill', 'centered', 'minimal'] as const;
-export type HeaderStyle = (typeof HEADER_STYLES)[number];
+export { HEADER_STYLES, type HeaderStyle } from './header.ts';
 
 /** Block types in the order the editor lists them. */
 export const BLOCK_TYPES = Object.keys(blockPropSchemas) as BlockType[];
@@ -125,6 +124,8 @@ export const projectSchema = z
         pageMenu: z.boolean().optional(),
         /** Header look; the top bar when not set. */
         headerStyle: z.enum(HEADER_STYLES).optional(),
+        /** Header background, layout, button and logo; the style's own look when not set. */
+        header: headerSchema.optional(),
       })
       .strict(),
     theme: themeSchema,
@@ -151,7 +152,26 @@ export const projectSchema = z
       // Case-insensitive: `Img1` and `img1` are the same file on Windows and macOS.
       .refine((a) => isUnique(a.map((x) => x.id.toLowerCase())), 'File ids must be unique'),
   })
-  .strict();
+  .strict()
+  .superRefine((project, ctx) => {
+    const header = project.meta.header;
+    const slug = header?.cta ? linkedSlug(header.cta.href) : null;
+    if (slug !== null && !project.pages.some((p) => p.slug === slug)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['meta', 'header', 'cta', 'href'],
+        message: 'A link points to a page that does not exist',
+      });
+    }
+    const logo = header?.logo;
+    if (logo && !project.assets.some((a) => a.id === logo.image && a.kind === 'image')) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['meta', 'header', 'logo', 'image'],
+        message: 'The logo picture is missing',
+      });
+    }
+  });
 
 export type Section = z.infer<typeof sectionSchema>;
 export type SectionOf<T extends BlockType> = Extract<Section, { type: T }>;

@@ -58,12 +58,15 @@ test('a non-coder picks a template, edits it and exports a site', async ({ page 
 
   // Change the accent color of the whole site.
   await page.getByRole('tab', { name: 'Site style' }).click();
+  await page.locator('summary', { hasText: 'Colors' }).click();
   await page.getByLabel('Accent', { exact: true }).fill('#1d5f7a');
   await expect
     .poll(() =>
       preview(page)
         .locator('html')
-        .evaluate((el) => getComputedStyle(el).getPropertyValue('--color-accent').trim()),
+        .evaluate((el) => getComputedStyle(el).getPropertyValue('--color-accent').trim())
+        // Each redraw replaces the preview frame; read again from the new one.
+        .catch(() => ''),
     )
     .toBe('#1d5f7a');
 

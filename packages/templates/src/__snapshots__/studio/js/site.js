@@ -31,6 +31,20 @@
     });
   });
 
+  // A see-through sticky header turns solid once the page scrolls (CSS does the look).
+  var overlay = document.querySelector('.hdr-transparent.hdr-sticky');
+  if (overlay) {
+    var pending = false;
+    var update = function () {
+      pending = false;
+      overlay.classList.toggle('is-top', window.scrollY < 8);
+    };
+    window.addEventListener('scroll', function () {
+      if (!pending) { pending = true; window.requestAnimationFrame(update); }
+    }, { passive: true });
+    update();
+  }
+
   // Scroll reveal. Skipped for reduced motion; the first section is never hidden.
   var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   if (reduce || !('IntersectionObserver' in window)) return;

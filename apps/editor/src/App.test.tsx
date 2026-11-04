@@ -12,11 +12,18 @@ afterEach(async () => {
   indexedDB.deleteDatabase('klinth');
 });
 
+const COLD_LOAD_MS = 5000;
+
 describe('App', () => {
   it('starts with the template picker and an empty project list', async () => {
     render(<App />);
     expect(
-      await screen.findByRole('heading', { name: 'Make a website you are proud of.' }),
+      // The first lazy screen can take over a second while other test files run in parallel.
+      await screen.findByRole(
+        'heading',
+        { name: 'Make a website you are proud of.' },
+        { timeout: COLD_LOAD_MS },
+      ),
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Personal portfolio/ })).toBeInTheDocument();
     expect(await screen.findByText(/Nothing saved yet/)).toBeInTheDocument();
@@ -24,8 +31,14 @@ describe('App', () => {
 
   it('opens a template in the editor and saves it to the browser', async () => {
     render(<App />);
-    fireEvent.click(await screen.findByRole('button', { name: /Small business/ }));
-    const sections = await screen.findByRole('navigation', { name: 'Sections' });
+    fireEvent.click(
+      await screen.findByRole('button', { name: /Small business/ }, { timeout: COLD_LOAD_MS }),
+    );
+    const sections = await screen.findByRole(
+      'navigation',
+      { name: 'Sections' },
+      { timeout: COLD_LOAD_MS },
+    );
     expect(within(sections).getAllByRole('listitem').length).toBeGreaterThan(3);
     expect(screen.getByTitle('Preview of your site')).toHaveAttribute('sandbox', 'allow-scripts');
     expect(await listProjects()).toHaveLength(1);

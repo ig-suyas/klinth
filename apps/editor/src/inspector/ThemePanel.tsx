@@ -1,16 +1,15 @@
 import {
   FONT_STACKS,
-  HEADER_STYLES,
   THEME_PRESETS,
   applyPreset,
   themeContrastIssues,
   type FontKey,
-  type HeaderStyle,
   type Theme,
 } from '@klinth/core';
-import { useId, useState } from 'react';
+import { useId, useState, type ReactNode } from 'react';
 import { useEditor } from '../state/store.ts';
 import { Icon } from '../ui/Icon.tsx';
+import { HeaderPanel } from './HeaderPanel.tsx';
 import { SiteCodePanel } from './SiteCodePanel.tsx';
 
 type ColorKey = keyof Theme['colors'];
@@ -90,13 +89,6 @@ export const PALETTES: readonly { name: string; colors: Theme['colors'] }[] = [
 
 const HEX = /^#[0-9a-fA-F]{6}$/;
 
-export const HEADER_LABELS: Record<HeaderStyle, { label: string; help: string }> = {
-  bar: { label: 'Top bar', help: 'Name left, menu right, stays on top.' },
-  pill: { label: 'Floating pill', help: 'A rounded bar floating over the page.' },
-  centered: { label: 'Centered logo', help: 'Big name in the middle, menu below.' },
-  minimal: { label: 'Minimal', help: 'Small and quiet, no line under it.' },
-};
-
 /** A copy of the theme that no longer claims to be a preset (after a manual edit). */
 function withoutPreset(theme: Theme): Theme {
   const next = { ...theme };
@@ -118,22 +110,22 @@ export function ThemePanel() {
       const base = 'colors' in patch || 'fonts' in patch ? withoutPreset(p.theme) : p.theme;
       return { ...p, theme: { ...base, ...patch } };
     }, `theme.${key}`);
-  const headerStyle = meta.headerStyle ?? 'bar';
   const setColor = (key: ColorKey, value: string) =>
     setTheme({ colors: { ...theme.colors, [key]: value.toLowerCase() } }, `colors.${key}`);
 
   return (
-    <div className="space-y-6 p-4">
-      <header>
+    <div className="p-4">
+      <header className="mb-3">
         <p className="eyebrow">Whole site</p>
         <h2 className="mt-1 font-display text-xl">Site style</h2>
         <p className="help">These settings change every page at once.</p>
       </header>
 
-      <section className="space-y-3" aria-labelledby="site-details">
-        <h3 id="site-details" className="text-sm font-semibold">
-          Details
-        </h3>
+      <Collapsible id="header" title="Header" defaultOpen>
+        <HeaderPanel />
+      </Collapsible>
+
+      <Collapsible id="details" title="Details" defaultOpen>
         <MetaField
           label="Site name"
           help="Shown at the top of the page and in the browser tab."
@@ -150,15 +142,10 @@ export function ThemePanel() {
             change((p) => ({ ...p, meta: { ...p.meta, description } }), 'meta.description')
           }
         />
-      </section>
+      </Collapsible>
 
-      <section className="space-y-3" aria-labelledby="site-looks">
-        <h3 id="site-looks" className="text-sm font-semibold">
-          Ready-made looks
-        </h3>
-        <p className="help -mt-1.5">
-          Colors and fonts in one click. You can still change them below.
-        </p>
+      <Collapsible id="looks" title="Ready-made looks">
+        <p className="help">Colors and fonts in one click. You can still change them below.</p>
         <div role="group" aria-label="Ready-made looks" className="grid grid-cols-2 gap-2">
           {THEME_PRESETS.map((preset) => {
             const active = theme.preset === preset.id;
@@ -200,41 +187,9 @@ export function ThemePanel() {
             );
           })}
         </div>
-      </section>
+      </Collapsible>
 
-      <fieldset className="space-y-2">
-        <legend className="text-sm font-semibold">Header style</legend>
-        <div className="grid grid-cols-2 gap-1.5">
-          {HEADER_STYLES.map((style) => (
-            <label
-              key={style}
-              className="cursor-pointer rounded-lg border border-line p-2 has-checked:border-ink has-checked:bg-sunk has-focus-visible:outline-2 has-focus-visible:outline-accent"
-            >
-              <input
-                type="radio"
-                className="sr-only"
-                name="header-style"
-                value={style}
-                checked={headerStyle === style}
-                onChange={() =>
-                  change((p) => ({ ...p, meta: { ...p.meta, headerStyle: style } }), 'meta.header')
-                }
-              />
-              <span className="block text-[0.8125rem] font-semibold">
-                {HEADER_LABELS[style].label}
-              </span>
-              <span className="block text-[0.6875rem] leading-snug text-ink-soft">
-                {HEADER_LABELS[style].help}
-              </span>
-            </label>
-          ))}
-        </div>
-      </fieldset>
-
-      <section className="space-y-3" aria-labelledby="site-colors">
-        <h3 id="site-colors" className="text-sm font-semibold">
-          Colors
-        </h3>
+      <Collapsible id="colors" title="Colors">
         <div className="grid grid-cols-4 gap-2">
           {PALETTES.map((palette) => (
             <button
@@ -294,12 +249,9 @@ export function ThemePanel() {
             </p>
           </div>
         ) : null}
-      </section>
+      </Collapsible>
 
-      <section className="space-y-3" aria-labelledby="site-fonts">
-        <h3 id="site-fonts" className="text-sm font-semibold">
-          Fonts
-        </h3>
+      <Collapsible id="fonts" title="Fonts">
         <FontField
           label="Headings"
           value={theme.fonts.heading}
@@ -310,12 +262,9 @@ export function ThemePanel() {
           value={theme.fonts.body}
           onChange={(body) => setTheme({ fonts: { ...theme.fonts, body } }, 'fonts')}
         />
-      </section>
+      </Collapsible>
 
-      <section className="space-y-4" aria-labelledby="site-shape">
-        <h3 id="site-shape" className="text-sm font-semibold">
-          Shape and space
-        </h3>
+      <Collapsible id="shape" title="Shape and space">
         <RangeField
           label="Corner roundness"
           value={theme.radius}
@@ -332,10 +281,65 @@ export function ThemePanel() {
           unit="px"
           onChange={(spacing) => setTheme({ spacing }, 'spacing')}
         />
-      </section>
+      </Collapsible>
 
-      <SiteCodePanel />
+      <Collapsible id="code" title="Custom code">
+        <SiteCodePanel />
+      </Collapsible>
     </div>
+  );
+}
+
+const OPEN_KEY = 'klinth.siteStyle.open';
+
+function readOpen(id: string, fallback: boolean): boolean {
+  try {
+    const saved = JSON.parse(localStorage.getItem(OPEN_KEY) ?? '{}') as Record<string, unknown>;
+    return typeof saved[id] === 'boolean' ? saved[id] : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function writeOpen(id: string, open: boolean): void {
+  try {
+    const saved = JSON.parse(localStorage.getItem(OPEN_KEY) ?? '{}') as Record<string, unknown>;
+    localStorage.setItem(OPEN_KEY, JSON.stringify({ ...saved, [id]: open }));
+  } catch {
+    // Storage blocked: the section simply opens with its default next time.
+  }
+}
+
+/** A panel section that folds away; which ones are open is remembered on this device. */
+function Collapsible(props: {
+  id: string;
+  title: string;
+  defaultOpen?: boolean;
+  children: ReactNode;
+}) {
+  const [open, setOpen] = useState(() => readOpen(props.id, props.defaultOpen === true));
+  return (
+    <details
+      className="group border-t border-line"
+      open={open}
+      onToggle={(e) => {
+        const next = e.currentTarget.open;
+        if (next === open) return;
+        setOpen(next);
+        writeOpen(props.id, next);
+      }}
+    >
+      <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 text-sm font-semibold [&::-webkit-details-marker]:hidden">
+        {props.title}
+        <Icon
+          name="down"
+          className="size-4 text-ink-soft transition-transform group-open:rotate-180"
+        />
+      </summary>
+      <section aria-label={props.title} className="space-y-3 pb-5">
+        {props.children}
+      </section>
+    </details>
   );
 }
 

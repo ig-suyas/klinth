@@ -32,6 +32,8 @@ test('start blank, add a section and a page, pick a header and a look, add site-
   await page.getByRole('tab', { name: 'Site style' }).click();
   await page.getByRole('group', { name: 'Header style' }).getByText('Floating pill').click();
   await expect(preview.locator('header.site-header')).toHaveClass(/header-pill/);
+  // Panel sections fold away; Header and Details start open.
+  await page.locator('summary', { hasText: 'Ready-made looks' }).click();
   const looks = page.getByRole('group', { name: 'Ready-made looks' });
   await looks.getByRole('button', { name: /Midnight/ }).click();
   await expect(looks.getByRole('button', { name: /Midnight/ })).toHaveAttribute(
@@ -40,6 +42,7 @@ test('start blank, add a section and a page, pick a header and a look, add site-
   );
 
   // Site-wide code runs in the preview, inside the sandbox only.
+  await page.locator('summary', { hasText: 'Custom code' }).click();
   const code = page.getByRole('region', { name: 'Custom code for every page' });
   await expect(code).toContainText(
     'This code runs on your published site. Only paste code you trust.',

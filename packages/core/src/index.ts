@@ -105,3 +105,24 @@ export {
 } from './media.ts';
 export * from './ai.ts';
 export { sampleProject } from './sample.ts';
+export {
+  GLASS_OPACITY,
+  HEADER_BACKGROUNDS,
+  HEADER_COLORS,
+  HEADER_LAYOUTS,
+  MAX_CTA_LABEL,
+  defaultHeader,
+  firstSectionBackground,
+  headerColors,
+  headerContrastIssues,
+  headerCta,
+  headerLayout,
+  headerSchema,
+  headerTextIssues,
+  headerToCss,
+  resolveHeader,
+  type HeaderBackground,
+  type HeaderColor,
+  type HeaderLayout,
+  type HeaderSettings,
+} from './header.ts';
