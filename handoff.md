@@ -59,7 +59,7 @@ Part 4 (site-wide custom code): optional `project.siteCode {css?, js?}` (strict;
 it before). Export writes `css/custom.css` (linked right after `css/site.css`) and `js/custom.js`
 (`<script>` at the end of `<body>`) on every page, only when non-blank; never inline; README
 mentions them. Preview (`preview/document.ts`): interactive frame only, CSS inline with every `<`
-turned into the CSS escape `c `, JS carried as a JSON string and run as a script element (so
+turned into the CSS escape `\3c `, JS carried as a JSON string and run as a script element (so
 `</style>` / `</script>` cannot break out); thumbnails get none. It runs in the shell's inner
 frame (`sandbox="allow-scripts"`, no same-origin; tested from source and in e2e: `window.top.document`
 is blocked). Editor: "Custom code for every page" at the bottom of Site style
