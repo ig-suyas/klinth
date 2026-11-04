@@ -50,6 +50,16 @@ export {
 } from './project-file.ts';
 export { assetPath, pagePath, renderSite, type RenderOptions, type SiteFile } from './render.ts';
 export { buildExport, buildZip } from './export.ts';
+export { PAGE_LINK, linkedSlug, pageFile } from './links.ts';
+export {
+  addPage,
+  blankProject,
+  deletePage,
+  movePage,
+  renamePage,
+  slugify,
+  uniqueSlug,
+} from './pages.ts';
 export {
   MAX_EMBED_URL_LENGTH,
   PROVIDER_NAME,

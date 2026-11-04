@@ -86,7 +86,7 @@ describe('URL allow-list', () => {
     '//evil.com',
     'https://',
     'file:///etc/passwd',
-    'page.html',
+    'page.htm',
   ])('blocks %s', (url) => expect(safeUrl(url)).toBeNull());
 
   it('drops unsafe links when rendering', () => {

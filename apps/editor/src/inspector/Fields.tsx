@@ -1,4 +1,6 @@
-import { safeUrl, type Asset, type BlockType } from '@klinth/core';
+import { pageFile, safeUrl, type Asset, type BlockType } from '@klinth/core';
+import { useShallow } from 'zustand/react/shallow';
+import { useEditor } from '../state/store.ts';
 import { useId, useState } from 'react';
 import { z } from 'zod';
 import { Icon } from '../ui/Icon.tsx';
@@ -149,7 +151,8 @@ function ChoiceField({
   );
 }
 
-const ADDRESS_HELP = 'Start with https:// for a website, or use mailto: or tel:.';
+const ADDRESS_HELP =
+  'Start with https:// for a website, use mailto: or tel:, or pick one of your pages.';
 
 /** A web address. Kept as a draft while it is not valid yet, so typing is never blocked. */
 export function AddressField({
@@ -175,6 +178,9 @@ export function AddressField({
     setSeen(value);
     setDraft(value);
   }
+  const pageFiles = useEditor(
+    useShallow((s) => (s.project?.pages ?? []).map((page) => pageFile(page.slug))),
+  );
   const valid = (v: string) => v.trim() === '' || safeUrl(v.trim()) !== null;
   const invalid = !valid(draft);
   return (
@@ -190,6 +196,7 @@ export function AddressField({
         value={draft}
         maxLength={max}
         placeholder="https://"
+        list={`${inputId}-pages`}
         aria-invalid={invalid}
         aria-describedby={`${inputId}-help`}
         onChange={(e) => {
@@ -197,13 +204,18 @@ export function AddressField({
           if (valid(e.target.value)) onChange(e.target.value.trim());
         }}
       />
+      <datalist id={`${inputId}-pages`}>
+        {pageFiles.map((file) => (
+          <option key={file} value={file} />
+        ))}
+      </datalist>
       {invalid ? (
         <p id={`${inputId}-help`} className="error-text" role="alert">
           {ADDRESS_HELP}
         </p>
       ) : (
         <p id={`${inputId}-help`} className="help">
-          {help ?? 'Paste a web address, or #contact to jump to a section.'}
+          {help ?? 'Paste a web address, #contact to jump to a section, or a page like about.html.'}
         </p>
       )}
     </div>

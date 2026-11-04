@@ -26,14 +26,16 @@ const ALLOWED_URL: RegExp[] = [
   /^tel:\+?[0-9().-]{3,32}$/i,
 ];
 const ANCHOR = /^#[A-Za-z][\w-]{0,63}$/;
+/** A page of this site, like `about.html` (see links.ts; repeated to keep this file standalone). */
+const PAGE_LINK = /^(index|[a-z0-9]+(?:-[a-z0-9]+)*)\.html(#[A-Za-z][\w-]{0,63})?$/;
 
 /**
- * Returns the URL if it is allowed in a site (https, mailto, tel or an in-page
- * #anchor), otherwise null. Callers must drop the link when this returns null.
+ * Returns the URL if it is allowed in a site (https, mailto, tel, an in-page
+ * #anchor or another page like `about.html`), otherwise null. Callers must drop the link when this returns null.
  */
 export function safeUrl(raw: string): string | null {
   const value = raw.trim();
-  if (ANCHOR.test(value)) return value;
+  if (ANCHOR.test(value) || PAGE_LINK.test(value)) return value;
   // Reject control characters and whitespace that browsers strip before parsing.
   if (value.length > 2048 || hasControlChar(value) || /\s/.test(value)) return null;
   return ALLOWED_URL.some((pattern) => pattern.test(value)) ? value : null;

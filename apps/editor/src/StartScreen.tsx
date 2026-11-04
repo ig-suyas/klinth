@@ -6,7 +6,7 @@ import { deleteProject, listProjects, type ProjectSummary } from './lib/storage.
 import { useFontUrls } from './lib/fonts.ts';
 import { buildPreviewDocument } from './preview/document.ts';
 import { Icon } from './ui/Icon.tsx';
-import type { Project } from '@klinth/core';
+import { blankProject, type Project } from '@klinth/core';
 
 interface StartScreenProps {
   onCreate: (project: Project) => Promise<void>;
@@ -85,7 +85,7 @@ export function StartScreen({ onCreate, onOpen }: StartScreenProps) {
           <motion.h2 {...rise(3)} id="pick" className="eyebrow">
             Start from a design
           </motion.h2>
-          <ul className="mt-4 grid gap-6 md:grid-cols-2">
+          <ul className="mt-4 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {templates.map((template, i) => (
               <motion.li key={template.id} {...rise(4 + i)}>
                 <TemplateCard
@@ -95,6 +95,9 @@ export function StartScreen({ onCreate, onOpen }: StartScreenProps) {
                 />
               </motion.li>
             ))}
+            <motion.li {...rise(4 + templates.length)}>
+              <BlankCard disabled={busy} onPick={() => void run(() => onCreate(blankProject()))} />
+            </motion.li>
           </ul>
         </section>
 
@@ -199,6 +202,30 @@ function TemplateCard({
           </span>
         </span>
         <span className="btn btn-primary shrink-0 group-hover:bg-accent-strong">Use this</span>
+      </span>
+    </button>
+  );
+}
+
+function BlankCard({ disabled, onPick }: { disabled: boolean; onPick: () => void }) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onPick}
+      className="group block w-full rounded-2xl border border-line bg-panel p-2.5 text-left transition-[border-color,transform] duration-300 ease-out hover:-translate-y-0.5 hover:border-ink disabled:opacity-60"
+    >
+      <span className="grid aspect-[16/10] place-items-center rounded-xl border border-dashed border-line-strong bg-sunk text-ink-soft">
+        <Icon name="plus" className="size-8" />
+      </span>
+      <span className="flex items-end justify-between gap-4 px-2 pt-4 pb-2">
+        <span>
+          <span className="block font-display text-xl">Blank page</span>
+          <span className="mt-1 block text-sm leading-snug text-ink-soft">
+            One empty page. Add only the sections you want.
+          </span>
+        </span>
+        <span className="btn btn-primary shrink-0 group-hover:bg-accent-strong">Start blank</span>
       </span>
     </button>
   );

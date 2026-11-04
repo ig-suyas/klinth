@@ -10,11 +10,28 @@
 | 3 Editor UI                  | done                                  |
 | 4 Media, embeds, custom code | done                                  |
 | 5 AI Worker, key vault, AI   | done (owner to review the skill text) |
+| 5.5 Blank start, multi-page  | done                                  |
 | 6 GitHub connect, export     | not started                           |
 | 7 Hardening                  | not started                           |
 | 8 Deploy, launch, push       | not started                           |
 
 ## 1. Current state
+
+**Phase 5.5 (blank start, pages):** "Start blank" card next to the two templates (`blankProject()`
+in core: one empty home page, default theme). New "Pages" panel above Sections: switch, add (asks
+for a name), rename, move up/down, delete (with Undo notice), "n of 50", and a "Show a menu of all
+pages at the top" checkbox (`meta.pageMenu`, optional, off = header lists named sections only).
+Core `pages.ts`: `slugify` (NFKD, ASCII, max 60, fallback `page`), `uniqueSlug` (case-insensitive,
+skips reserved `index assets css js fonts readme` and Windows device names, `-2`, `-3`...),
+`addPage` (cap `MAX_PAGES` = 50), `renamePage` (address follows the name; every `href` to the old
+page is rewritten, anchors kept; home stays `index.html`), `deletePage` (never the home page or the
+last page; links to it become empty, so they render as text), `movePage` (home always first).
+Schema: max 50 pages, home must be first, and any page link (`about.html`, `index.html#x`) must
+point to an existing page. `safeUrl` now allows page links (still no paths, `..` or other files).
+Link fields suggest page files. Export/ZIP/project file need no change: same 5 MB file limit, safe
+path check and case-insensitive duplicate check; a 50-page ZIP round-trip is tested. Tests: 498 unit
+(core 351, templates 27, editor 77, api 43) and 7 e2e (new `e2e/pages.spec.ts`). Phase 1 tests
+updated on purpose: `page.html` is now an allowed link, page limit test uses 51.
 
 Phase 5 done. Key vault (PBKDF2-SHA-256 600k → AES-GCM, only ciphertext/salt/IV in localStorage,
 key in memory only, optional 30 min auto-lock, Forget, Test my key, honest note). "Remember" can be
@@ -73,6 +90,9 @@ repos at ₹0.
 - `apps/editor/src/lib/fonts.ts` : font URLs (fontsource packages), bytes for export, `data:` URLs
   for the preview, `installEditorFonts` (FontFace API, no inline CSS)
 - `apps/editor/src/ai/changes.ts` : plain names of changed settings for the AI result
+- `packages/core/src/pages.ts`, `links.ts`, `pages.test.ts` : page add/rename/move/delete, slugs,
+  link walking (`collectHrefs`, `mapHrefs`), blank project
+- `apps/editor/src/panels/PagesPanel.tsx` : page list UI; `e2e/pages.spec.ts`
 - `.claude/launch.json` (untracked) : now also `api` (wrangler dev on 8787)
 
 ## 4. What worked
@@ -111,7 +131,8 @@ repos at ₹0.
 ## 6. What is still left to do
 
 1. **Owner:** review `workers/api/skill/skill.md` (or send your own text). It is never committed.
-2. Phase 6: re-imported project files have no media bytes (decide: include `assets/` on re-import
+2. Phase 6: GitHub push is not built yet; it must push the `buildExport` file list as is (up to 50
+   pages, the same path checks as the ZIP). Re-imported project files have no media bytes (decide: include `assets/` on re-import
    or ask to re-upload). Unused files are still exported.
 3. Phase 7: editor CSP must allow `connect-src` to the Worker, `font-src 'self' data:` (preview
    fonts are data: URLs) plus the srcdoc/blob needs; bundle is 633 kB (201 kB gzip), split Motion/Zod or lazy-load the AI panel; consider Turnstile if abuse

@@ -3,6 +3,7 @@ import { AiSettings, useAutoLock } from './ai/AiSettings.tsx';
 import { QuotaBanner } from './ai/QuotaBanner.tsx';
 import { Inspector } from './inspector/Inspector.tsx';
 import { MediaLibrary } from './media/MediaLibrary.tsx';
+import { PagesPanel } from './panels/PagesPanel.tsx';
 import { SectionsPanel } from './panels/SectionsPanel.tsx';
 import { TopBar } from './panels/TopBar.tsx';
 import { Preview } from './preview/Preview.tsx';
@@ -53,7 +54,10 @@ export function Editor({ onExit }: { onExit: () => void }) {
   return (
     <div className="grid h-full grid-cols-[17rem_minmax(0,1fr)_20rem] grid-rows-[auto_minmax(0,1fr)] xl:grid-cols-[18rem_minmax(0,1fr)_22rem]">
       <TopBar onExit={onExit} />
-      <SectionsPanel />
+      <div className="grid min-h-0 min-w-0 grid-cols-[minmax(0,1fr)] grid-rows-[auto_minmax(0,1fr)]">
+        <PagesPanel />
+        <SectionsPanel />
+      </div>
       <main className="flex min-h-0 min-w-0 flex-col" aria-label="Preview">
         <QuotaBanner />
         <Preview />

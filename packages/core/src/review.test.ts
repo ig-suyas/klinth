@@ -89,7 +89,9 @@ describe('1. URL allow-list', () => {
     '#1abc',
     '#a b',
     '# x',
-    'page.html',
+    'page.htm',
+    'Page.html',
+    '../page.html',
     '../secret',
     '',
     `https://example.com/${'a'.repeat(2100)}`,
@@ -449,7 +451,7 @@ describe('6. import hardening', () => {
   });
 
   it.each([
-    ['pages', 11],
+    ['pages', 51],
     ['sections', 101],
     ['assets', 201],
   ] as const)('rejects more than the limit of %s', (kind, count) => {

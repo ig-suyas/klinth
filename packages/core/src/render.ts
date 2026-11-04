@@ -29,9 +29,9 @@ interface NavItem {
   current: boolean;
 }
 
-/** Pages when there are several; otherwise sections the user named for the menu. */
+/** Pages when there are several (unless the menu is off); otherwise sections the user named for the menu. */
 function navItems(project: Project, page: Page): NavItem[] {
-  if (project.pages.length > 1) {
+  if (project.pages.length > 1 && project.meta.pageMenu !== false) {
     return project.pages.map((p) => ({ href: pagePath(p), label: p.title, current: p === page }));
   }
   return page.sections

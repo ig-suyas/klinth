@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { blockPropSchemas, singleLine, type BlockType } from './blocks.ts';
 import { MAX_VIDEO_BYTES } from './media.ts';
+import { DEVICE_NAME, RESERVED_SLUGS, collectHrefs, linkedSlug } from './links.ts';
 import { themeSchema } from './tokens.ts';
 
 export const SCHEMA_VERSION = 1;
@@ -10,11 +11,8 @@ export const BLOCK_TYPES = Object.keys(blockPropSchemas) as BlockType[];
 
 const id = z.string().regex(/^[A-Za-z0-9_-]{1,64}$/, 'Invalid id');
 
-/** Windows cannot create files with these names (even with an extension). */
-const DEVICE_NAME = /^(con|prn|aux|nul|com\d|lpt\d)$/i;
-
-/** Page addresses that would clash with exported files or folders. */
-const RESERVED_SLUGS = new Set(['index', 'assets', 'css', 'js', 'readme']);
+/** Most pages one site can have. */
+export const MAX_PAGES = 50;
 
 /** Asset ids become file names, so they also avoid Windows device names. */
 const assetId = id.refine((v) => !DEVICE_NAME.test(v), 'This file id is reserved');
@@ -88,15 +86,27 @@ export const projectSchema = z
         description: singleLine(300).default(''),
         language: z.string().regex(/^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$/),
         favicon: id.optional(),
+        /** Shared menu of pages in the header. Shown unless set to false. */
+        pageMenu: z.boolean().optional(),
       })
       .strict(),
     theme: themeSchema,
     pages: z
       .array(pageSchema)
       .min(1)
-      .max(10)
+      .max(MAX_PAGES, `A site can have up to ${MAX_PAGES} pages`)
       .refine((pages) => isUnique(pages.map((p) => p.slug)), 'Page addresses must be unique')
-      .refine((pages) => pages.some((p) => p.slug === ''), 'A home page is required'),
+      .refine((pages) => pages[0]?.slug === '', 'The home page must come first')
+      .refine(
+        (pages) =>
+          pages.every((page) =>
+            collectHrefs(page.sections).every((href) => {
+              const slug = linkedSlug(href);
+              return slug === null || pages.some((p) => p.slug === slug);
+            }),
+          ),
+        'A link points to a page that does not exist',
+      ),
     assets: z
       .array(assetSchema)
       .max(200)
