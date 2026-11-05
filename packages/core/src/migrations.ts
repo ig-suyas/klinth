@@ -23,7 +23,47 @@ export const MIGRATIONS: Readonly<Record<number, Migration>> = {
   // 4 -> 5: sections can be laid out freely (`layout: 'free'` + `canvas`). Older files are all
   // flow, so nothing changes; the new version stops older editors from dropping free sections.
   4: (data) => ({ ...data }),
+  // 5 -> 6: text wraps naturally. Hard line breaks in headings (flow and free) and inside
+  // free text become spaces; blank lines between free body paragraphs stay. Only
+  // whitespace changes, and anything with an unexpected shape is left for validation.
+  5: (data) => (Array.isArray(data.pages) ? { ...data, pages: data.pages.map(unbreakPage) } : data),
 };
+
+/** Single line breaks (and the spaces around them) become one space. */
+const joinLines = (text: string): string => text.replace(/[ \t]*\r?\n[ \t\r\n]*/g, ' ').trim();
+/** Paragraphs (blank lines) stay; line breaks inside a paragraph become spaces. */
+const joinInParagraphs = (text: string): string =>
+  text
+    .split(/\r?\n[ \t]*\r?\n\s*/)
+    .map(joinLines)
+    .filter(Boolean)
+    .join('\n\n');
+
+function unbreakPage(page: unknown): unknown {
+  if (!isRecord(page) || !Array.isArray(page.sections)) return page;
+  return { ...page, sections: page.sections.map(unbreakSection) };
+}
+
+function unbreakSection(section: unknown): unknown {
+  if (!isRecord(section)) return section;
+  let next = section;
+  const props = section.props;
+  if (isRecord(props) && typeof props.heading === 'string' && props.heading.includes('\n')) {
+    next = { ...next, props: { ...props, heading: joinLines(props.heading) } };
+  }
+  const canvas = section.canvas;
+  if (isRecord(canvas) && Array.isArray(canvas.items)) {
+    const items = canvas.items.map((item: unknown) => {
+      if (!isRecord(item) || item.type !== 'text' || typeof item.text !== 'string') return item;
+      if (!item.text.includes('\n')) return item;
+      const text = item.style === 'body' ? joinInParagraphs(item.text) : joinLines(item.text);
+      // Never empty a text (the schema needs one character); keep the original then.
+      return text ? { ...item, text } : item;
+    });
+    next = { ...next, canvas: { ...canvas, items } };
+  }
+  return next;
+}
 
 export class ProjectError extends Error {
   override name = 'ProjectError';

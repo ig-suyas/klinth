@@ -1,4 +1,4 @@
-import { clampBox, moveBox, resizeBox, snapBox } from './free-geometry.ts';
+import { clampBox, moveBox, resizeBox, scaleBox, snapBox, widthBox } from './free-geometry.ts';
 
 /**
  * The free layout part of the preview script (bridge.ts inserts it inside its
@@ -13,10 +13,16 @@ import { clampBox, moveBox, resizeBox, snapBox } from './free-geometry.ts';
  *
  * Free sections: click selects an item, drag moves it (snapping to other
  * items, the artboard's edges and middle, and a grid; Alt turns snapping off),
- * handles resize it (pictures and videos keep their shape; Shift locks any
- * item), arrow keys nudge it (Shift = bigger steps), double-click or Enter
- * edits text. Positions are written to the item's CSS variables at once and
- * sent as `freeChange` when the pointer is let go.
+ * arrow keys nudge it (Shift = bigger steps), double-click or Enter edits text.
+ * Handles work like common design tools: a corner scales text and buttons
+ * proportionally (the font size too, so text keeps its line breaks), pictures
+ * and videos keep their shape; a side handle changes only the width of text,
+ * which reflows (never narrower than its longest word). Text height is
+ * automatic, so text has no top or bottom handle. Positions are written to the
+ * item's CSS variables at once and sent as `freeChange` when the pointer is
+ * let go. The selection frame is the item's real rendered box and follows it
+ * (ResizeObserver, font loading, typing); the real height of every text is
+ * reported as `freeMeasure`, so the editor can grow the artboard.
  */
 export const FREE_BRIDGE_JS = `
   var FREE = (function () {
@@ -26,10 +32,16 @@ export const FREE_BRIDGE_JS = `
     var NUDGE = 0.5;
     var NUDGE_BIG = 5;
     var HANDLES = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
+    // Text size limits for corner scaling, in cqw (a size already outside them may stay).
+    var FONT_MIN = 1;
+    var FONT_MAX = 20;
+    var MEASURE_MS = 120;
     var clampBox = ${clampBox.toString()};
     var moveBox = ${moveBox.toString()};
     var snapBox = ${snapBox.toString()};
     var resizeBox = ${resizeBox.toString()};
+    var scaleBox = ${scaleBox.toString()};
+    var widthBox = ${widthBox.toString()};
     var freeable = {};
     var freeIds = {};
     (cfg.freeable || []).forEach(function (id) { freeable[id] = true; });
@@ -44,6 +56,9 @@ export const FREE_BRIDGE_JS = `
     var frame = null;
     var guides = null;
     var freeEditing = null;
+    var measureTimer = 0;
+    var observer = null;
+    var hintTimer = 0;
     var NBSP = String.fromCharCode(160);
 
     function idOf(section) { return section.getAttribute('data-k-section'); }
@@ -108,8 +123,11 @@ export const FREE_BRIDGE_JS = `
         var path = el.getAttribute('data-k-from');
         var g = Object.prototype.hasOwnProperty.call(byPath, path) ? byPath[path] : null;
         if (!g) {
-          var fs = parseFloat(window.getComputedStyle(el).fontSize);
-          g = { from: path, l: r.left, t: r.top, r: r.right, b: r.bottom, fs: fs > 0 ? fs : 0 };
+          var cs = window.getComputedStyle(el);
+          var fs = parseFloat(cs.fontSize);
+          var lh = parseFloat(cs.lineHeight);
+          g = { from: path, l: r.left, t: r.top, r: r.right, b: r.bottom, fs: fs > 0 ? fs : 0,
+            lh: lh > 0 ? lh : 0 };
           byPath[path] = g;
           groups.push(g);
         } else {
@@ -123,6 +141,7 @@ export const FREE_BRIDGE_JS = `
         elements: groups.slice(0, 100).map(function (g) {
           var e = { from: g.from, x: g.l - box.left, y: g.t - box.top, width: g.r - g.l, height: g.b - g.t };
           if (g.fs) e.fontSize = g.fs;
+          if (g.fs && g.lh) e.lineHeight = g.lh;
           return e;
         })
       };
@@ -155,7 +174,8 @@ export const FREE_BRIDGE_JS = `
       }
       return null;
     }
-    function positioned(el) { return window.getComputedStyle(el).position === 'absolute'; }
+    // Placed on the artboard (not stacked in a column on phones).
+    function positioned(el) { return window.getComputedStyle(el).position !== 'static'; }
     // Phones with their own arrangement edit the phone boxes (--px...); otherwise --x...
     function prefix(board) {
       var phone = board.classList.contains('free-phone') && window.matchMedia &&
@@ -175,6 +195,44 @@ export const FREE_BRIDGE_JS = `
     function locked(el) {
       return el.classList.contains('free-image') || el.classList.contains('free-video');
     }
+    function isText(el) { return el.classList.contains('free-text'); }
+    function isButton(el) { return el.classList.contains('free-button'); }
+    // Artboard width / height (the phone artboard's on phones with their own arrangement).
+    function ratioOf(board, p) {
+      var v = parseFloat(board.style.getPropertyValue(p ? '--par' : '--ar'));
+      return v > 0 ? v : 0;
+    }
+    // Height of the artboard in px as its numbers mean it (the board may have grown taller).
+    function boardHeight(board, rect, p) {
+      var ar = ratioOf(board, p);
+      return ar ? rect.width / ar : rect.height;
+    }
+    // The real height of a text item, in % of the artboard height.
+    function textHeight(it, p) {
+      var rect = it.board.getBoundingClientRect();
+      var h = boardHeight(it.board, rect, p) || 1;
+      var v = (it.el.getBoundingClientRect().height / h) * 100;
+      return Math.round(Math.min(1000, Math.max(0.25, v)) * 1000) / 1000;
+    }
+    // Narrowest width the text can have (its longest word), in % of the artboard width.
+    function minTextWidth(it) {
+      var probe = it.el.cloneNode(true);
+      probe.removeAttribute('data-k-item');
+      probe.removeAttribute('data-free');
+      probe.classList.remove('k-item-on');
+      probe.style.width = 'min-content';
+      probe.style.position = 'absolute';
+      probe.style.visibility = 'hidden';
+      it.board.appendChild(probe);
+      var w = probe.getBoundingClientRect().width;
+      probe.remove();
+      var bw = it.board.getBoundingClientRect().width || 1;
+      return Math.min(100, (w / bw) * 100);
+    }
+    function fontOf(el) {
+      var v = parseFloat(el.style.getPropertyValue('--fs'));
+      return v > 0 ? v : isButton(el) ? 1.4 : 0;
+    }
     function drawFrame() {
       if (frame) { frame.remove(); frame = null; }
       var marked = document.querySelectorAll('.k-item-on');
@@ -184,9 +242,11 @@ export const FREE_BRIDGE_JS = `
       it.el.classList.add('k-item-on');
       if (!positioned(it.el)) return;
       frame = document.createElement('div');
-      frame.className = 'k-frame';
+      frame.className = isText(it.el) ? 'k-frame k-text' : 'k-frame';
       frame.setAttribute('aria-hidden', 'true');
       for (var h = 0; h < HANDLES.length; h++) {
+        // Text is as tall as its lines: no top or bottom handle.
+        if (isText(it.el) && (HANDLES[h] === 'n' || HANDLES[h] === 's')) continue;
         var handle = document.createElement('span');
         handle.className = 'k-handle';
         handle.setAttribute('data-h', HANDLES[h]);
@@ -194,11 +254,49 @@ export const FREE_BRIDGE_JS = `
       }
       it.board.appendChild(frame);
       syncFrame(it);
+      if (observer) observer.observe(it.el);
     }
+    // The frame is the item's real rendered box (text is as tall as its lines), in px of the
+    // board. Rects include any transform on the section, so they are divided by its scale.
     function syncFrame(it) {
-      if (!frame) return;
-      var b = readBox(it.el, prefix(it.board));
-      writeBox(frame, b, '');
+      if (!frame || !it) return;
+      var br = it.board.getBoundingClientRect();
+      var r = it.el.getBoundingClientRect();
+      var scale = it.board.offsetWidth ? br.width / it.board.offsetWidth : 1;
+      if (!(scale > 0)) scale = 1;
+      frame.style.left = ((r.left - br.left) / scale - (it.board.clientLeft || 0)) + 'px';
+      frame.style.top = ((r.top - br.top) / scale - (it.board.clientTop || 0)) + 'px';
+      frame.style.width = r.width / scale + 'px';
+      frame.style.height = r.height / scale + 'px';
+    }
+    function syncSelected() { syncFrame(findItem(item)); }
+
+    // ---- Real sizes: the frame follows the item, the editor learns text heights ----
+
+    function scheduleMeasure() {
+      if (measureTimer) clearTimeout(measureTimer);
+      measureTimer = setTimeout(measureAll, MEASURE_MS);
+    }
+    // Sends the height of every placed text whose stored height is off by more than 0.05%.
+    function measureAll() {
+      measureTimer = 0;
+      if (track || freeEditing || pending) { scheduleMeasure(); return; }
+      var sections = document.querySelectorAll('[data-k-section]');
+      for (var s = 0; s < sections.length; s++) {
+        var sid = idOf(sections[s]);
+        if (!freeIds[sid]) continue;
+        var found = [];
+        var texts = sections[s].querySelectorAll('.free-text[data-k-item]');
+        for (var i = 0; i < texts.length; i++) {
+          var it = asItem(texts[i]);
+          if (!it || !positioned(it.el) || prefix(it.board)) continue;
+          var h = textHeight(it, '');
+          if (Math.abs(h - readBox(it.el, '').h) <= 0.05) continue;
+          it.el.style.setProperty('--h', String(h));
+          found.push({ item: it.id, h: h });
+        }
+        if (found.length) send({ type: 'freeMeasure', id: sid, items: found.slice(0, 100) });
+      }
     }
     function selectItem(it) {
       var sid = it ? idOf(it.section) : selected;
@@ -254,6 +352,7 @@ export const FREE_BRIDGE_JS = `
       it.el.setAttribute('contenteditable', 'plaintext-only');
       it.el.classList.add('k-editing');
       it.el.focus();
+      it.el.addEventListener('input', syncSelected);
     }
     function stopFreeEdit(save) {
       if (!freeEditing) return;
@@ -261,6 +360,7 @@ export const FREE_BRIDGE_JS = `
       freeEditing = null;
       cur.el.removeAttribute('contenteditable');
       cur.el.classList.remove('k-editing');
+      cur.el.removeEventListener('input', syncSelected);
       var text = textOf(cur.el);
       if (!save || !text) { cur.el.replaceWith(cur.original); return; }
       if (text !== cur.before) send({ type: 'freeText', id: idOf(cur.section), item: cur.id, text: text });
@@ -273,9 +373,15 @@ export const FREE_BRIDGE_JS = `
       var hit = handle ? findItem(item) : null;
       if (hit) {
         var hp = prefix(hit.board);
+        var hname = handle.getAttribute('data-h') || 'se';
+        var text = isText(hit.el);
+        // Corners scale text and buttons (font size too); sides of text change the width only.
+        var mode = (text || isButton(hit.el)) && hname.length === 2 ? 'scale' : text ? 'width' : 'box';
         track = { kind: 'resize', id: e.pointerId, x0: e.clientX, y0: e.clientY, it: hit, p: hp,
-          handle: handle.getAttribute('data-h') || 'se', start: readBox(hit.el, hp),
-          rect: hit.board.getBoundingClientRect(), lock: locked(hit.el), started: false };
+          handle: hname, start: readBox(hit.el, hp), rect: hit.board.getBoundingClientRect(),
+          lock: locked(hit.el), mode: mode, text: text, fs0: fontOf(hit.el), fs: fontOf(hit.el),
+          minW: mode === 'width' ? minTextWidth(hit) : 0, started: false };
+        track.nh = boardHeight(hit.board, track.rect, hp);
         capture(handle, e.pointerId);
         return true;
       }
@@ -291,6 +397,7 @@ export const FREE_BRIDGE_JS = `
       var p = prefix(it.board);
       track = { kind: 'move', id: e.pointerId, x0: e.clientX, y0: e.clientY, it: it, p: p,
         start: readBox(it.el, p), rect: it.board.getBoundingClientRect(), targets: lines(it), started: false };
+      track.nh = boardHeight(it.board, track.rect, p);
       capture(it.el, e.pointerId);
       return true;
     }
@@ -302,7 +409,7 @@ export const FREE_BRIDGE_JS = `
         t.it.board.classList.add('k-dragging');
       }
       var w = t.rect.width || 1;
-      var h = t.rect.height || 1;
+      var h = t.nh || t.rect.height || 1;
       var b;
       if (t.kind === 'move') {
         b = moveBox(t.start, (dx / w) * 100, (dy / h) * 100);
@@ -312,6 +419,14 @@ export const FREE_BRIDGE_JS = `
           b = s.box;
           showGuides(t.it.board, s.gx, s.gy);
         }
+      } else if (t.mode === 'scale' && t.fs0 > 0) {
+        var scaled = scaleBox(t.start, t.handle, (dx / w) * 100, (dy / h) * 100, t.fs0,
+          { min: FONT_MIN, max: FONT_MAX, grow: t.text });
+        b = scaled.box;
+        t.fs = scaled.size;
+        t.it.el.style.setProperty('--fs', String(t.fs));
+      } else if (t.mode === 'width') {
+        b = widthBox(t.start, t.handle, (dx / w) * 100, t.minW);
       } else {
         b = resizeBox(t.start, t.handle, (dx / w) * 100, (dy / h) * 100, t.lock || e.shiftKey);
       }
@@ -323,9 +438,20 @@ export const FREE_BRIDGE_JS = `
       t.it.board.classList.remove('k-dragging');
       hideGuides();
       blockClick();
-      var message = { type: 'freeChange', id: idOf(t.it.section), item: t.it.id, box: clampBox(readBox(t.it.el, t.p)) };
+      var box = readBox(t.it.el, t.p);
+      if (t.kind === 'resize' && t.text && !t.p) {
+        // Text keeps the height of its lines; the editor grows the artboard when needed.
+        var bx = clampBox({ x: box.x, y: box.y, w: box.w, h: 0.25 });
+        box = { x: bx.x, y: bx.y, w: bx.w, h: textHeight(t.it, t.p) };
+        t.it.el.style.setProperty('--h', String(box.h));
+      } else {
+        box = clampBox(box);
+      }
+      var message = { type: 'freeChange', id: idOf(t.it.section), item: t.it.id, box: box };
+      if (t.kind === 'resize' && t.fs !== t.fs0) message.size = t.fs;
       if (t.p) message.phone = true;
       send(message);
+      syncFrame(t.it);
     }
 
     function down(e) {
@@ -441,6 +567,24 @@ export const FREE_BRIDGE_JS = `
     function focusout(e) {
       if (freeEditing && e.target === freeEditing.el) stopFreeEdit(true);
     }
+    // "Show" in the settings: outline the items a warning is about, for a moment.
+    function hint(ids) {
+      var old = document.querySelectorAll('.k-hint');
+      for (var o = 0; o < old.length; o++) old[o].classList.remove('k-hint');
+      if (hintTimer) clearTimeout(hintTimer);
+      var first = null;
+      var els = document.querySelectorAll('[data-k-item]');
+      for (var i = 0; i < els.length; i++) {
+        if (ids.indexOf(els[i].getAttribute('data-k-item')) < 0 || !asItem(els[i])) continue;
+        els[i].classList.add('k-hint');
+        if (!first) first = els[i];
+      }
+      if (first && first.scrollIntoView) first.scrollIntoView({ block: 'nearest' });
+      hintTimer = setTimeout(function () {
+        var on = document.querySelectorAll('.k-hint');
+        for (var j = 0; j < on.length; j++) on[j].classList.remove('k-hint');
+      }, 2600);
+    }
     function fromEditor(id) {
       item = id;
       drawFrame();
@@ -465,10 +609,23 @@ export const FREE_BRIDGE_JS = `
       badge.textContent = 'Free layout';
       all[s].appendChild(badge);
     }
-    window.addEventListener('resize', function () { var it = findItem(item); if (it) syncFrame(it); });
+    function sizesChanged() { syncSelected(); scheduleMeasure(); }
+    window.addEventListener('resize', sizesChanged);
+    // Sizes change when fonts arrive, text is typed or a box is resized: the frame follows
+    // and the editor hears about new text heights.
+    if (typeof ResizeObserver !== 'undefined') {
+      observer = new ResizeObserver(sizesChanged);
+      var watched = document.querySelectorAll('.free-text[data-k-item], .free-board');
+      for (var wi = 0; wi < watched.length; wi++) observer.observe(watched[wi]);
+    }
+    if (document.fonts) {
+      if (document.fonts.ready) document.fonts.ready.then(sizesChanged);
+      if (document.fonts.addEventListener) document.fonts.addEventListener('loadingdone', sizesChanged);
+    }
+    if (Object.keys(freeIds).length) scheduleMeasure();
 
     return { click: click, dblclick: dblclick, keydown: keydown, focusout: focusout,
-      decided: decided, select: fromEditor, redraw: drawFrame };
+      decided: decided, select: fromEditor, redraw: drawFrame, hint: hint };
   })();
 `;
 
@@ -482,7 +639,8 @@ export const FREE_BRIDGE_CSS = `
 .block-free [data-k-item] { cursor: move; user-select: none; -webkit-user-select: none; touch-action: none; }
 .block-free [data-k-item].k-editing { cursor: text; user-select: text; -webkit-user-select: text; }
 .block-free [data-k-item]:hover { box-shadow: 0 0 0 1px rgba(194, 65, 12, .5); }
-.free-board > .k-frame { position: absolute; left: calc(var(--x) * 1%); top: calc(var(--y) * 1%); width: calc(var(--w) * 1%); height: calc(var(--h) * 1%); z-index: 10000; outline: 2px solid #c2410c; pointer-events: none; }
+.free-board > .k-frame { position: absolute; z-index: 10000; outline: 2px solid #c2410c; pointer-events: none; }
+.block-free [data-k-item].k-hint { outline: 2px dashed #c2410c; outline-offset: 4px; }
 .k-item-on:not(.free-board > *) { outline: 2px solid #c2410c; outline-offset: 2px; }
 .k-handle { position: absolute; width: 12px; height: 12px; margin: -6px 0 0 -6px; box-sizing: border-box; border: 2px solid #c2410c; border-radius: 3px; background: #fffdf8; pointer-events: auto; touch-action: none; }
 .k-handle[data-h="nw"] { left: 0; top: 0; cursor: nwse-resize; }

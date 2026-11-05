@@ -138,3 +138,70 @@ export function resizeBox(start: Box, handle: string, dx: number, dy: number, lo
   const f = (n: number) => Math.floor(n * 1000) / 1000;
   return { x: r(x), y: r(y), w: f(w), h: f(h) };
 }
+
+/**
+ * A corner handle on text or a button: the box and its font size scale by the
+ * same factor around the opposite corner, so text keeps its line breaks (like
+ * common design tools). The size stays within `min`/`max` (a size already
+ * below `min` never shrinks further), the box never passes the side edges or
+ * the top, and only with `grow` may it pass the bottom (the artboard grows).
+ */
+export function scaleBox(
+  start: Box,
+  handle: string,
+  dx: number,
+  dy: number,
+  size: number,
+  limits: { min: number; max: number; grow: boolean },
+): { box: Box; size: number } {
+  const hx = handle.includes('e') ? 'e' : handle.includes('w') ? 'w' : '';
+  const vy = handle.includes('s') ? 's' : handle.includes('n') ? 'n' : '';
+  if (!hx || !vy || start.w <= 0 || start.h <= 0 || !(size > 0)) return { box: start, size };
+  const r = (n: number) => {
+    const v = Math.round(n * 1000) / 1000;
+    return Object.is(v, -0) ? 0 : v;
+  };
+  const f = (n: number) => Math.floor(n * 1000) / 1000;
+  const left = start.x;
+  const top = start.y;
+  const right = start.x + start.w;
+  const bottom = start.y + start.h;
+  const kx = (hx === 'e' ? start.w + dx : start.w - dx) / start.w;
+  const ky = (vy === 's' ? start.h + dy : start.h - dy) / start.h;
+  let k = Math.abs(dx / start.w) >= Math.abs(dy / start.h) ? kx : ky;
+  const low = Math.max(Math.min(limits.min, size) / size, 0.25 / start.w, 0.25 / start.h);
+  const roomX = (hx === 'w' ? right : 100 - left) / start.w;
+  const roomY = vy === 'n' ? bottom / start.h : limits.grow ? Infinity : (100 - top) / start.h;
+  const high = Math.min(Math.max(limits.max, size) / size, roomX, roomY);
+  k = Math.min(high, Math.max(low, k));
+  const w = f(start.w * k);
+  const h = f(start.h * k);
+  return {
+    box: { x: r(hx === 'w' ? right - w : left), y: r(vy === 'n' ? bottom - h : top), w, h },
+    size: r(size * k),
+  };
+}
+
+/**
+ * A side handle (left or right): only the width changes and text reflows to
+ * it. Never narrower than `minW` (the longest word) and never past the edges.
+ */
+export function widthBox(start: Box, handle: string, dx: number, minW: number): Box {
+  const r = (n: number) => {
+    const v = Math.round(n * 1000) / 1000;
+    return Object.is(v, -0) ? 0 : v;
+  };
+  const left = start.x;
+  const right = start.x + start.w;
+  const room = handle === 'w' ? right : 100 - left;
+  const least = Math.min(room, Math.max(0.25, minW));
+  if (handle === 'w') {
+    const l = Math.min(right - least, Math.max(0, left + dx));
+    return { x: r(l), y: start.y, w: r(right - l), h: start.h };
+  }
+  if (handle === 'e') {
+    const w = Math.min(room, Math.max(least, start.w + dx));
+    return { x: start.x, y: start.y, w: r(w), h: start.h };
+  }
+  return start;
+}

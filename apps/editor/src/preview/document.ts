@@ -234,6 +234,7 @@ export const previewMessageSchema = z.discriminatedUnion('type', [
             width: z.number().finite().min(0).max(100_000),
             height: z.number().finite().min(0).max(100_000),
             fontSize: z.number().finite().positive().max(1_000).optional(),
+            lineHeight: z.number().finite().positive().max(10_000).optional(),
           }),
         )
         .max(MAX_FREE_ITEMS),
@@ -257,8 +258,20 @@ export const previewMessageSchema = z.discriminatedUnion('type', [
     id: sectionId,
     item: itemId,
     box: z.object({ x: percent, y: percent, w: percent, h: percent }),
+    /** New text size (cqw) after a corner handle scaled the item; clamped again by the editor. */
+    size: z.number().finite().min(0).max(100).optional(),
     nudge: z.literal(true).optional(),
     phone: z.literal(true).optional(),
+  }),
+  /** How tall the text items really are (in % of the artboard height), measured after drawing. */
+  z.object({
+    source: z.literal('klinth-preview'),
+    type: z.literal('freeMeasure'),
+    id: sectionId,
+    items: z
+      .array(z.object({ item: itemId, h: z.number().finite().positive().max(10_000) }))
+      .min(1)
+      .max(MAX_FREE_ITEMS),
   }),
   /** Text of a free item edited in place. */
   z.object({

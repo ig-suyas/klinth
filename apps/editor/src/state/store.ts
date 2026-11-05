@@ -40,6 +40,11 @@ interface EditorState {
    * broken is ever saved. Returns null on success.
    */
   change: (recipe: (project: Project) => unknown, key?: string) => string | null;
+  /**
+   * Like `change`, but adds no undo step: for facts the preview measured about
+   * the current state (how tall a free text is), not edits of their own.
+   */
+  amend: (recipe: (project: Project) => unknown) => string | null;
   undo: () => void;
   redo: () => void;
   select: (id: string | null) => void;
@@ -100,6 +105,19 @@ export const useEditor = create<EditorState>()((set, get) => ({
       future: [],
       lastKey: key ?? null,
       lastAt: now,
+      selectedId: keepSelection(result.data, pageIndex, selectedId),
+      save: { status: 'unsaved' },
+    });
+    return null;
+  },
+
+  amend: (recipe) => {
+    const { project, pageIndex, selectedId } = get();
+    if (!project) return 'No project is open.';
+    const result = projectSchema.safeParse(recipe(project));
+    if (!result.success) return result.error.issues[0]?.message ?? 'That change is not allowed.';
+    set({
+      project: result.data,
       selectedId: keepSelection(result.data, pageIndex, selectedId),
       save: { status: 'unsaved' },
     });

@@ -63,8 +63,13 @@ export function Editor({ onExit }: { onExit: () => void }) {
       </div>
       <main className="flex min-h-0 min-w-0 flex-col" aria-label="Preview">
         <QuotaBanner />
-        <SafetyBanners />
-        <Preview />
+        {/* The banners float over the preview, so it never resizes or jumps when one comes or goes. */}
+        <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
+          <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex flex-col">
+            <SafetyBanners />
+          </div>
+          <Preview />
+        </div>
       </main>
       <Inspector />
       <Tour />

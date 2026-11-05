@@ -32,6 +32,9 @@ interface FreeUiState {
   bridge: ((accept: boolean) => void) | null;
   setBridge: (post: ((accept: boolean) => void) | null) => void;
   selectItem: (item: string | null) => void;
+  /** Items a "Show" button points at; the preview outlines them for a moment. */
+  hint: { items: string[]; at: number } | null;
+  showItems: (items: string[]) => void;
   reset: () => void;
 }
 
@@ -42,6 +45,8 @@ export const useFreeUi = create<FreeUiState>()((set) => ({
   bridge: null,
   setBridge: (bridge) => set({ bridge }),
   selectItem: (item) => set({ item }),
+  hint: null,
+  showItems: (items) => set({ hint: { items: [...items], at: Date.now() } }),
   reset: () => set({ item: null, intent: null, asking: false }),
 }));
 

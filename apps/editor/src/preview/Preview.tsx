@@ -245,6 +245,9 @@ export function Preview() {
     useFreeUi.getState().setBridge((accept) => post({ type: 'freeDecision', accept }));
     const stop = useFreeUi.subscribe((state, previous) => {
       if (state.item !== previous.item) post({ type: 'freeItem', item: state.item });
+      if (state.hint && state.hint !== previous.hint) {
+        post({ type: 'freeHint', items: state.hint.items });
+      }
     });
     return () => {
       stop();

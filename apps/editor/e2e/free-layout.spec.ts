@@ -88,9 +88,11 @@ test('double-click, drag, warning, Yes, move, nudge, undo and export', async ({ 
   await expect(hero.locator('.k-badge')).toHaveText('Free layout');
   const title = hero.locator('h1[data-k-item]');
   await expect(title).toBeVisible();
+  // Compare the top-left corner: free text gets a little extra width (so it never wraps
+  // sooner than in the optimized layout), which moves its centre but not its corner.
   const dropped = await centre(title);
-  expect(Math.abs(dropped.x - start.x)).toBeLessThan(3);
-  expect(Math.abs(dropped.y - (start.y + 40))).toBeLessThan(3);
+  expect(Math.abs(dropped.box.x - start.box.x)).toBeLessThan(3);
+  expect(Math.abs(dropped.box.y - (start.box.y + 40))).toBeLessThan(3);
   await expect(settings(page).getByText('Placed by hand')).toBeVisible();
   await expect(page.getByRole('navigation', { name: 'Sections' })).toContainText('Free layout');
 
@@ -99,7 +101,11 @@ test('double-click, drag, warning, Yes, move, nudge, undo and export', async ({ 
   await settings(page).getByRole('spinbutton', { name: 'Width' }).fill('50');
   await expect.poll(async () => (await position(title)).w).toBe(50);
   const before = await position(title);
-  const grab = await centre(title);
+  // The narrower title wraps onto more lines and grows taller, so items drawn in front of it
+  // may cover its middle: grab it near its top-left corner.
+  await page.waitForTimeout(500);
+  const { box: at } = await centre(title);
+  const grab = { x: at.x + 20, y: at.y + 12 };
   await page.mouse.move(grab.x, grab.y);
   await page.mouse.down();
   await page.mouse.move(grab.x + 200, grab.y + 20, { steps: 10 });
@@ -213,7 +219,7 @@ test('resize, stacking and Return to optimized layout', async ({ page }) => {
   await panel.getByRole('button', { name: 'See it on a phone' }).click();
   await expect(hero.locator('h1[data-k-item]')).toHaveCSS('position', 'static');
   await page.getByRole('radio', { name: 'Computer' }).click();
-  await expect(hero.locator('h1[data-k-item]')).toHaveCSS('position', 'absolute');
+  await expect(hero.locator('h1[data-k-item]')).toHaveCSS('position', 'relative');
 
   // Return to optimized layout asks first; Cancel keeps it, confirm goes back.
   await panel.getByRole('button', { name: 'Return to optimized layout' }).click();

@@ -34,6 +34,9 @@ export const MIN_FREE_SIZE = 0.25;
 /** Text size range, in % of the artboard width (CSS `cqw`). */
 export const MIN_FREE_FONT = 0.25;
 export const MAX_FREE_FONT = 25;
+/** Line height range of text, as a multiple of its size. */
+export const MIN_FREE_LEADING = 0.5;
+export const MAX_FREE_LEADING = 3;
 /** Highest stacking value. */
 export const MAX_FREE_Z = 9999;
 
@@ -104,6 +107,8 @@ export const freeItemSchema = z.discriminatedUnion('type', [
       text: z.string().min(1).max(4000),
       size: fontSize,
       align: z.enum(FREE_ALIGNS).optional(),
+      /** Line height as a multiple of the size (kept from the flow layout); absent = the default. */
+      leading: z.number().min(MIN_FREE_LEADING).max(MAX_FREE_LEADING).optional(),
     })
     .strict(),
   z
@@ -274,6 +279,8 @@ export interface MeasuredElement {
   height: number;
   /** Computed font size in px (text and buttons). */
   fontSize?: number | undefined;
+  /** Computed line height in px (text), so a tight heading stays as tall as it was. */
+  lineHeight?: number | undefined;
 }
 
 export interface FlowMeasurement {
@@ -422,7 +429,21 @@ export function flowToFree<S extends SectionLike>(
         : undefined;
     const common = { id: `i${items.length + 1}`, ...box, z: items.length, from: el.from };
     if (content.type === 'text') {
-      items.push({ ...common, ...content, size: size ?? DEFAULT_FONT[content.style] });
+      const lh = el.lineHeight;
+      const leading =
+        lh !== undefined &&
+        el.fontSize !== undefined &&
+        finite(lh, el.fontSize) &&
+        lh > 0 &&
+        el.fontSize > 0
+          ? round(clamp(lh / el.fontSize, MIN_FREE_LEADING, MAX_FREE_LEADING), 3)
+          : undefined;
+      items.push({
+        ...common,
+        ...content,
+        size: size ?? DEFAULT_FONT[content.style],
+        ...(leading !== undefined ? { leading } : {}),
+      });
     } else if (content.type === 'button') {
       items.push({ ...common, ...content, ...(size !== undefined ? { size } : {}) });
     } else {

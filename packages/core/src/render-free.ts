@@ -6,7 +6,7 @@
  */
 import { escapeHtml as esc, safeUrl } from './html.ts';
 import { freeCanvas, readingOrder, type FreeCanvas, type FreeItem } from './free.ts';
-import { lines, paras, sizeAttrs, source, videoEmbed, type BlockCtx } from './render-blocks.ts';
+import { sizeAttrs, source, videoEmbed, type BlockCtx } from './render-blocks.ts';
 
 /** Linked only from pages that have a free section. */
 export const FREE_CSS_PATH = 'css/free.css';
@@ -14,11 +14,12 @@ export const FREE_CSS_PATH = 'css/free.css';
 /** Phones narrower than this get the stacked (or phone) layout. */
 const PHONE = '(max-width:37.49rem)';
 
-export const FREE_CSS = `.free-board{position:relative;width:100%;aspect-ratio:var(--ar);container-type:inline-size}
-.free-board>.free-item{position:absolute;left:calc(var(--x)*1%);top:calc(var(--y)*1%);width:calc(var(--w)*1%);height:calc(var(--h)*1%);z-index:var(--z);margin:0;max-width:none}
+export const FREE_CSS = `.free-board{position:relative;display:grid;grid-template:auto/minmax(0,1fr);align-items:start;justify-items:start;width:100%;aspect-ratio:var(--ar);container-type:inline-size}
+.free-board>.free-item{grid-area:1/1;position:relative;margin:0;margin-left:calc(var(--x)*1%);margin-top:calc(var(--y)/var(--ar)*1%);width:calc(var(--w)*1%);height:calc(var(--h)/var(--ar)*1cqw);z-index:var(--z);max-width:none}
+.free-board>.free-text{height:auto}
 .free-text{font-size:calc(var(--fs)*1cqw);color:var(--fg);overflow-wrap:break-word}
-.free-title,.free-subtitle{line-height:1.08}
-.free-body{line-height:1.5}
+.free-title,.free-subtitle{line-height:var(--lh,1.08);text-wrap:balance}
+.free-body{line-height:var(--lh,1.5);text-wrap:pretty}
 .free-body>p+p{margin-top:.75em}
 .free-center{text-align:center}
 .free-end{text-align:end}
@@ -28,7 +29,7 @@ export const FREE_CSS = `.free-board{position:relative;width:100%;aspect-ratio:v
 .free-board>.free-button{min-height:0;padding:0 1em;font-size:calc(var(--fs,1.4)*1cqw)}
 @media ${PHONE}{
 .free-stack{aspect-ratio:auto;display:flex;flex-direction:column;align-items:flex-start;gap:calc(var(--space)*2)}
-.free-stack>.free-item{position:static;width:auto;height:auto;max-width:100%}
+.free-stack>.free-item{position:static;margin:0;width:auto;height:auto;max-width:100%}
 .free-stack>.free-text,.free-stack>.free-video{align-self:stretch}
 .free-stack>.free-title{font-size:clamp(2rem,1.2rem + 4vw,2.6rem)}
 .free-stack>.free-subtitle{font-size:1.35rem}
@@ -37,10 +38,24 @@ export const FREE_CSS = `.free-board{position:relative;width:100%;aspect-ratio:v
 .free-stack>.free-image{width:100%;height:auto;object-fit:initial}
 .free-stack .video-frame{height:auto;aspect-ratio:16/9}
 .free-phone{aspect-ratio:var(--par)}
-.free-phone>.free-item{left:calc(var(--px)*1%);top:calc(var(--py)*1%);width:calc(var(--pw)*1%);height:calc(var(--ph)*1%)}
+.free-phone>.free-item{margin-left:calc(var(--px)*1%);margin-top:calc(var(--py)/var(--par)*1%);width:calc(var(--pw)*1%);height:calc(var(--ph)/var(--par)*1cqw)}
+.free-phone>.free-text{height:auto}
 .free-phone>.free-hide{display:none}
 }
 `;
+
+/** Text wraps naturally: a line break typed in the text is just a space. */
+const joinLines = (text: string): string => text.replace(/\s*\r?\n\s*/g, ' ').trim();
+
+/** Paragraphs split on blank lines; line breaks inside a paragraph become spaces. */
+function paragraphs(text: string): string {
+  return text
+    .split(/\r?\n[ \t]*\r?\n/)
+    .map(joinLines)
+    .filter(Boolean)
+    .map((p) => `<p>${esc(p)}</p>`)
+    .join('');
+}
 
 /** True when the page has at least one free section (it then links `css/free.css`). */
 export function pageHasFree(page: {
@@ -72,6 +87,7 @@ function itemAttrs(item: FreeItem, canvas: FreeCanvas, classes: string, ctx: Blo
     ['h', item.h],
     ['z', item.z],
     ['fs', size],
+    ['lh', item.type === 'text' ? item.leading : undefined],
     ['px', phone?.x],
     ['py', phone?.y],
     ['pw', phone?.w],
@@ -92,9 +108,9 @@ function renderItem(
     case 'text': {
       const align = item.align && item.align !== 'start' ? ` free-${item.align}` : '';
       const attrs = itemAttrs(item, canvas, `free-item free-text free-${item.style}${align}`, ctx);
-      if (item.style === 'body') return `<div${attrs}>${paras(item.text)}</div>`;
+      if (item.style === 'body') return `<div${attrs}>${paragraphs(item.text)}</div>`;
       const h = level(item.style);
-      return `<h${h}${attrs}>${lines(item.text)}</h${h}>`;
+      return `<h${h}${attrs}>${esc(joinLines(item.text))}</h${h}>`;
     }
     case 'image': {
       const asset = ctx.assets.get(item.image);

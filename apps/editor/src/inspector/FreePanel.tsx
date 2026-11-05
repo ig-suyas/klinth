@@ -11,7 +11,8 @@ import { AnimatePresence } from 'motion/react';
 import { useId, useState } from 'react';
 import {
   itemLabel,
-  readableSizeWarnings,
+  overlapWarnings,
+  readabilityGroup,
   restackItem,
   returnToFlow,
   setItemBox,
@@ -30,13 +31,14 @@ export function FreePanel({ section }: { section: Section }) {
   const canvas = freeCanvas(section);
   const item = useFreeUi((s) => s.item);
   const selectItem = useFreeUi((s) => s.selectItem);
+  const showItems = useFreeUi((s) => s.showItems);
   const setDevice = useEditor((s) => s.setDevice);
   const [confirming, setConfirming] = useState(false);
   const id = useId();
   if (!canvas) return null;
   const items = readingOrder(canvas);
   const current = items.find((i) => i.id === item);
-  const warnings = [...freeWarnings(section), ...readableSizeWarnings(canvas)];
+  const warnings = checksFor(section);
 
   return (
     <section aria-labelledby={`${id}-title`} className="space-y-4">
@@ -65,14 +67,19 @@ export function FreePanel({ section }: { section: Section }) {
         <ul className="space-y-1.5" aria-label="Things to check">
           {warnings.map((w) => (
             <li
-              key={`${w.item}-${w.message}`}
-              className="flex items-start justify-between gap-2 rounded-lg bg-accent-wash px-3 py-2 text-xs"
+              key={w.key}
+              className={`flex items-start justify-between gap-2 rounded-lg px-3 py-2 text-xs ${
+                w.gentle ? 'bg-sunk' : 'bg-accent-wash'
+              }`}
             >
               <span>{w.message}</span>
               <button
                 type="button"
                 className="shrink-0 font-semibold underline underline-offset-2"
-                onClick={() => selectItem(w.item)}
+                onClick={() => {
+                  if (w.items.length === 1) selectItem(w.items[0] ?? null);
+                  showItems(w.items);
+                }}
               >
                 Show
               </button>
@@ -132,6 +139,42 @@ export function FreePanel({ section }: { section: Section }) {
       </AnimatePresence>
     </section>
   );
+}
+
+interface Check {
+  key: string;
+  message: string;
+  /** The items it is about; "Show" outlines them in the preview. */
+  items: string[];
+  /** A hint rather than something to fix. */
+  gentle?: boolean;
+}
+
+/**
+ * Things to check in a free section: each picture without a description, then
+ * one grouped line for all small text and one for overlapping text.
+ */
+function checksFor(section: Section): Check[] {
+  const canvas = freeCanvas(section);
+  if (!canvas) return [];
+  const checks: Check[] = freeWarnings(section).map((w) => ({
+    key: `alt-${w.item}`,
+    message: w.message,
+    items: [w.item],
+  }));
+  const small = readabilityGroup(canvas);
+  if (small) checks.push({ key: 'small', message: small.message, items: small.items });
+  const overlaps = overlapWarnings(canvas).map((w) => w.item);
+  if (overlaps.length) {
+    const n = overlaps.length;
+    checks.push({
+      key: 'overlap',
+      message: n === 1 ? 'A text overlaps another item.' : `${n} texts overlap other items.`,
+      items: overlaps,
+      gentle: true,
+    });
+  }
+  return checks;
 }
 
 function returnNow(sectionId: string) {
@@ -344,20 +387,28 @@ function ItemSettings({ section, item }: { section: Section; item: FreeItem }) {
       <fieldset>
         <legend className="label">Position and size (% of the section)</legend>
         <div className="grid grid-cols-2 gap-2">
-          {BOX_FIELDS.map(([key, label]) => (
-            <label key={key} className="text-xs text-ink-soft">
-              {label}
-              <input
-                className="input mt-1"
-                type="number"
-                step={0.5}
-                min={key === 'w' || key === 'h' ? 0.25 : 0}
-                max={100}
-                value={item[key]}
-                onChange={(e) => box(key, Number(e.target.value))}
-              />
-            </label>
-          ))}
+          {BOX_FIELDS.map(([key, label]) => {
+            // Text is as tall as its lines: its height follows the width and the text size.
+            const auto = key === 'h' && item.type === 'text';
+            return (
+              <label key={key} className="text-xs text-ink-soft">
+                {auto ? 'Height (automatic)' : label}
+                <input
+                  className="input mt-1"
+                  type="number"
+                  step={0.5}
+                  min={key === 'w' || key === 'h' ? 0.25 : 0}
+                  max={100}
+                  value={item[key]}
+                  readOnly={auto}
+                  aria-readonly={auto || undefined}
+                  onChange={(e) => {
+                    if (!auto) box(key, Number(e.target.value));
+                  }}
+                />
+              </label>
+            );
+          })}
         </div>
       </fieldset>
       <div className="flex gap-2">

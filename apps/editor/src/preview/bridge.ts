@@ -257,6 +257,9 @@ ${FREE_BRIDGE_JS}
     else if (e.data.type === 'assets') showAssets(e.data.items);
     else if (e.data.type === 'freeDecision') FREE.decided(e.data.accept === true);
     else if (e.data.type === 'freeItem') FREE.select(typeof e.data.item === 'string' ? e.data.item : null);
+    else if (e.data.type === 'freeHint' && Array.isArray(e.data.items)) {
+      FREE.hint(e.data.items.filter(function (id) { return typeof id === 'string'; }).slice(0, 100));
+    }
   });
 
   if (cfg.scrollTo) scrollToAnchor(cfg.scrollTo, false);

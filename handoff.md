@@ -22,8 +22,57 @@
 | Fix: blank site on first visit | done (owner must fix Pages build)     |
 | 6F Free canvas, Part 1 of 2    | done (model, render, export; no UI)   |
 | 6F Free canvas, Part 2 of 2    | done (drag to free, warning, editing) |
+| Fix: free resize and sizing    | done (schema v6)                      |
 
 ## 1. Current state
+
+**Fix: free-layout resize and sizing (schema version 6).** Symptoms (studio "Big intro"): corner
+drag changed the box but not the text, the heading wrapped to 5-6 lines and overflowed / overlapped
+/ was cut off, widening did not reflow (hard line breaks), the selection box did not match the
+text, the "Keep a backup" banner made the preview jump, four identical tablet warnings.
+Causes: text items had a fixed height (`--h`), the board had a fixed `aspect-ratio` with
+absolutely placed items (could not grow), the free title used line-height 1.08 instead of the
+source heading's (0.86 on the poster), measured widths were exactly the text width (rounding
+wrapped them), the studio heading had `\n`s, the frame was drawn from the stored numbers, and
+the banner sat in the preview's flex column. Now: **render** (`render-free.ts`): `.free-board`
+is a one-cell grid; items share `grid-area:1/1`, placed with `margin-left:x%`,
+`margin-top:calc(y/ar*1%)` (percent margins use the board width), `position:relative`; so the
+board is at least its aspect ratio tall and grows with its lowest item in exports too. Text has
+`height:auto`, titles `text-wrap:balance`, body `pretty`; typed line breaks render as spaces
+(body keeps blank-line paragraphs). New optional text field `leading` (0.5-3, measured at
+conversion from the computed line height, rendered as `--lh`). **Migration 5 -> 6**: newlines
+in every `props.heading` and in free text become spaces (body paragraphs kept; only strings that
+contain `\n`; odd shapes left for validation). Studio heading is one line now (snapshot updated;
+the poster heading is one `.line` that wraps). **Editor**: corners scale text and buttons
+proportionally, font size too (`scaleBox`, 1-20 cqw, a size below 1 may stay), text may grow
+down (board grows), pictures/videos keep their ratio; side handles change only the width of text
+(`widthBox`, min = the text's `min-content` width, measured with a hidden clone); text has no
+n/s handles; Height field shows "Height (automatic)" (read-only). The bridge sends the measured
+text height with resizes and `freeMeasure {id, items:[{item,h}]}` whenever a text's real height
+differs from its stored `h` by > 0.05% (ResizeObserver on text items and boards, `fonts.ready`,
+`loadingdone`, window resize; skipped while dragging/typing). The editor applies it with the new
+`store.amend` (validated, **no undo step**) and `growBoard` (lower `aspect`, every `y`/`h` scaled,
+nothing moves on screen; never shrinks by itself). The selection frame is now positioned in px
+from the item's real rect (divided by the board's transform scale) and follows typing. Drags use
+the board's nominal height (width / `--ar`). Conversion gives text 2% extra width (never past
+the edge). **Banners**: `SafetyBanners` float over the top of the preview (`Editor.tsx` overlay,
+`pointer-events` only on the cards), so the preview never resizes. **Panel**: one grouped line
+"N items may be too small on tablets" (rounded to 0.1 px, threshold 12 px on a 706.56 px board)
+with one Show button (`useFreeUi.showItems` -> `freeHint` -> dashed outline for 2.6 s), plus a
+gentle "texts overlap other items" hint (`overlapWarnings`, > 0.5% each way). Picture-description
+warnings stay one per picture. Tests: core `free-wrap.test.ts` (no `<br>`, paragraphs, CSS
+growth/auto height/cqw only, leading kept and bounded, migration, import, odd shapes); editor
+`state/free-resize.test.ts` (scale/width geometry, min width, growth keeps px, measured heights,
+size clamp, grouped and overlap checks, `amend` adds no undo step, slack), new bridge cases
+(corner sends `size`, side width only and min width, `freeMeasure`, `freeHint`),
+`inspector/FreePanel.test.tsx`; e2e `free-resize.spec.ts` (corner keeps lines and scales font,
+side reflows and widens back, min width, frame within 2 px after every action incl. typing,
+section grows + overlap hint, banner on/off changes no item box, editor vs export at 1366/1024/768
+normalised by board width within 0.4%, same line counts, grouped warning once). Changed on purpose:
+version pins 5 -> 6, migration key lists, placed items' `position` is `relative` (was absolute),
+a few exact widths in older tests (+2% text room), free-layout e2e compares the dropped corner,
+not the centre. Totals: 867 unit (core 531, templates 46, editor 234, api 56), 43 e2e
+(`--workers=1`, all pass); lint, format, types and build pass. Pushed; not deployed.
 
 **6F Part 2 (hidden free canvas: editor interaction).** Schema unchanged (v5); Part 1's
 `free.ts` / `render-free.ts` untouched. No menu item: free layout appears only when the owner
@@ -508,7 +557,9 @@ repos at ₹0.
   `updateFreeItem`, `returnToFlow`, warnings; `state/free-intent.ts` : warning flow, choices
 - `apps/editor/src/ui/FreeLayoutDialog.tsx`, `ui/ConfirmDialog.tsx`, `inspector/FreePanel.tsx`
 - `apps/editor/scripts/lighthouse-free.ts` : Lighthouse on an export with free sections
-- `apps/editor/e2e/free-layout.spec.ts` : the whole flow in Chrome
+- `apps/editor/e2e/free-layout.spec.ts` : the whole flow in Chrome; `e2e/free-resize.spec.ts` : resize,
+  frame, growth, banner, export parity
+- `packages/core/src/free-wrap.test.ts` : natural wrapping, growth CSS, `leading`, migration 5 -> 6
 - `packages/core/src/free.ts` (+ `free.test.ts`) : free canvas schema, reading order, warnings,
   `flowToFree` / `freeToFlow`; `render-free.ts` : `FREE_CSS`, `renderFreeBoard`, `pageHasFree`
 
@@ -605,6 +656,11 @@ repos at ₹0.
 
 ## 5. What didn't work
 
+- Free layout sizing: Playwright clicks at an item's centre can land on a later item stacked over
+  it once text is tall (auto height); click near the top-left. A grown board redraws the preview
+  ~120 ms after the drop, so a grab right after can hit the old frame; tests wait 500 ms. Tall
+  display glyphs ink past a tight line height (scrollHeight > clientHeight with height:auto), so
+  only sideways overflow counts for text.
 - Free layout warning: the dialog opened under the pointer mid-drag, so moves and the release went
   to the editor, not the preview (the drop was lost and "Yes" waited forever). Fixed with
   `pointer-events:none` on the whole dialog while the button is held, `freeDrag` updates and the

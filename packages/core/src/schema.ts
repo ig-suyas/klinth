@@ -19,7 +19,7 @@ import {
   freeSectionProblem,
 } from './free.ts';
 
-export const SCHEMA_VERSION = 5;
+export const SCHEMA_VERSION = 6;
 
 export { HEADER_STYLES, type HeaderStyle } from './header.ts';
 

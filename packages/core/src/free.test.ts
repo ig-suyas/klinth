@@ -526,11 +526,11 @@ describe('free export', () => {
 
 describe('versions, round trips and the key guard', () => {
   it('upgrades version 4 files without changing them', () => {
-    expect(SCHEMA_VERSION).toBe(5);
+    expect(SCHEMA_VERSION).toBe(6);
     expect(typeof MIGRATIONS[4]).toBe('function');
     const v4 = { ...clone(), schemaVersion: 4 };
     const upgraded = migrateProject(v4);
-    expect(upgraded).toEqual({ ...clone(), schemaVersion: 5 });
+    expect(upgraded).toEqual({ ...clone(), schemaVersion: 6 });
   });
 
   it('round-trips an existing project and a free project through the project file', () => {

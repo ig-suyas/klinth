@@ -42,7 +42,7 @@ export function createStudio(): Project {
               layout: 'poster',
               eyebrow: 'Brand and web studio, Lisbon',
               status: 'Booking projects from March',
-              heading: 'We make\nbrands\nthat speak\nclearly.',
+              heading: 'We make brands that speak clearly.',
               subheading:
                 'Field & Form is a two-person studio. We name, shape and build brands and websites for independent shops, makers and cultural spaces.',
               buttons: [

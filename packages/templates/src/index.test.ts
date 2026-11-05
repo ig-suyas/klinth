@@ -162,10 +162,12 @@ describe('Creative studio template', () => {
   const page = renderSite(project).find((f) => f.path === 'index.html')?.content as string;
   const sheet = renderSite(project).find((f) => f.path === 'css/site.css')?.content as string;
 
-  it('opens with a poster headline split into masked lines', () => {
+  it('opens with a poster headline that wraps naturally (no hard line breaks)', () => {
     expect(page).toContain('<div class="hero hero-poster">');
     const h1 = /<h1 class="display"[^>]*>(.*?)<\/h1>/.exec(page)?.[1] ?? '';
-    expect(h1.match(/<span class="line">/g)?.length).toBeGreaterThanOrEqual(3);
+    const hero = project.pages[0]?.sections[0]?.props as { heading?: string } | undefined;
+    expect(hero?.heading).not.toMatch(/\n/);
+    expect(h1).not.toContain('<br>');
     // Words on different lines stay separate words for screen readers and search.
     const words = h1
       .replace(/<[^>]+>/g, '')

@@ -88,12 +88,12 @@ describe('the free layout warning', () => {
 
   it('a release over the editor uses the last position the preview reported', () => {
     receiveFreeIntent(intent(hero()?.id ?? ''));
-    receiveFreeDrag(300, 0);
+    receiveFreeDrag(200, 0);
     decideFreeIntent(true, false);
     expect(hero()?.layout).toBeUndefined();
     receiveFreeRelease();
     const heading = freeCanvas(hero() ?? ({} as never))?.items.find((i) => i.from === 'heading');
-    expect(heading?.x).toBe(30);
+    expect(heading?.x).toBe(20);
   });
 
   it('remembers "Don’t ask again" per section', () => {

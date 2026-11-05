@@ -57,8 +57,9 @@ function useEditsAndStorage(): { edits: number; at: number; persisted: boolean }
 }
 
 /**
- * Banners over the preview that protect the user's work: one when the internet
- * is gone (editing and saving still work), one reminding them to keep a backup.
+ * Banners that protect the user's work: one when the internet is gone (editing
+ * and saving still work), one reminding them to keep a backup. They float over
+ * the top of the preview (see Editor.tsx), so it never resizes or jumps.
  */
 export function SafetyBanners() {
   const online = useOnline();
@@ -88,7 +89,7 @@ export function SafetyBanners() {
           key="memory"
           role="status"
           {...motionProps}
-          className="mx-4 mt-3 flex items-center gap-3 rounded-xl border border-line bg-panel px-4 py-2.5"
+          className="pointer-events-auto mx-4 mt-3 flex items-center gap-3 rounded-xl border border-line bg-panel px-4 py-2.5 shadow-[0_8px_28px_-12px_rgba(29,27,24,.35)]"
         >
           <Icon name="file" className="size-4 shrink-0 text-ink-soft" />
           <p className="flex-1 text-sm leading-snug">
@@ -113,7 +114,7 @@ export function SafetyBanners() {
           key="offline"
           role="status"
           {...motionProps}
-          className="mx-4 mt-3 flex items-center gap-3 rounded-xl border border-line bg-panel px-4 py-2.5"
+          className="pointer-events-auto mx-4 mt-3 flex items-center gap-3 rounded-xl border border-line bg-panel px-4 py-2.5 shadow-[0_8px_28px_-12px_rgba(29,27,24,.35)]"
         >
           <span aria-hidden="true" className="size-2 shrink-0 rounded-full bg-ink-soft" />
           <p className="flex-1 text-sm leading-snug">
@@ -127,7 +128,7 @@ export function SafetyBanners() {
           key="backup"
           role="status"
           {...motionProps}
-          className="mx-4 mt-3 flex items-center gap-3 rounded-xl border border-line bg-panel px-4 py-2.5"
+          className="pointer-events-auto mx-4 mt-3 flex items-center gap-3 rounded-xl border border-line bg-panel px-4 py-2.5 shadow-[0_8px_28px_-12px_rgba(29,27,24,.35)]"
         >
           <Icon name="file" className="size-4 shrink-0 text-ink-soft" />
           <p className="flex-1 text-sm leading-snug">
