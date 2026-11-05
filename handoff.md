@@ -72,7 +72,8 @@ normalised by board width within 0.4%, same line counts, grouped warning once). 
 version pins 5 -> 6, migration key lists, placed items' `position` is `relative` (was absolute),
 a few exact widths in older tests (+2% text room), free-layout e2e compares the dropped corner,
 not the centre. Totals: 867 unit (core 531, templates 46, editor 234, api 56), 43 e2e
-(`--workers=1`, all pass); lint, format, types and build pass. Pushed; not deployed.
+(`--workers=1`, all pass); lint, format, types and build pass. Pushed and deployed (`npm run deploy:editor`, deployment
+a7727cbb; `klinth.pages.dev` serves the new bundle).
 
 **6F Part 2 (hidden free canvas: editor interaction).** Schema unchanged (v5); Part 1's
 `free.ts` / `render-free.ts` untouched. No menu item: free layout appears only when the owner
