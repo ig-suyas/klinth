@@ -139,7 +139,7 @@ test('a video carousel and a blank canvas: build, try in the preview, export', a
   expect(read('css/video.css')).toContain('.vr-vertical{--vr:9/16');
   expect(read('css/free.css')).toContain('.canvas-wrap{');
   expect(read('js/video.js')).toContain('data-carousel');
-  expect(JSON.parse(read('.klinth/project.json')).schemaVersion).toBe(8);
+  expect(JSON.parse(read('.klinth/project.json')).schemaVersion).toBe(9);
 
   // The exported carousel works on its own, also with a swipe and with reduced motion.
   const context = page.context();

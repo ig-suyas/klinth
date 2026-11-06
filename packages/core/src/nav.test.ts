@@ -282,7 +282,7 @@ describe('schema version 3', () => {
   };
 
   it('is upgraded past by version 5 (see free.test.ts)', () => {
-    expect(SCHEMA_VERSION).toBe(8);
+    expect(SCHEMA_VERSION).toBe(9);
     expect(Object.keys(MIGRATIONS)).toContain('2');
   });
 

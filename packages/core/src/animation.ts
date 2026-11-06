@@ -93,6 +93,11 @@ const TARGETS: Record<BlockType, readonly AnimationTarget[]> = {
   footer: [],
   // Placed freely, so it only animates as a whole.
   canvas: ['section'],
+  rotator: ['section'],
+  cardStack: ['section', 'heading'],
+  steps: ['section', 'heading'],
+  marquee: ['section', 'heading'],
+  giantText: ['section'],
 };
 
 /** Blocks with one big picture, where parallax fits. */

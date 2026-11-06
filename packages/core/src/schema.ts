@@ -1,5 +1,6 @@
 import { z } from 'zod';
-import { blockPropSchemas, singleLine, type BlockType } from './blocks.ts';
+import { MAX_SHAPES_PER_PAGE, blockPropSchemas, singleLine, type BlockType } from './blocks.ts';
+import { sectionShapes } from './extras.ts';
 import { MAX_VIDEO_BYTES } from './media.ts';
 import { DEVICE_NAME, RESERVED_SLUGS, collectHrefs, linkedSlug } from './links.ts';
 import { themeSchema } from './tokens.ts';
@@ -19,7 +20,7 @@ import {
   freeSectionProblem,
 } from './free.ts';
 
-export const SCHEMA_VERSION = 8;
+export const SCHEMA_VERSION = 9;
 
 export { HEADER_STYLES, type HeaderStyle } from './header.ts';
 
@@ -98,6 +99,11 @@ export const sectionSchema = z.discriminatedUnion('type', [
   sectionOf('customCode'),
   sectionOf('spacer'),
   sectionOf('canvas'),
+  sectionOf('rotator'),
+  sectionOf('cardStack'),
+  sectionOf('steps'),
+  sectionOf('marquee'),
+  sectionOf('giantText'),
 ]);
 
 export const pageSchema = z
@@ -136,6 +142,13 @@ export const pageSchema = z
           ctx.addIssue({
             code: 'custom',
             message: `A page can have up to ${MAX_FREE_SECTIONS} freely placed sections`,
+          });
+        }
+        const shapes = sections.reduce((n, s) => n + sectionShapes(s).length, 0);
+        if (shapes > MAX_SHAPES_PER_PAGE) {
+          ctx.addIssue({
+            code: 'custom',
+            message: `A page can have up to ${MAX_SHAPES_PER_PAGE} decorative shapes`,
           });
         }
         if (sections.filter((s) => hasAnimation(s.animation)).length > MAX_ANIMATED_SECTIONS) {

@@ -1,5 +1,5 @@
 import type { BlockType } from '@klinth/core';
-import { blockDefinitions } from '@klinth/templates';
+import { blockDefinitions, sectionPresets, type SectionPresetId } from '@klinth/templates';
 import {
   addSection,
   deleteSection,
@@ -22,12 +22,15 @@ export function useSectionActions() {
   };
 
   return {
-    add(type: BlockType) {
+    /** Adds a block, or a ready-made section (`expandable`, `shapes`). */
+    add(entry: BlockType | SectionPresetId) {
       const { selectedId } = useEditor.getState();
+      const preset = entry in sectionPresets ? sectionPresets[entry as SectionPresetId] : null;
+      const type = preset ? preset.type : (entry as BlockType);
       let id = '';
       const ok = report(
         change((p) => {
-          const result = addSection(p, pageIndex, type, selectedId);
+          const result = addSection(p, pageIndex, type, selectedId, preset?.defaults());
           id = result.id;
           return result.project;
         }),

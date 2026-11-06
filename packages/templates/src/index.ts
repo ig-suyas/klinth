@@ -6,7 +6,13 @@ import { createLanding } from './landing.ts';
 import { createPortfolio } from './portfolio.ts';
 import { createStudio } from './studio.ts';
 
-export { blockDefinitions, type BlockDefinition } from './blocks.ts';
+export {
+  blockDefinitions,
+  sectionPresets,
+  type BlockDefinition,
+  type SectionPreset,
+  type SectionPresetId,
+} from './blocks.ts';
 
 export interface TemplateInfo {
   readonly id: string;

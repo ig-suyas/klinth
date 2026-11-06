@@ -1,9 +1,9 @@
 import { freeCanvas, type Section } from '@klinth/core';
-import { blockDefinitions } from '@klinth/templates';
+import { blockDefinitions, sectionPresets, type SectionPresetId } from '@klinth/templates';
 import { AnimatePresence, Reorder, motion, useDragControls, useReducedMotion } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
 import { useAi } from '../ai/store.ts';
-import { ADDABLE_BLOCKS } from '../inspector/fields.ts';
+import { ADDABLE_SECTIONS, type AddEntry } from '../inspector/fields.ts';
 import { sectionTitle } from '../state/sections.ts';
 import { currentPage, useEditor } from '../state/store.ts';
 import { useSectionActions } from '../state/useSectionActions.ts';
@@ -184,11 +184,18 @@ function SectionRow({
   );
 }
 
+/** Name and description of an "Add a section" entry. */
+function addEntryInfo(entry: AddEntry): { label: string; description: string } {
+  return entry in sectionPresets
+    ? sectionPresets[entry as SectionPresetId]
+    : blockDefinitions[entry as keyof typeof blockDefinitions];
+}
+
 function AddSectionMenu({
   onPick,
   onClose,
 }: {
-  onPick: (type: (typeof ADDABLE_BLOCKS)[number]) => void;
+  onPick: (entry: AddEntry) => void;
   onClose: () => void;
 }) {
   const reduce = useReducedMotion();
@@ -215,17 +222,17 @@ function AddSectionMenu({
     >
       <p className="px-2.5 pt-2 pb-1 eyebrow">Pick a section to add</p>
       <ul>
-        {ADDABLE_BLOCKS.map((type, i) => (
-          <li key={type}>
+        {ADDABLE_SECTIONS.map((entry, i) => (
+          <li key={entry}>
             <button
               ref={i === 0 ? first : undefined}
               type="button"
               className="w-full rounded-lg px-2.5 py-2 text-left hover:bg-sunk focus-visible:bg-sunk"
-              onClick={() => onPick(type)}
+              onClick={() => onPick(entry)}
             >
-              <span className="block text-sm font-medium">{blockDefinitions[type].label}</span>
+              <span className="block text-sm font-medium">{addEntryInfo(entry).label}</span>
               <span className="block text-xs leading-snug text-ink-soft">
-                {blockDefinitions[type].description}
+                {addEntryInfo(entry).description}
               </span>
             </button>
           </li>

@@ -35,6 +35,20 @@ import { freeCanvas, freeTitle } from './free.ts';
 import { FREE_CSS, FREE_CSS_PATH, pageHasFree, renderFreeBoard } from './render-free.ts';
 import { CANVAS_CSS, canvasClasses, renderCanvasInner } from './canvas.ts';
 import {
+  EXTRAS_CSS,
+  EXTRAS_CSS_PATH,
+  EXTRAS_JS,
+  EXTRAS_JS_PATH,
+  FOLD_NOSCRIPT,
+  extraSectionClasses,
+  pageExtrasCss,
+  pageExtrasJs,
+  pageFolds,
+  renderShapes,
+  rotatorPhrase,
+  wrapFold,
+} from './extras.ts';
+import {
   VIDEO_CSS,
   VIDEO_CSS_PATH,
   VIDEO_JS,
@@ -57,6 +71,7 @@ export function pagePath(page: Page): string {
 const sectionHeading = (s: Section): string => {
   const canvas = freeCanvas(s);
   if (canvas) return freeTitle(canvas);
+  if (s.type === 'rotator') return rotatorPhrase(s.props);
   return 'heading' in s.props ? (s.props.heading ?? '').trim() : '';
 };
 const sectionNavLabel = (s: Section): string =>
@@ -242,6 +257,8 @@ function renderPage(
   const free = pageHasFree(page);
   const videoCss = pageVideoCss(page);
   const videoJs = pageVideoJs(page);
+  const extrasCss = pageExtrasCss(page);
+  const extrasJs = pageExtrasJs(page);
   const title = page.slug === '' ? meta.title : `${page.title} | ${meta.title}`;
   const favicon = faviconAsset(project, assets);
   const icon = favicon ? assetPath(favicon) : MONOGRAM_PATH;
@@ -279,8 +296,11 @@ function renderPage(
             sizeAttrs,
           })
         : `<div class="wrap">${inner}</div>`;
-      const extra = blank ? canvasClasses(blank) : '';
-      return `<section id="${esc(sectionAnchor(section))}" class="block block-${section.type}${layout}${extra} bg-${bg}${anim.classes}"${marker}${anim.attrs}>${content}</section>`;
+      const extra = (blank ? canvasClasses(blank) : '') + extraSectionClasses(section);
+      const anchor = sectionAnchor(section);
+      // Decorative shapes sit behind everything; folding wraps whatever the section shows.
+      const body = renderShapes(section) + wrapFold(section, anchor, content);
+      return `<section id="${esc(anchor)}" class="block block-${section.type}${layout}${extra} bg-${bg}${anim.classes}"${marker}${anim.attrs}>${body}</section>`;
     })
     .join('\n');
   const footer = footers
@@ -300,8 +320,8 @@ function renderPage(
 <link rel="icon" href="${esc(icon)}">
 <meta name="theme-color" content="${esc(project.theme.colors.background)}">
 ${preloadFonts(project, options)}<link rel="stylesheet" href="css/site.css">
-${animates ? `<link rel="stylesheet" href="${ANIM_CSS_PATH}">\n` : ''}${free ? `<link rel="stylesheet" href="${FREE_CSS_PATH}">\n` : ''}${videoCss ? `<link rel="stylesheet" href="${VIDEO_CSS_PATH}">\n` : ''}${split ? `<link rel="stylesheet" href="${HEADER_CSS_PATH}">\n` : ''}${code.css ? `<link rel="stylesheet" href="${CUSTOM_CSS_PATH}">\n` : ''}<script src="js/site.js" defer></script>
-${animates ? `<script src="${ANIM_JS_PATH}" defer></script>\n` : ''}${videoJs ? `<script src="${VIDEO_JS_PATH}" defer></script>\n` : ''}${split ? `<script src="${HEADER_JS_PATH}" defer></script>\n` : ''}</head>
+${animates ? `<link rel="stylesheet" href="${ANIM_CSS_PATH}">\n` : ''}${free ? `<link rel="stylesheet" href="${FREE_CSS_PATH}">\n` : ''}${videoCss ? `<link rel="stylesheet" href="${VIDEO_CSS_PATH}">\n` : ''}${extrasCss ? `<link rel="stylesheet" href="${EXTRAS_CSS_PATH}">\n` : ''}${pageFolds(page) ? FOLD_NOSCRIPT : ''}${split ? `<link rel="stylesheet" href="${HEADER_CSS_PATH}">\n` : ''}${code.css ? `<link rel="stylesheet" href="${CUSTOM_CSS_PATH}">\n` : ''}<script src="js/site.js" defer></script>
+${animates ? `<script src="${ANIM_JS_PATH}" defer></script>\n` : ''}${videoJs ? `<script src="${VIDEO_JS_PATH}" defer></script>\n` : ''}${extrasJs ? `<script src="${EXTRAS_JS_PATH}" defer></script>\n` : ''}${split ? `<script src="${HEADER_JS_PATH}" defer></script>\n` : ''}</head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
 ${shown ? `${renderHeader(project, page, { assets, preview: options.preview === true, editable })}\n` : ''}<main id="main">
@@ -366,6 +386,8 @@ export function renderSite(project: Project, options: RenderOptions = {}): SiteF
       : []),
     ...(project.pages.some(pageVideoCss) ? [{ path: VIDEO_CSS_PATH, content: VIDEO_CSS }] : []),
     ...(project.pages.some(pageVideoJs) ? [{ path: VIDEO_JS_PATH, content: VIDEO_JS }] : []),
+    ...(project.pages.some(pageExtrasCss) ? [{ path: EXTRAS_CSS_PATH, content: EXTRAS_CSS }] : []),
+    ...(project.pages.some(pageExtrasJs) ? [{ path: EXTRAS_JS_PATH, content: EXTRAS_JS }] : []),
     ...(code.css ? [{ path: CUSTOM_CSS_PATH, content: withNewline(code.css) }] : []),
     ...(code.js ? [{ path: CUSTOM_JS_PATH, content: withNewline(code.js) }] : []),
     ...(faviconAsset(project, assets) ? [] : [{ path: MONOGRAM_PATH, content: monogram(project) }]),

@@ -73,10 +73,12 @@ export function addSection(
   pageIndex: number,
   type: BlockType,
   afterId?: string | null,
+  /** Starting props instead of the block's defaults (a ready-made section). */
+  startProps?: Props,
 ): { project: unknown; id: string } {
   const sections = project.pages[pageIndex]?.sections ?? [];
   const id = newSectionId(type, new Set(sections.map((s) => s.id)));
-  const props = blockDefinitions[type].defaults();
+  const props = startProps ?? blockDefinitions[type].defaults();
   // A blank canvas is placed freely from the start: an empty artboard as tall as its height.
   const section =
     type === 'canvas'

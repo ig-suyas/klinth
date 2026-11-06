@@ -4,6 +4,8 @@ import { escapeHtml as esc, safeUrl } from './html.ts';
 import type { Asset, Section } from './schema.ts';
 import { splitAttrs, splitLines, splitText, type SplitMode } from './animation.ts';
 import { videoLayout, videoMaxWidth, videoStyled } from './video.ts';
+import { cssWhole, highlightPhrases, rotatorPhrase } from './extras.ts';
+import { hexToRgb } from './canvas.ts';
 
 /** Per-section render context. */
 export interface BlockCtx {
@@ -425,6 +427,160 @@ function styledVideo(p: BlockProps<'video'>, ctx: BlockCtx): string {
   return `${head(p, ctx)}${body}${paras(p.caption, 'caption', field(ctx, 'caption'))}`;
 }
 
+// ---- Extras (see extras.ts for their CSS and script) ----
+
+const ROT_EFFECTS = new Set(['fade', 'slide', 'typewriter']);
+const ALIGNS = new Set(['left', 'center', 'right']);
+const choose = (value: string | undefined, allowed: ReadonlySet<string>, fallback: string) =>
+  value !== undefined && allowed.has(value) ? value : fallback;
+
+/**
+ * Rotating headline. The heading is named by the whole phrase; the visible
+ * pieces are hidden from screen readers. All words share one grid cell, so the
+ * widest one sets the width and nothing shifts when they swap. Without
+ * scripts (or with reduced motion) the first word stays.
+ */
+function rotator(p: BlockProps<'rotator'>, ctx: BlockCtx): string {
+  const words = (p.words ?? []).map((w) => oneLine(w.word)).filter(Boolean);
+  const before = oneLine(p.heading);
+  const after = oneLine(p.after);
+  const phrase = rotatorPhrase(p);
+  const effect = choose(p.effect, ROT_EFFECTS, 'fade');
+  const align = p.align === 'center' ? 'center' : 'left';
+  const interval = cssWhole(p.interval, 1000, 10000, 2500);
+  const wordHtml = words.length
+    ? `<span class="rot-words" aria-hidden="true">${words
+        .map(
+          (w, i) =>
+            `<span class="rot-w${i === 0 ? ' is-on' : ''}" style="--n:${Math.min(Array.from(w).length, 99)}">${esc(w)}</span>`,
+        )
+        .join('')}</span>`
+    : '';
+  const pieces = [
+    before ? `<span aria-hidden="true">${esc(before)}</span>` : '',
+    wordHtml,
+    after ? `<span aria-hidden="true">${esc(after)}</span>` : '',
+  ].filter(Boolean);
+  const title = phrase
+    ? `<h${ctx.level} class="rot-title" aria-label="${esc(phrase)}">${pieces.join(' ')}</h${ctx.level}>`
+    : '';
+  const top = p.eyebrow ? `<p class="eyebrow"${field(ctx, 'eyebrow')}>${esc(p.eyebrow)}</p>` : '';
+  const data = words.length > 1 ? ` data-rotator data-interval="${interval}"` : '';
+  return `<div class="rot rot-${effect} rot-al-${align}"${data}>${top}${title}${paras(p.intro, 'rot-intro', field(ctx, 'intro'))}</div>`;
+}
+
+const STACK_SHAPES = new Set(['portrait', 'square', 'landscape']);
+
+/**
+ * Picture stack: cards stacked with a tilt (depth `--d`, side `--sg`). Without
+ * scripts it is already a stack; js/extras.js adds arrows, keys, clicks,
+ * swipes and the optional shuffle. The arrows' row keeps its space before the
+ * script runs, so nothing moves.
+ */
+function cardStack(p: BlockProps<'cardStack'>, ctx: BlockCtx): string {
+  const pics = (p.images ?? [])
+    .map((item, i) => ({
+      item,
+      html: img(item, { ...ctx, first: ctx.first && i === 0 }, `images.${i}.image`),
+    }))
+    .filter((x) => x.html);
+  const n = pics.length;
+  if (n === 0) return head(p, ctx);
+  const tilt = cssWhole(p.tilt, 0, 15, 6);
+  const ratio = choose(p.ratio, STACK_SHAPES, 'portrait');
+  const name = esc(oneLine(p.heading) || 'Pictures');
+  const auto = p.auto === true && n > 1 ? cssWhole(p.interval, 2000, 10000, 4000) : 0;
+  const cards = pics
+    .map(
+      ({ item, html }, k) =>
+        `<div class="stk-card${k === 0 ? ' is-front' : ''}${k > 3 ? ' is-far' : ''}" style="--d:${Math.min(k, 4)};--sg:${k % 2 ? -1 : 1}" role="group" aria-roledescription="slide" aria-label="${k + 1} of ${n}"><figure>${html}${
+          item.caption ? `<figcaption>${esc(item.caption)}</figcaption>` : ''
+        }</figure></div>`,
+    )
+    .join('');
+  const pause = auto
+    ? '<button type="button" class="x-btn stk-btn stk-pause" hidden>Pause</button>'
+    : '';
+  const nav = `<div class="stk-nav" hidden><button type="button" class="x-btn stk-btn stk-prev" aria-label="Previous picture"><span aria-hidden="true">←</span></button><p class="stk-count" aria-live="polite">1 / ${n}</p><button type="button" class="x-btn stk-btn stk-next" aria-label="Next picture"><span aria-hidden="true">→</span></button>${pause}</div>`;
+  return `${head(p, ctx)}<div class="stk stk-${ratio}" data-stack${auto ? ` data-auto="${auto}"` : ''} role="region" aria-roledescription="carousel" aria-label="${name}" style="--tilt:${tilt}"><div class="stk-cards" tabindex="0">${cards}</div>${n > 1 ? nav : ''}</div>`;
+}
+
+/** Numbered steps on cards (an ordered list, so the numbers are also read out). */
+function steps(p: BlockProps<'steps'>, ctx: BlockCtx): string {
+  const sub = ctx.level + 1;
+  const items = (p.items ?? [])
+    .map(
+      (s, i) =>
+        `<li class="step"><span class="step-num" aria-hidden="true">${pad(i + 1)}</span>${heading(s.title, sub, 'step-title', from(ctx, `items.${i}.title`))}${paras(s.text, 'step-text', from(ctx, `items.${i}.text`))}</li>`,
+    )
+    .join('');
+  return `${head(p, ctx)}${items ? `<ol class="steps" role="list">${items}</ol>` : ''}`;
+}
+
+/** Seconds each quote takes to pass, per speed. */
+const MARQUEE_SECONDS: Record<string, number> = { slow: 10, normal: 7, fast: 4.5 };
+
+/** Paragraphs with `**highlighted**` phrases. */
+function highlightParas(text: string): string {
+  return text
+    .split(/\r?\n\s*\r?\n/)
+    .map((x) => x.trim())
+    .filter(Boolean)
+    .map((x) => `<p>${highlightPhrases(x).replace(/\r?\n/g, '<br>')}</p>`)
+    .join('');
+}
+
+/**
+ * Quote marquee. Without scripts, or with reduced motion, it is a row that
+ * scrolls and snaps; js/extras.js adds hidden copies and moves it.
+ */
+function marquee(p: BlockProps<'marquee'>, ctx: BlockCtx): string {
+  const items = p.items ?? [];
+  if (items.length === 0) return head(p, ctx);
+  const cards = items
+    .map(
+      (q, i) =>
+        `<li class="mq-card"><figure><blockquote${from(ctx, `items.${i}.quote`)}>${highlightParas(q.quote)}</blockquote><figcaption><span class="mq-who"${from(ctx, `items.${i}.name`)}>${esc(q.name)}</span>${
+          q.role ? `<span class="mq-role"${from(ctx, `items.${i}.role`)}>${esc(q.role)}</span>` : ''
+        }</figcaption></figure></li>`,
+    )
+    .join('');
+  const seconds = MARQUEE_SECONDS[p.speed ?? 'normal'] ?? 7;
+  const dur = Math.round(Math.min(Math.max(items.length * seconds, 10), 200));
+  const dir = p.direction === 'right' ? 'right' : 'left';
+  return `${head(p, ctx)}<div class="mq mq-${dir}" data-marquee style="--mq-dur:${dur}"><div class="mq-view" tabindex="0"><ul class="mq-track" role="list">${cards}</ul></div><div class="mq-bar"><button type="button" class="mq-toggle" hidden>Pause</button></div></div>`;
+}
+
+const GIANT_FILL = new Set(['accent', 'ink', 'custom']);
+const GIANT_SIZE = new Set(['large', 'huge', 'max']);
+
+/** Giant text with a gradient fill. Custom colors reach CSS only as three numbers each. */
+function giantText(p: BlockProps<'giantText'>, ctx: BlockCtx): string {
+  const fill = choose(p.fill, GIANT_FILL, 'accent');
+  const classes = [
+    'giant',
+    `gt-${choose(p.size, GIANT_SIZE, 'huge')}`,
+    `gt-f-${fill}`,
+    ...(p.reveal === true ? ['gt-reveal'] : []),
+  ].join(' ');
+  const vars: string[] = [];
+  if (fill === 'custom') {
+    const a = hexToRgb(p.color) ?? [31, 63, 224];
+    const b = hexToRgb(p.colorTo) ?? [12, 12, 13];
+    vars.push(`--g1:${a.join(',')}`, `--g2:${b.join(',')}`);
+  }
+  if (p.angle !== undefined) vars.push(`--ga:${cssWhole(p.angle, 0, 360, 100)}`);
+  const style = vars.length ? ` style="${vars.join(';')}"` : '';
+  const big = p.heading?.trim()
+    ? `<h${ctx.level} class="${classes}"${style}${field(ctx, 'heading')}>${lines(p.heading)}</h${ctx.level}>`
+    : '';
+  const top = p.eyebrow ? `<p class="eyebrow"${field(ctx, 'eyebrow')}>${esc(p.eyebrow)}</p>` : '';
+  const intro = paras(p.intro, 'gt-intro', field(ctx, 'intro'));
+  if (!top && !intro && !big) return '';
+  // The big text comes last, so it can be cut off at the section's bottom edge.
+  return `<div class="gt gt-al-${choose(p.align, ALIGNS, 'left')}">${top}${intro}${big}</div>`;
+}
+
 /**
  * Reports the code's height to the preview so the frame fits it. It runs
  * inside the same sandbox as the user's code and can only send a number.
@@ -566,6 +722,16 @@ export function renderBlock(section: Section, ctx: BlockCtx): string {
       return spacer(section.props);
     case 'customCode':
       return customCode(section.props, ctx);
+    case 'rotator':
+      return rotator(section.props, ctx);
+    case 'cardStack':
+      return cardStack(section.props, ctx);
+    case 'steps':
+      return steps(section.props, ctx);
+    case 'marquee':
+      return marquee(section.props, ctx);
+    case 'giantText':
+      return giantText(section.props, ctx);
     // The page renders the footer, and a blank canvas's artboard (it is always free).
     case 'footer':
     case 'canvas':

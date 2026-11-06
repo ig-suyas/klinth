@@ -17,7 +17,7 @@ import {
 } from '@klinth/core';
 import { describe, expect, it } from 'vitest';
 import { TEST_FONTS } from '../../core/src/test-fonts.ts';
-import { blockDefinitions, getTemplate, templates } from './index.ts';
+import { blockDefinitions, getTemplate, sectionPresets, templates } from './index.ts';
 
 const attrs = (html: string, name: string): string[] =>
   [...html.matchAll(new RegExp(`\\s${name}="([^"]*)"`, 'g'))].map((m) => m[1] ?? '');
@@ -216,5 +216,18 @@ describe('block definitions', () => {
 
   it('return a fresh copy each time', () => {
     expect(blockDefinitions.hero.defaults()).not.toBe(blockDefinitions.hero.defaults());
+  });
+
+  it('ready-made sections start valid and have their own names', () => {
+    for (const [id, preset] of Object.entries(sectionPresets)) {
+      const props = preset.defaults();
+      expect(sectionSchema.safeParse({ id: 'new', type: preset.type, props }).success, id).toBe(
+        true,
+      );
+    }
+    const labels = [...Object.values(blockDefinitions), ...Object.values(sectionPresets)].map(
+      (d) => d.label,
+    );
+    expect(new Set(labels).size).toBe(labels.length);
   });
 });

@@ -180,7 +180,7 @@ describe('back to top', () => {
 
 describe('version 7', () => {
   it('upgrades version 6 files without changing them (absent = shown, old layout)', () => {
-    expect(SCHEMA_VERSION).toBe(8);
+    expect(SCHEMA_VERSION).toBe(9);
     expect(typeof MIGRATIONS[6]).toBe('function');
     const upgraded = migrateProject({ ...clone(), schemaVersion: 6 });
     expect(upgraded).toEqual(clone());

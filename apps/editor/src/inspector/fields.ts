@@ -8,7 +8,11 @@ import {
   FOOTER_DEFAULT_PADDING,
   FOOTER_MAX_OFFSET,
   FOOTER_MAX_PADDING,
+  ROTATOR_INTERVAL,
+  SHAPE_SIZE,
   SPACER_PRESETS,
+  STACK_INTERVAL,
+  STACK_MAX_TILT,
   VIDEO_MAX_BORDER,
   VIDEO_MAX_RADIUS,
   VIDEO_MAX_WIDTH,
@@ -16,6 +20,7 @@ import {
   blockPropSchemas,
   type BlockType,
 } from '@klinth/core';
+import type { SectionPresetId } from '@klinth/templates';
 import { z } from 'zod';
 
 /**
@@ -130,6 +135,117 @@ const picture = (label = 'Picture'): FieldSpec => ({
 });
 const look = [background, navLabel];
 
+// ---- Extras: shapes and folding on (almost) every section, glass on card sections ----
+
+const cardStyle: FieldSpec = {
+  kind: 'choice',
+  key: 'cardStyle',
+  label: 'Card style',
+  options: { plain: 'Plain', glass: 'Frosted glass' },
+};
+const shapes: FieldSpec = {
+  kind: 'list',
+  key: 'shapes',
+  label: 'Decorative shapes',
+  itemLabel: 'Shape',
+  fields: [
+    {
+      kind: 'choice',
+      key: 'kind',
+      label: 'Shape',
+      options: { starburst: 'Star burst', blob: 'Blob', rings: 'Rings', grid: 'Dot grid' },
+    },
+    {
+      kind: 'choice',
+      key: 'color',
+      label: 'Color',
+      options: { accent: 'Accent', text: 'Text', muted: 'Soft', surface: 'Light' },
+    },
+    {
+      kind: 'choice',
+      key: 'motion',
+      label: 'Movement',
+      options: { none: 'Still', spin: 'Spin', float: 'Float', pulse: 'Pulse' },
+    },
+    {
+      kind: 'choice',
+      key: 'speed',
+      label: 'Speed',
+      options: { slow: 'Slow', normal: 'Normal', fast: 'Fast' },
+      fallback: 'normal',
+      when: (item) => item.motion !== undefined && item.motion !== 'none',
+    },
+    {
+      kind: 'number',
+      key: 'size',
+      label: 'Size',
+      min: SHAPE_SIZE.min,
+      max: SHAPE_SIZE.max,
+      step: 8,
+      unit: ' px',
+      fallback: 160,
+    },
+    {
+      kind: 'number',
+      key: 'x',
+      label: 'Across',
+      help: '0 is the left edge, 100 the right edge.',
+      min: 0,
+      max: 100,
+      step: 1,
+      unit: '%',
+      fallback: 85,
+    },
+    {
+      kind: 'number',
+      key: 'y',
+      label: 'Down',
+      help: '0 is the top, 100 the bottom.',
+      min: 0,
+      max: 100,
+      step: 1,
+      unit: '%',
+      fallback: 20,
+    },
+    {
+      kind: 'number',
+      key: 'opacity',
+      label: 'Strength',
+      min: 10,
+      max: 100,
+      step: 5,
+      unit: '%',
+      fallback: 100,
+    },
+  ],
+  newItem: () => ({ kind: 'starburst', color: 'accent', motion: 'spin', size: 140, x: 85, y: 20 }),
+};
+const fold: FieldSpec[] = [
+  {
+    kind: 'toggle',
+    key: 'fold',
+    label: 'Fold behind a title row',
+    help: 'Visitors open and close the section with an arrow.',
+    fallback: false,
+  },
+  {
+    kind: 'line',
+    key: 'foldTitle',
+    label: 'Title row text',
+    help: 'Empty: “Show more”.',
+    when: (p) => p.fold === true,
+  },
+  {
+    kind: 'toggle',
+    key: 'foldOpen',
+    label: 'Open when the page loads',
+    fallback: false,
+    when: (p) => p.fold === true,
+  },
+];
+/** Shapes and folding, offered on every section but the footer (empty space only gets shapes). */
+const extras: FieldSpec[] = [shapes, ...fold];
+
 // An empty address is allowed: the link shows as text until the user adds one.
 const linkItem = (): Record<string, unknown> => ({ label: 'New link', href: '' });
 
@@ -168,6 +284,7 @@ export const blockFields: { readonly [T in BlockType]: readonly FieldSpec[] } = 
       newItem: () => ({ label: 'New button', href: '#contact' }),
     },
     ...look,
+    ...extras,
   ],
   about: [
     ...head,
@@ -184,7 +301,9 @@ export const blockFields: { readonly [T in BlockType]: readonly FieldSpec[] } = 
       ],
       newItem: () => ({ label: 'Based in', value: 'Your city' }),
     },
+    cardStyle,
     ...look,
+    ...extras,
   ],
   textImage: [
     ...head,
@@ -198,6 +317,7 @@ export const blockFields: { readonly [T in BlockType]: readonly FieldSpec[] } = 
     },
     { kind: 'link', key: 'button', label: 'Button' },
     ...look,
+    ...extras,
   ],
   gallery: [
     ...head,
@@ -210,6 +330,7 @@ export const blockFields: { readonly [T in BlockType]: readonly FieldSpec[] } = 
       newItem: () => ({}),
     },
     ...look,
+    ...extras,
   ],
   video: [
     ...head,
@@ -335,6 +456,7 @@ export const blockFields: { readonly [T in BlockType]: readonly FieldSpec[] } = 
       when: (p) => p.autoplay === true,
     },
     ...look,
+    ...extras,
   ],
   projects: [
     ...head,
@@ -359,7 +481,9 @@ export const blockFields: { readonly [T in BlockType]: readonly FieldSpec[] } = 
       ],
       newItem: () => ({ title: 'New project', description: 'One sentence about it.' }),
     },
+    cardStyle,
     ...look,
+    ...extras,
   ],
   testimonials: [
     ...head,
@@ -375,7 +499,9 @@ export const blockFields: { readonly [T in BlockType]: readonly FieldSpec[] } = 
       ],
       newItem: () => ({ quote: 'A short, honest quote.', name: 'Their name' }),
     },
+    cardStyle,
     ...look,
+    ...extras,
   ],
   links: [
     ...head,
@@ -391,7 +517,9 @@ export const blockFields: { readonly [T in BlockType]: readonly FieldSpec[] } = 
       ],
       newItem: linkItem,
     },
+    cardStyle,
     ...look,
+    ...extras,
   ],
   contact: [
     ...head,
@@ -405,6 +533,7 @@ export const blockFields: { readonly [T in BlockType]: readonly FieldSpec[] } = 
     },
     { kind: 'line', key: 'buttonLabel', label: 'Form button text' },
     ...look,
+    ...extras,
   ],
   footer: [
     { kind: 'line', key: 'text', label: 'Text' },
@@ -444,7 +573,7 @@ export const blockFields: { readonly [T in BlockType]: readonly FieldSpec[] } = 
       fallback: FOOTER_DEFAULT_PADDING,
     },
   ],
-  customCode: [{ kind: 'code', key: 'code', label: 'Your code' }],
+  customCode: [{ kind: 'code', key: 'code', label: 'Your code' }, ...extras],
   spacer: [
     {
       kind: 'presets',
@@ -454,6 +583,7 @@ export const blockFields: { readonly [T in BlockType]: readonly FieldSpec[] } = 
       options: SPACER_PRESETS,
       unit: 'px',
     },
+    shapes,
   ],
   canvas: [
     {
@@ -565,6 +695,216 @@ export const blockFields: { readonly [T in BlockType]: readonly FieldSpec[] } = 
       fallback: 0,
       when: (p) => p.fill === 'image',
     },
+    ...extras,
+  ],
+  rotator: [
+    eyebrow,
+    { kind: 'line', key: 'heading', label: 'Text before the word' },
+    {
+      kind: 'list',
+      key: 'words',
+      label: 'Words that change',
+      itemLabel: 'Word',
+      fields: [{ kind: 'line', key: 'word', label: 'Word' }],
+      newItem: () => ({ word: 'new word' }),
+    },
+    { kind: 'line', key: 'after', label: 'Text after the word', help: 'Optional.' },
+    {
+      kind: 'choice',
+      key: 'effect',
+      label: 'How the word changes',
+      options: { fade: 'Fade', slide: 'Slide up', typewriter: 'Typewriter' },
+    },
+    {
+      kind: 'number',
+      key: 'interval',
+      label: 'Each word stays',
+      help: '1000 ms is one second. Visitors who ask for less motion only see the first word.',
+      min: ROTATOR_INTERVAL.min,
+      max: ROTATOR_INTERVAL.max,
+      step: 250,
+      unit: ' ms',
+      fallback: ROTATOR_INTERVAL.fallback,
+    },
+    {
+      kind: 'choice',
+      key: 'align',
+      label: 'Position',
+      options: { left: 'Left', center: 'Centered' },
+    },
+    intro,
+    ...look,
+    ...extras,
+  ],
+  cardStack: [
+    ...head,
+    {
+      kind: 'list',
+      key: 'images',
+      label: 'Pictures',
+      itemLabel: 'Picture',
+      fields: [picture(), { kind: 'line', key: 'caption', label: 'Caption' }],
+      newItem: () => ({}),
+    },
+    {
+      kind: 'choice',
+      key: 'ratio',
+      label: 'Picture shape',
+      options: { portrait: 'Tall 4:5', square: 'Square', landscape: 'Wide 4:3' },
+    },
+    {
+      kind: 'number',
+      key: 'tilt',
+      label: 'Tilt',
+      min: 0,
+      max: STACK_MAX_TILT,
+      step: 1,
+      unit: '°',
+      fallback: 6,
+    },
+    {
+      kind: 'toggle',
+      key: 'auto',
+      label: 'Shuffle by itself',
+      help: 'Stops while someone points at it, and never for visitors who ask for less motion.',
+      fallback: false,
+    },
+    {
+      kind: 'number',
+      key: 'interval',
+      label: 'Next picture every',
+      min: STACK_INTERVAL.min,
+      max: STACK_INTERVAL.max,
+      step: 500,
+      unit: ' ms',
+      fallback: STACK_INTERVAL.fallback,
+      when: (p) => p.auto === true,
+    },
+    ...look,
+    ...extras,
+  ],
+  steps: [
+    ...head,
+    {
+      kind: 'list',
+      key: 'items',
+      label: 'Steps',
+      itemLabel: 'Step',
+      fields: [
+        { kind: 'line', key: 'title', label: 'Title' },
+        { kind: 'text', key: 'text', label: 'Text', rows: 2 },
+      ],
+      newItem: () => ({ title: 'Next step', text: 'One sentence about it.' }),
+    },
+    cardStyle,
+    ...look,
+    ...extras,
+  ],
+  marquee: [
+    ...head,
+    {
+      kind: 'list',
+      key: 'items',
+      label: 'Quotes',
+      itemLabel: 'Quote',
+      fields: [
+        {
+          kind: 'text',
+          key: 'quote',
+          label: 'Quote',
+          rows: 3,
+          help: 'Put **two stars** around words to highlight them.',
+        },
+        { kind: 'line', key: 'name', label: 'Name' },
+        { kind: 'line', key: 'role', label: 'Role or company' },
+      ],
+      newItem: () => ({ quote: 'A short, **honest** quote.', name: 'Their name' }),
+    },
+    {
+      kind: 'choice',
+      key: 'speed',
+      label: 'Speed',
+      options: { slow: 'Slow', normal: 'Normal', fast: 'Fast' },
+      fallback: 'normal',
+    },
+    {
+      kind: 'choice',
+      key: 'direction',
+      label: 'Moves',
+      options: { left: 'To the left', right: 'To the right' },
+    },
+    cardStyle,
+    ...look,
+    ...extras,
+  ],
+  giantText: [
+    eyebrow,
+    {
+      kind: 'text',
+      key: 'heading',
+      label: 'Giant text',
+      rows: 2,
+      help: 'One or two short words work best.',
+    },
+    intro,
+    {
+      kind: 'choice',
+      key: 'fill',
+      label: 'Color',
+      options: { accent: 'Accent to text', ink: 'Text to soft', custom: 'My own gradient' },
+    },
+    {
+      kind: 'color',
+      key: 'color',
+      label: 'Gradient from',
+      fallback: '#1f3fe0',
+      when: (p) => p.fill === 'custom',
+    },
+    {
+      kind: 'color',
+      key: 'colorTo',
+      label: 'Gradient to',
+      fallback: '#0c0c0d',
+      when: (p) => p.fill === 'custom',
+    },
+    {
+      kind: 'number',
+      key: 'angle',
+      label: 'Gradient direction',
+      min: 0,
+      max: 360,
+      step: 15,
+      unit: '°',
+      fallback: 100,
+    },
+    {
+      kind: 'choice',
+      key: 'size',
+      label: 'Size',
+      options: { large: 'Large', huge: 'Huge', max: 'Biggest' },
+      fallback: 'huge',
+    },
+    {
+      kind: 'choice',
+      key: 'align',
+      label: 'Position',
+      options: { left: 'Left', center: 'Centered', right: 'Right' },
+    },
+    {
+      kind: 'toggle',
+      key: 'crop',
+      label: 'Cut off at the bottom of the section',
+      fallback: false,
+    },
+    {
+      kind: 'toggle',
+      key: 'reveal',
+      label: 'Rise into view on scroll',
+      help: 'Never for visitors who ask for less motion.',
+      fallback: false,
+    },
+    ...look,
+    ...extras,
   ],
 };
 
@@ -583,8 +923,11 @@ export const UNUSED_PROPS: Partial<Record<BlockType, readonly string[]>> = {
   spacer: ['size'],
 };
 
-/** Block types offered in "Add a section", in the order shown. */
-export const ADDABLE_BLOCKS: readonly BlockType[] = [
+/** A block type, or a ready-made section built from one (see `sectionPresets`). */
+export type AddEntry = BlockType | SectionPresetId;
+
+/** What "Add a section" offers, in the order shown. */
+export const ADDABLE_SECTIONS: readonly AddEntry[] = [
   'hero',
   'about',
   'textImage',
@@ -594,6 +937,13 @@ export const ADDABLE_BLOCKS: readonly BlockType[] = [
   'testimonials',
   'links',
   'contact',
+  'rotator',
+  'giantText',
+  'steps',
+  'marquee',
+  'cardStack',
+  'expandable',
+  'shapes',
   'canvas',
   'customCode',
   'footer',

@@ -12,6 +12,8 @@ import {
   HEADER_JS_PATH,
   VIDEO_CSS_PATH,
   VIDEO_JS_PATH,
+  EXTRAS_CSS_PATH,
+  EXTRAS_JS_PATH,
   fontFaceCss,
   pagePath,
   renderSite,
@@ -112,6 +114,9 @@ export function buildPreviewDocument(
   // Only on pages with styled or several videos (carousel, deck, one at a time).
   const videoJsTag = `<script src="${VIDEO_JS_PATH}" defer></script>\n`;
   const videoJs = html.includes(videoJsTag) ? fileText(files, VIDEO_JS_PATH) : '';
+  // Only on pages with a rotating headline, stack, marquee, fold or giant text reveal.
+  const extrasJsTag = `<script src="${EXTRAS_JS_PATH}" defer></script>\n`;
+  const extrasJs = html.includes(extrasJsTag) ? fileText(files, EXTRAS_JS_PATH) : '';
   const extraCss =
     previewFontCss(project, options.fontUrls) +
     PREVIEW_CSS +
@@ -161,13 +166,18 @@ export function buildPreviewDocument(
         () => `<style>${fileText(files, VIDEO_CSS_PATH)}</style>\n`,
       )
       .replace(videoJsTag, () => '')
+      .replace(
+        `<link rel="stylesheet" href="${EXTRAS_CSS_PATH}">\n`,
+        () => `<style>${fileText(files, EXTRAS_CSS_PATH)}</style>\n`,
+      )
+      .replace(extrasJsTag, () => '')
       .replace(`<link rel="stylesheet" href="${CUSTOM_CSS_PATH}">\n`, () => custom.css)
       .replace(`<script src="${CUSTOM_JS_PATH}"></script>\n`, () => custom.js)
       .replace('<script src="js/site.js" defer></script>', () => '')
       // Thumbnails run no scripts at all (their frame forbids them).
       .replace('</body>', () =>
         options.interactive
-          ? `<script>${js}${headerJs ? `\n${headerJs}` : ''}${animJs ? `\n${animJs}` : ''}${videoJs ? `\n${videoJs}` : ''}</script>\n${bridge}</body>`
+          ? `<script>${js}${headerJs ? `\n${headerJs}` : ''}${animJs ? `\n${animJs}` : ''}${videoJs ? `\n${videoJs}` : ''}${extrasJs ? `\n${extrasJs}` : ''}</script>\n${bridge}</body>`
           : '</body>',
       )
   );

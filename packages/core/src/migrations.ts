@@ -35,6 +35,11 @@ export const MIGRATIONS: Readonly<Record<number, Migration>> = {
   // and the blank canvas section. All optional or new; older files have none, so nothing
   // changes. The new version stops older editors from dropping them.
   7: (data) => ({ ...data }),
+  // 8 -> 9: rotating headline, picture stack, numbered steps, quote marquee and giant text
+  // sections, and glass cards, folding and decorative shapes on existing sections. All new
+  // or optional; older files have none, so nothing changes. The new version stops older
+  // editors from dropping them.
+  8: (data) => ({ ...data }),
 };
 
 /** Single line breaks (and the spaces around them) become one space. */

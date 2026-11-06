@@ -25,8 +25,74 @@
 | Fix: free resize and sizing    | done (schema v6)                      |
 | Fix: footer, header pop-up     | done (schema v7, not pushed)          |
 | 6G Video options, Blank canvas | done (schema v8, not pushed)          |
+| 6H Extras (7 new components)   | done (schema v9, not pushed)          |
 
 ## 1. Current state
+
+**6H: extras inspired by a reference portfolio (schema version 9).** `MIGRATIONS[8]` changes
+nothing (new block types, all new props optional). Nothing is tied to a page, template or sample
+content: every part works on any page, any number of times, in any template (theme variables only).
+**New blocks** (`blocks.ts`, renderers in `render-blocks.ts`, CSS/JS in new `extras.ts`):
+`rotator` "Rotating headline" (`heading` = text before, `words` 1-8 x 40 chars, `after`, `effect`
+fade|slide|typewriter, `interval` int 1000-10000 ms, `align`): `<hN class="rot-title"
+aria-label="before w1, w2, w3 after">`, visible pieces `aria-hidden`; all words in one grid cell
+(widest sets the width, no shift); first word painted at once (LCP), later words animate in;
+pauses on hover, off screen and in hidden tabs, stops on the first word after 4 rounds.
+`cardStack` "Picture stack" (`images` <= 6, `auto`, `interval` 2000-10000, `tilt` 0-15,
+`ratio` portrait|square|landscape): already a stack without JS (`--d` depth, `--sg` side), JS
+adds Prev/Next, ArrowLeft/Right/Home/End on the region (`.stk-cards` has `tabindex=0`), click on
+the front card, pointer swipe > 40 px (`touch-action:pan-y`), live "n / N", `inert` on hidden
+cards, optional shuffle with a Pause/Play button (paused on hover/focus, never with reduced
+motion); nav row keeps its space before JS (`[hidden]` = `visibility:hidden`), hover fan-out
+only with `(hover:hover)` + no-preference. `steps` "Numbered steps" (`<ol role=list>`, items <= 8,
+glass by default). `marquee` "Moving quotes" (items <= 12, `speed`, `direction`): scroll-snap row
+without JS or with reduced motion; JS adds `aria-hidden` + `inert` copies (counted, never measured:
+k = ceil(5/n) groups, doubled), `is-moving`, Pause/Play; paused on hover/focus of the row;
+`**phrase**` -> `<mark class="hl">` (`highlightPhrases`: escape first, then markers). Blur is
+dropped while it moves (paint cost). `giantText` "Giant text" (`fill` accent|ink|custom +
+`color`/`colorTo` as `--g1/--g2` numbers, `angle`, `size` large|huge|max, `align`, `crop` =
+`gt-crop` on the section, `reveal` = IO in `extras.js`, never the first section or reduced motion).
+**Props on existing blocks:** `cardStyle` plain|glass (about, projects, testimonials, links,
+steps, marquee; `cs-glass` on the section; blur, soft shadow, hover lift); `shapes` (every block but
+the footer; <= 4 per section, <= 12 per page in `pageSchema`; `kind` starburst|blob|rings|grid,
+`color` accent|text|muted|surface, `motion` none|spin|float|pulse, `speed`, `size` 32-640, `x`/`y`
+0-100, `opacity` 10-100; fixed SVG drawings in a `shp-layer` `aria-hidden` behind the content,
+`isolation:isolate`); `fold`/`foldTitle`/`foldOpen` (every block but footer and spacer):
+`wrapFold` puts any section content in `.xp` with `<button class="xp-btn" aria-expanded
+aria-controls>` and `role=region aria-labelledby` panel (ids from the section anchor, unique),
+grid-rows height animation, closed panels `inert`, Escape inside closes and refocuses, a hash link
+into a closed panel opens it; pages with a fold get a fixed `<noscript><style>` so nothing stays
+folded without JS. **Files:** `css/extras.css` / `js/extras.js` only on pages that use them
+(`pageExtrasCss`/`pageExtrasJs`; steps, glass and shapes need no JS); sites without extras are
+byte-identical (template snapshots unchanged). All motion inside `prefers-reduced-motion:
+no-preference` (a test strips those blocks and finds no animation or transition left).
+**Editor:** inspector fields for all of it (`fields.ts`: shapes list, fold switches, card style);
+"Add a section" now lists Rotating headline, Giant text, Numbered steps, Moving quotes, Picture
+stack, Expandable section and Decorative shapes (the last two are `sectionPresets` in
+`@klinth/templates`: a text section with `fold`, an Empty space with two shapes; `addSection` takes
+starting props). Preview inlines both files. Free sections keep shapes/fold but their panel does
+not show those fields. New blocks are not free-able. Animation panel: whole section (plus heading
+for stack, steps, marquee).
+Tests (unit tests written first and seen failing: 20/21 core, 13/13 script): core `extras.test.ts`
+(validation incl. NaN/Infinity/strings/markup, caps, export markup per component, escaping,
+per-page files, reduced-motion CSS, every component and effect on a second page made from Blank,
+v9 migration); editor `preview/extras-script.test.ts` (jsdom: fold button/aria-expanded/inert/Escape,
+stack keys/arrows/click/swipe/auto/pause/reduced motion, rotator ticks and reduced motion, marquee
+copies/pause/reduced motion, giant reveal), `state/extras.test.ts` (each new menu entry twice on a
+second Blank page, fields on every block); templates preset test; e2e `extras.spec.ts` (written
+after the code: Blank -> second page -> menu descriptions -> rotating headline + shape, expandable,
+marquee on glass -> export -> exported page: Enter/Space on the fold button, word changes, marquee
+pauses, CLS < 0.02 on load, no overflow at 1280/375; reduced motion: first word stays, scroll-snap,
+fold works). Changed on purpose: version pins 8 -> 9 (core and 4 e2e), migration key lists.
+Lighthouse 13.6 (`npm run lighthouse:extras -w @klinth/editor`: portfolio + every extra, mobile,
+fails < 95): 96-98 / 100 / 100 / 100 over 5 runs, CLS 0, LCP 1.7-1.8 s, TBT 100-160 ms (the video
+check gives 99 / LCP 1.2 s on this laptop today; the gap is one more render-blocking stylesheet and
+`site.js`'s existing reveal reflow, 206 ms). Totals: 1004 unit (core 609, templates 47, editor 292,
+api 56), 46 e2e (`--workers=1`; the first full run failed 6 because the marquee's description said
+"Kind words", which the older specs' `/Kind words/` menu lookup then matched twice; the description
+was reworded and those specs pass). Committed locally, **not pushed, not deployed**. Not done: the rotating headline has no
+pause button (it stops by itself after 4 rounds); find-in-page does not open closed folds
+(`hidden=until-found` not used); the AI helper's output for the new blocks was not tried live.
 
 **6G: video options, several videos per section, Blank canvas, bigger Empty space (schema
 version 8).** `MIGRATIONS[7]` changes nothing (all new fields optional, new block type). Rules kept:
@@ -657,6 +723,12 @@ All phases done; only the push to `github.com/ig-suyas/klinth` (public) waits fo
 repos at ₹0.
 
 ## 3. Files
+
+- `packages/core/src/extras.ts` (+ `extras.test.ts`) : `EXTRAS_CSS`, `EXTRAS_JS`, shapes, folding,
+  page detection, `highlightPhrases`, `rotatorPhrase`; renderers in `render-blocks.ts`
+- `packages/templates/src/blocks.ts` : new block definitions and `sectionPresets`
+- `apps/editor/src/preview/extras-script.test.ts`, `state/extras.test.ts`, `e2e/extras.spec.ts`,
+  `scripts/lighthouse-extras.ts`
 
 - `packages/core/src/video.ts` (+ `video.test.ts`) : video widths, `videoStyled`, `pageVideoCss/Js`,
   `VIDEO_CSS`, `VIDEO_JS`; styled markup in `render-blocks.ts` (`styledVideo`)
