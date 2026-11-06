@@ -45,7 +45,9 @@ test('three new animations on a second page made from Blank, then export', async
   await page.goto('/');
   await page.getByRole('button', { name: /Start blank/ }).click();
   await page.getByRole('button', { name: 'Skip tour' }).click();
-  const preview = page.frameLocator('iframe[title="Preview of your site"]').frameLocator('iframe');
+  const preview = page
+    .frameLocator('iframe[title="Preview of your site"]')
+    .frameLocator('iframe[title="Your site"]');
   const menu = page.getByRole('dialog', { name: 'Add a section' });
   const addSection = async (name: RegExp, heading: string) => {
     await page.getByRole('button', { name: 'Add a section' }).click();

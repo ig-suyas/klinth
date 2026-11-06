@@ -8,7 +8,9 @@ test('start blank, add a section and a page, pick a header and a look, add site-
   await page.goto('/');
   await page.getByRole('button', { name: /Start blank/ }).click();
   await page.getByRole('button', { name: 'Skip tour' }).click();
-  const preview = page.frameLocator('iframe[title="Preview of your site"]').frameLocator('iframe');
+  const preview = page
+    .frameLocator('iframe[title="Preview of your site"]')
+    .frameLocator('iframe[title="Your site"]');
 
   // Add a section.
   await page.getByRole('button', { name: 'Add a section' }).click();

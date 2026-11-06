@@ -12,35 +12,93 @@
         overflow: hidden;
         background: #fff;
       }
+      body {
+        position: relative;
+      }
       iframe {
+        position: absolute;
+        inset: 0;
+        z-index: 1;
         display: block;
         width: 100%;
         height: 100%;
         border: 0;
+        background: #fff;
+      }
+      /* A redraw is built under the shown page and swapped in once it is in place. */
+      iframe.next {
+        z-index: 0;
+        pointer-events: none;
       }
     </style>
   </head>
-  <body>
+  <body data-loads="0">
     <!--
       Klinth live preview shell. The editor loads this page once, in a frame
       sandboxed without same-origin, then sends each rendered page here. It is
       a separate page (not srcdoc in the editor) so it gets its own, looser
       security policy: the editor's strict policy would block the site's
-      scripts and pasted custom code. Each page is shown in a fresh inner
-      frame (srcdoc, its own opaque origin), so redrawing needs no network and
-      keeps working offline. The page talks to the editor through window.top.
+      scripts and pasted custom code. Each page is shown in an inner frame
+      (srcdoc, its own opaque origin), so redrawing needs no network and keeps
+      working offline. The page talks to the editor through window.top.
+      Small edits never come here: the editor swaps sections in place inside
+      the shown page. A full redraw is built in a second frame under the shown
+      one; when the new page says it has set its scroll place ("shown"), it
+      takes the old one's place, so the reader never sees a jump or a blank.
+      The new frame comes first in the page, so it is frames[0] for the editor.
     -->
     <iframe sandbox="allow-scripts" title="Your site"></iframe>
     <script>
       (function () {
         'use strict';
-        var frame = document.querySelector('iframe');
+        var current = document.querySelector('iframe');
+        var next = null;
+        var timer = 0;
+        var loads = 0;
         // The frame's origin is opaque, but its address still names the editor's origin.
         var editorOrigin = new URL(location.href).origin;
+        function swap() {
+          clearTimeout(timer);
+          if (!next) return;
+          var shown = next;
+          next = null;
+          shown.className = '';
+          shown.removeAttribute('aria-hidden');
+          shown.removeAttribute('tabindex');
+          shown.title = 'Your site';
+          if (current && current !== shown) current.remove();
+          current = shown;
+        }
         window.addEventListener('message', function (event) {
           var data = event.data;
-          if (event.source !== window.parent || !data || data.source !== 'klinth-editor') return;
-          if (data.type === 'render' && typeof data.html === 'string') frame.srcdoc = data.html;
+          if (!data || typeof data !== 'object') return;
+          // Only the frame being built may say it is ready to be shown.
+          if (next && event.source === next.contentWindow) {
+            if (data.source === 'klinth-preview' && data.type === 'shown') swap();
+            return;
+          }
+          if (event.source !== window.parent || data.source !== 'klinth-editor') return;
+          if (data.type !== 'render' || typeof data.html !== 'string') return;
+          loads += 1;
+          document.body.setAttribute('data-loads', String(loads));
+          // The very first page is shown straight away.
+          if (!current.hasAttribute('srcdoc')) {
+            current.srcdoc = data.html;
+            return;
+          }
+          if (!next) {
+            next = document.createElement('iframe');
+            next.setAttribute('sandbox', 'allow-scripts');
+            next.className = 'next';
+            next.title = 'Next page';
+            next.setAttribute('aria-hidden', 'true');
+            next.setAttribute('tabindex', '-1');
+            document.body.insertBefore(next, document.body.firstChild);
+          }
+          next.srcdoc = data.html;
+          clearTimeout(timer);
+          // Shown anyway if the page never says so (a script error in pasted code).
+          timer = setTimeout(swap, 2500);
         });
         window.parent.postMessage({ source: 'klinth-preview', type: 'host' }, editorOrigin);
       })();

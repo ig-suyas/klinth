@@ -26,7 +26,92 @@
 | Fix: footer, header pop-up     | done (schema v7, not pushed)          |
 | 6G Video options, Blank canvas | done (schema v8, not pushed)          |
 | 6H Extras (7 new components)   | done (schema v9, not pushed)          |
-| 6I Animation presets (more)    | done (schema v10, not pushed)         |
+| 6I Animation presets (more)    | done (schema v10, pushed, deployed)   |
+| Preview updates, Back to top   | done (see the session entry below)    |
+
+## Session: Preview updates and Back to top fix
+
+**Current state.** No schema change (still v10). Exports are byte-identical except that new
+projects start with "Back to top" off.
+
+- **Back to top: cause.** The render code was right: `backToTopShown` drives both the preview and
+  the export (checked again in a browser probe on all three templates and Blank: the Site style
+  switch removes it from the preview, and `footer.spec` covers the export). The problems were (1)
+  the switch was only in Site style > Footer, folded by default, so selecting the footer (where the
+  link is) offered no way to turn it off, and (2) every new project started with it on. **Fixes:**
+  `newProjectDefaults` (`state/footer.ts`) sets `meta.backToTop: false` on projects started from a
+  template or Blank (`StartScreen.tsx`; the template thumbnails too). Imported and saved projects
+  keep their setting (absent still means on). The footer section's settings now include the same
+  `FooterPanel` (region "Back to top", same switch and "Hide on this page").
+- **Preview jump: cause, confirmed.** Every edit rebuilt the inner `srcdoc` frame. The new page
+  started at the top, then the bridge scrolled back with `window.scrollTo(0, y)`, which the site's
+  own `html{scroll-behavior:smooth}` turned into a visible glide from the top. The position it used
+  was reported 100 ms after scrolling stopped, and pictures arrived only after `ready`.
+- **A. Targeted updates (main path).** The editable preview gives each `<section>` a
+  `data-section-id` (exports unchanged; the core marker test strips it). `preview/patch.ts` splits
+  the preview document into the section HTML (renderer output, already escaped), the `<head>`
+  style text and the rest. `planUpdate` returns `patch` (changed sections, and/or new style text)
+  or `full`. The editor posts `{type:'patch', sections:[{id, html}], styles}` to the shown page
+  (`Preview.tsx`). The bridge checks the source (`window.top`), the shape (arrays, id regex, string
+  sizes), parses each section in a `<template>`, and swaps it only when it is exactly one
+  `<section>` with the same id; otherwise it sends `patchFailed` and the editor redraws. After a
+  swap: selection kept, site reveal items shown, animations wired as `anim.js` does (entrance
+  `k-in-*`, its own IntersectionObserver for "every time"), pictures filled from a per-page
+  blob-URL cache, and the editor sends that section's files. A section being edited in place is
+  never swapped; its update waits until editing ends.
+- **B. Debounce.** Preview updates wait 300 ms after the last change (`PREVIEW_DELAY_MS`).
+  Autosave to IndexedDB is unchanged and separate. Inspector fields are never re-rendered by the
+  preview, so the caret and focus stay.
+- **C. Full redraws** (header, footer, page scripts, site-wide JS, sections added/removed/moved,
+  another page, "Preview animations", or a changed section whose scripts hold its elements:
+  marquee/parallax animations, rotating headline, stack, quote marquee, fold, giant reveal,
+  carousel/deck, `<video>`, free layout). Theme colours, fonts and site-wide CSS only change style
+  text, so they are applied in place. A full redraw is built in a second frame under the shown
+  one (`public/preview.html`; first in the DOM, so it is `frames[0]`). The bridge restores the
+  place (bottom of page, or the section in view and its offset, else `scrollY`) with
+  `behavior:'instant'`, again after `document.fonts.ready`, then posts `shown` to the shell, which
+  swaps the frames (fallback 2.5 s). The editor accepts messages from either inner frame, and
+  patches only once the newest full redraw said `ready` (`load` number).
+- Undo and redo go the same way (they are project changes). Side panels are not touched. The
+  iframes stay `sandbox="allow-scripts"` without same-origin.
+
+**Files.** `apps/editor/src/preview/patch.ts` (+ `patch.test.ts`, `patch-bridge.test.ts`),
+`preview/bridge.ts` (patch, `where`/`restore`, assets cache, `shown`), `preview/Preview.tsx`,
+`preview/document.ts` (options `anchor/offset/bottom/load`; schema `scroll` extended,
+`patchFailed`, `ready.load`), `public/preview.html` (two-frame swap, `data-loads` counter),
+`state/footer.ts`, `StartScreen.tsx`, `inspector/Inspector.tsx`, `inspector/FooterPanel.tsx`,
+`inspector/BackToTop.test.tsx`, core `render.ts` (`data-section-id`, preview only),
+`e2e/preview-updates.spec.ts`.
+
+**Tests.** Written first and seen failing: `patch.test.ts`, `patch-bridge.test.ts`,
+`BackToTop.test.tsx` (missing modules and region), and the Playwright spec (first failure: the
+reader moved). `e2e/preview-updates.spec.ts`: portfolio, intro selected, preview at the bottom,
+then picture upload, typing in the inspector (caret at the end, focus kept, no reload; both side
+panels keep their scroll), add a quote, change the accent colour, Undo, an animated section
+edited (still `data-anim-section`, `k-in-section`, visible), "Back to top" on and off from the
+footer's own settings (a full redraw that keeps the place), export without "Back to top" or
+preview markers. Each step: the section in the middle of the preview stays within 2 px, and the
+shell's load count does not change (except the footer switch). Changed on purpose: older e2e specs
+use `iframe[title="Your site"]` instead of any `iframe`, and the core "markers only" test strips
+`data-section-id`; `footer.spec` turns "Back to top" on first (new projects start with it
+off). Totals: 1036 unit (core 619, templates 47, editor 314, api 56), 48 e2e (`--workers=1`, all
+pass; the first full run failed only `footer.spec`, for that reason).
+
+**What worked.** Measuring the reader's place as "section in view + offset" instead of `scrollY`:
+a picture added far above legitimately changes `scrollY` (the browser keeps the view still), so
+the test checks the section in the middle of the window. A covered frame (z-index under the
+shown one) instead of a `visibility:hidden` one, so Chrome does not throttle it.
+
+**What didn't work.** The first test runs moved by 115-120 px: the smooth-scroll CSS (fixed with
+`behavior:'instant'`) and the test itself (Playwright scrolls a field into view on click, so the
+panel scroll is now recorded after focusing). `jsdom` has no `innerText`; the bridge test shims it.
+`getByLabel('Accent color picker')` also matches "Text on accent color picker" (`exact: true`).
+
+**Left.** Changed sections that need their own scripts still redraw fully (it keeps the place).
+Sections added or removed redraw fully. Inline typing in the preview is not swapped until editing
+ends (by design).
+
+**Push and deploy.** See section 1 end of this entry once done.
 
 ## 1. Current state
 

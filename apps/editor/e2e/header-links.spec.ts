@@ -32,7 +32,9 @@ test('header links work in the preview and the export, then the header is remove
   await page.getByRole('button', { name: /Start blank/ }).click();
   await page.getByRole('button', { name: 'Skip tour' }).click();
   const editorUrl = page.url();
-  const preview = page.frameLocator('iframe[title="Preview of your site"]').frameLocator('iframe');
+  const preview = page
+    .frameLocator('iframe[title="Preview of your site"]')
+    .frameLocator('iframe[title="Your site"]');
 
   for (const block of [/^Big intro/, /^Work and projects/, /^Contact/]) {
     await page.getByRole('button', { name: 'Add a section' }).click();

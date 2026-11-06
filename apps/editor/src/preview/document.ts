@@ -32,11 +32,18 @@ export interface PreviewOptions {
   /** Turns off the scroll reveal (for reloads after an edit). */
   calm?: boolean;
   scrollY?: number;
+  /** The section in view and how far from the top it starts (kept across a full redraw). */
+  anchor?: string | null;
+  offset?: number;
+  /** The reader was at the very bottom: stay there. */
+  bottom?: boolean;
   selectedId?: string | null;
   /** Section anchor to show first (after following a header link from another page). */
   scrollTo?: string | null;
   /** `data:` addresses of the bundled fonts by file name (see lib/fonts.ts). */
   fontUrls?: Readonly<Record<string, string>>;
+  /** Number of this full redraw; the page answers `ready` with it. */
+  load?: number;
   /** The selected item of a free section (its frame is drawn after the redraw). */
   freeItem?: string | null;
 }
@@ -124,7 +131,11 @@ export function buildPreviewDocument(
     (options.calm ? CALM_CSS : '');
   const config = {
     origin: options.origin,
+    load: options.load ?? 0,
     scrollY: options.scrollY ?? 0,
+    anchor: options.anchor ?? null,
+    offset: options.offset ?? 0,
+    bottom: options.bottom === true,
     selected: options.selectedId ?? null,
     page: page.slug,
     scrollTo: options.scrollTo ?? null,
@@ -193,7 +204,11 @@ const percent = z.number().finite().min(-1_000).max(1_000);
 export const previewMessageSchema = z.discriminatedUnion('type', [
   /** The empty preview page has loaded and waits for the page to show. */
   z.object({ source: z.literal('klinth-preview'), type: z.literal('host') }),
-  z.object({ source: z.literal('klinth-preview'), type: z.literal('ready') }),
+  z.object({
+    source: z.literal('klinth-preview'),
+    type: z.literal('ready'),
+    load: z.number().int().min(0).max(1_000_000_000).optional(),
+  }),
   z.object({
     source: z.literal('klinth-preview'),
     type: z.literal('select'),
@@ -227,7 +242,16 @@ export const previewMessageSchema = z.discriminatedUnion('type', [
     source: z.literal('klinth-preview'),
     type: z.literal('scroll'),
     y: z.number().int().min(0).max(1_000_000),
+    /** The first section in view, and where it starts in the window. */
+    anchor: z
+      .string()
+      .regex(/^[A-Za-z0-9_-]{1,64}$/)
+      .optional(),
+    offset: z.number().int().min(-1_000_000).max(1_000_000).optional(),
+    bottom: z.boolean().optional(),
   }),
+  /** A section swap did not fit the page: the editor redraws it whole. */
+  z.object({ source: z.literal('klinth-preview'), type: z.literal('patchFailed') }),
   /** Ctrl/Cmd+Z, Ctrl/Cmd+Shift+Z or Ctrl/Cmd+Y pressed inside the preview. */
   z.object({
     source: z.literal('klinth-preview'),

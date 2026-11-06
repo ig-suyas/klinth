@@ -6,7 +6,7 @@ import { useEditor } from '../state/store.ts';
  * Site style > Footer: the "Back to top" link, for the whole site and for this page.
  * Alignment, offset and padding live in the footer section's own settings.
  */
-export function FooterPanel() {
+export function FooterPanel({ inFooter = false }: { inFooter?: boolean }) {
   const project = useEditor((s) => s.project);
   const change = useEditor((s) => s.change);
   const pageIndex = useEditor((s) => s.pageIndex);
@@ -49,9 +49,13 @@ export function FooterPanel() {
           </span>
         </label>
       ) : null}
-      <p className="help">
-        To move the footer’s text, links or “Back to top”, select the footer section.
-      </p>
+      {inFooter ? (
+        <p className="help">The same switch is in Site style &gt; Footer.</p>
+      ) : (
+        <p className="help">
+          To move the footer’s text, links or “Back to top”, select the footer section.
+        </p>
+      )}
       {problem ? (
         <p role="alert" className="error-text">
           {problem}

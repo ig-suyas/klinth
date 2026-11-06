@@ -8,10 +8,17 @@ test('footer: align each group, move it sideways, set its padding, hide "Back to
   await page.goto('/');
   await page.getByRole('button', { name: /Personal portfolio/ }).click();
   await page.getByRole('button', { name: 'Skip tour' }).click();
-  const preview = page.frameLocator('iframe[title="Preview of your site"]').frameLocator('iframe');
+  const preview = page
+    .frameLocator('iframe[title="Preview of your site"]')
+    .frameLocator('iframe[title="Your site"]');
   const settings = page.getByRole('complementary', { name: 'Settings' });
 
   await preview.locator('footer .foot').click({ position: { x: 4, y: 4 } });
+  // New projects start without "Back to top"; turn it on from the footer's own settings.
+  const own = settings.getByRole('region', { name: 'Back to top' });
+  await expect(own.getByRole('switch', { name: 'Show “Back to top”' })).not.toBeChecked();
+  await own.locator('label', { has: page.getByRole('switch') }).click();
+  await expect(preview.locator('footer .totop')).toHaveCount(1);
   await settings
     .getByRole('group', { name: 'Copyright text position' })
     .getByText('Center')

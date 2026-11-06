@@ -4,9 +4,11 @@ import { FREE_BRIDGE_CSS, FREE_BRIDGE_JS } from './free-bridge.ts';
  * The small script that runs inside the sandboxed preview frame. It has no
  * access to the editor: it only talks to the editor (`window.top`; its direct
  * parent is the preview.html shell) through `postMessage`.
- * Sent to the editor: `ready`, `select`, `edit`, `scroll`, `header` (header clicked),
+ * Sent to the editor: `ready`, `select`, `edit`, `scroll` (with the section in view),
+ * `patchFailed` (a swap did not fit: redraw), `header` (header clicked),
  * `removeHeader`, `navigate` (a header link to another page), `history` (undo/redo keys)
- * and the free layout messages (see free-bridge.ts). Received: `select`, `assets`
+ * and the free layout messages (see free-bridge.ts). Received: `select`, `patch`
+ * (sections and style text swapped in place, see patch.ts), `assets`
  * (uploaded files as Blobs, shown through this frame's own blob: addresses),
  * `freeDecision` and `freeItem`.
  * Custom code frames inside the page may only report their height.
@@ -97,7 +99,8 @@ export const BRIDGE_JS = `(function () {
     var still = !smooth || window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     var offset = parseFloat(window.getComputedStyle(document.documentElement).scrollPaddingTop) || 0;
     var top = target.getBoundingClientRect().top + window.scrollY - offset;
-    window.scrollTo({ top: Math.max(0, top), behavior: still ? 'auto' : 'smooth' });
+    // 'instant', not 'auto': the site's CSS asks for smooth scrolling.
+    window.scrollTo({ top: Math.max(0, top), behavior: still ? 'instant' : 'smooth' });
   }
   function follow(href) {
     var same = SAME_PAGE.exec(href);
@@ -129,12 +132,151 @@ export const BRIDGE_JS = `(function () {
     if (!save) {
       // Put back the untouched copy (keeps line breaks; no HTML strings involved).
       current.el.replaceWith(current.original);
+      flushDeferred();
       return;
     }
     var value = fieldValue(current.section, current.field);
     if (value !== current.before) {
       send({ type: 'edit', id: current.section.getAttribute('data-k-section'), field: current.field, value: value });
     }
+    flushDeferred();
+  }
+
+  // ---- Updates in place: one section (or the styles) swapped, no reload ----
+  var ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
+  var MAX_TEXT = 4000000;
+  /** Sections that changed while their text was being edited here; swapped when editing ends. */
+  var deferred = {};
+  var assetUrls = {};
+  function sectionById(id) {
+    var all = document.querySelectorAll('main > [data-section-id]');
+    for (var i = 0; i < all.length; i++) {
+      if (all[i].getAttribute('data-section-id') === id) return all[i];
+    }
+    return null;
+  }
+  function words(el, name) { var v = el.getAttribute(name); return v ? v.split(' ') : []; }
+  // The site's scroll reveal only saw the old elements: show the new ones at once.
+  function revealAll(root) {
+    var items = root.querySelectorAll('.reveal, .reveal-mask');
+    for (var i = 0; i < items.length; i++) items[i].classList.add('is-visible');
+  }
+  // Animations as anim.js sets them up: entrances shown, "every time" parts watched again.
+  var againIo = null;
+  function reanimate(el) {
+    if (!el.classList.contains('k-anim')) return;
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    words(el, 'data-k-enter').forEach(function (t) {
+      el.classList.remove('k-wait-' + t);
+      el.classList.add('k-in-' + t);
+    });
+    if (!words(el, 'data-k-again').length || !('IntersectionObserver' in window)) return;
+    if (!againIo) {
+      againIo = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+          var s = entry.target;
+          words(s, 'data-k-again').forEach(function (t) {
+            if (entry.isIntersecting) {
+              s.classList.remove('k-wait-' + t);
+              s.classList.add('k-in-' + t);
+            } else if (s.classList.contains('k-in-' + t)) {
+              s.classList.remove('k-in-' + t);
+              s.classList.add('k-wait-' + t);
+            }
+          });
+        });
+      }, { rootMargin: '0px 0px -10% 0px' });
+    }
+    againIo.observe(el);
+  }
+  function swapSection(id, html) {
+    var old = sectionById(id);
+    if (!old) return false;
+    if (editing && old.contains(editing.el)) { deferred[id] = html; return true; }
+    var t = document.createElement('template');
+    t.innerHTML = html;
+    var el = t.content.firstElementChild;
+    if (t.content.childNodes.length !== 1 || !el || el.tagName !== 'SECTION' ||
+        el.getAttribute('data-section-id') !== id) return false;
+    old.replaceWith(el);
+    revealAll(el);
+    reanimate(el);
+    fillAssets(el);
+    el.classList.toggle('k-selected', selected === id);
+    return true;
+  }
+  function flushDeferred() {
+    var ids = Object.keys(deferred);
+    var ok = true;
+    for (var i = 0; i < ids.length; i++) {
+      var html = deferred[ids[i]];
+      delete deferred[ids[i]];
+      if (!swapSection(ids[i], html)) ok = false;
+    }
+    if (!ok) send({ type: 'patchFailed' });
+  }
+  function validPatch(d) {
+    if (!Array.isArray(d.sections) || d.sections.length > 200) return false;
+    for (var i = 0; i < d.sections.length; i++) {
+      var s = d.sections[i];
+      if (!s || typeof s.id !== 'string' || !ID_RE.test(s.id) || typeof s.html !== 'string' || s.html.length > MAX_TEXT) return false;
+    }
+    if (d.styles === null || d.styles === undefined) return true;
+    if (!Array.isArray(d.styles) || d.styles.length > 50) return false;
+    for (var k = 0; k < d.styles.length; k++) {
+      if (typeof d.styles[k] !== 'string' || d.styles[k].length > MAX_TEXT) return false;
+    }
+    return true;
+  }
+  function patch(d) {
+    if (!validPatch(d)) return;
+    var ok = true;
+    if (d.styles) {
+      var list = [];
+      for (var c = document.head.firstElementChild; c; c = c.nextElementSibling) {
+        if (c.tagName === 'STYLE') list.push(c);
+      }
+      if (list.length !== d.styles.length) ok = false;
+      else {
+        for (var j = 0; j < list.length; j++) {
+          if (list[j].textContent !== d.styles[j]) list[j].textContent = d.styles[j];
+        }
+      }
+    }
+    for (var i = 0; i < d.sections.length; i++) {
+      if (!swapSection(d.sections[i].id, d.sections[i].html)) ok = false;
+    }
+    if (!ok) send({ type: 'patchFailed' });
+    placeToolbar();
+  }
+
+  // Where the reader is: the first section still in view and how far down it starts.
+  function where() {
+    var all = document.querySelectorAll('main > [data-section-id]');
+    var anchor = null;
+    var offset = 0;
+    for (var i = 0; i < all.length; i++) {
+      var box = all[i].getBoundingClientRect();
+      if (box.bottom > 0) { anchor = all[i]; offset = box.top; break; }
+    }
+    if (!anchor && all.length) { anchor = all[0]; offset = all[0].getBoundingClientRect().top; }
+    var root = document.documentElement;
+    var m = {
+      type: 'scroll',
+      y: Math.round(window.scrollY),
+      bottom: window.scrollY > 0 && window.scrollY + window.innerHeight >= root.scrollHeight - 2
+    };
+    if (anchor) { m.anchor = anchor.getAttribute('data-section-id'); m.offset = Math.round(offset); }
+    return m;
+  }
+  // Jumps straight to the place (the site's CSS would otherwise glide there from the top).
+  function jump(y) { window.scrollTo({ top: Math.max(0, Math.round(y)), behavior: 'instant' }); }
+  function restore() {
+    if (cfg.scrollTo) { scrollToAnchor(cfg.scrollTo, false); return; }
+    if (cfg.bottom) { jump(document.documentElement.scrollHeight); return; }
+    var el = cfg.anchor ? sectionById(cfg.anchor) : null;
+    if (el) { jump(el.getBoundingClientRect().top + window.scrollY - (cfg.offset || 0)); return; }
+    if (cfg.scrollY) jump(cfg.scrollY);
   }
 
   // Animated headings: marquee copies go, and words or letters split for the animation
@@ -251,7 +393,7 @@ ${FREE_BRIDGE_JS}
   var scrollTimer = 0;
   window.addEventListener('scroll', function () {
     clearTimeout(scrollTimer);
-    scrollTimer = setTimeout(function () { send({ type: 'scroll', y: Math.round(window.scrollY) }); }, 100);
+    scrollTimer = setTimeout(function () { send(where()); }, 80);
     placeToolbar();
   }, { passive: true });
   window.addEventListener('resize', placeToolbar);
@@ -263,16 +405,22 @@ ${FREE_BRIDGE_JS}
     for (var i = 0; i < items.length; i++) {
       var item = items[i];
       if (!item || typeof item.id !== 'string' || !(item.blob instanceof Blob)) continue;
-      var url = URL.createObjectURL(item.blob);
-      var els = document.querySelectorAll('[data-k-asset]');
-      for (var j = 0; j < els.length; j++) {
-        if (els[j].getAttribute('data-k-asset') === item.id) els[j].src = url;
-      }
-      // An uploaded video's poster picture.
-      var posters = document.querySelectorAll('video[data-k-poster]');
-      for (var k = 0; k < posters.length; k++) {
-        if (posters[k].getAttribute('data-k-poster') === item.id) posters[k].poster = url;
-      }
+      // One address per file, reused by sections swapped in later.
+      if (!assetUrls[item.id]) assetUrls[item.id] = URL.createObjectURL(item.blob);
+    }
+    fillAssets(document);
+  }
+  function fillAssets(root) {
+    var els = root.querySelectorAll('[data-k-asset]');
+    for (var j = 0; j < els.length; j++) {
+      var url = assetUrls[els[j].getAttribute('data-k-asset')];
+      if (url && els[j].getAttribute('src') !== url) els[j].src = url;
+    }
+    // An uploaded video's poster picture.
+    var posters = root.querySelectorAll('video[data-k-poster]');
+    for (var k = 0; k < posters.length; k++) {
+      var poster = assetUrls[posters[k].getAttribute('data-k-poster')];
+      if (poster) posters[k].poster = poster;
     }
   }
 
@@ -292,6 +440,7 @@ ${FREE_BRIDGE_JS}
     if (e.source !== window.top || e.data.source !== 'klinth-editor') return;
     if (e.data.type === 'select') mark(e.data.id, true);
     else if (e.data.type === 'assets') showAssets(e.data.items);
+    else if (e.data.type === 'patch') patch(e.data);
     else if (e.data.type === 'freeDecision') FREE.decided(e.data.accept === true);
     else if (e.data.type === 'freeItem') FREE.select(typeof e.data.item === 'string' ? e.data.item : null);
     else if (e.data.type === 'freeHint' && Array.isArray(e.data.items)) {
@@ -299,11 +448,22 @@ ${FREE_BRIDGE_JS}
     }
   });
 
-  if (cfg.scrollTo) scrollToAnchor(cfg.scrollTo, false);
-  else if (cfg.scrollY) window.scrollTo(0, cfg.scrollY);
+  restore();
+  var restoredAt = window.scrollY;
   if (selected) mark(selected, false);
   FREE.redraw();
-  send({ type: 'ready' });
+  send({ type: 'ready', load: cfg.load || 0 });
+  // Tell the shell this page is ready to be shown (it is built behind the old one).
+  // Fonts can change line heights, so the place is set again once they are in.
+  function shown() {
+    try { window.parent.postMessage({ source: 'klinth-preview', type: 'shown' }, '*'); } catch (err) {}
+  }
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(function () {
+      if (window.scrollY === restoredAt) restore();
+      shown();
+    }, shown);
+  } else shown();
 })();
 `;
 

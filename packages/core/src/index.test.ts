@@ -230,11 +230,13 @@ describe('editor preview markers', () => {
     }
     expect(marked).toContain('data-k-field="heading"');
     expect(html(false)).not.toContain('data-k-');
+    expect(html(false)).not.toContain('data-section-id');
   });
 
   it('do not change anything else in the page', () => {
     const stripped = html(true)
       .replace(/ data-k-(section|field|from)="[^"]*"/g, '')
+      .replace(/ data-section-id="[^"]*"/g, '')
       .replace(/ data-k-header/g, '');
     expect(stripped).toBe(html(false));
   });

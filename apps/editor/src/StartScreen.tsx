@@ -5,6 +5,7 @@ import { importAnyFile, type ImportedProject } from './lib/files.ts';
 import { deleteProject, listProjects, type ProjectSummary } from './lib/storage.ts';
 import { useFontUrls } from './lib/fonts.ts';
 import { buildPreviewDocument } from './preview/document.ts';
+import { newProjectDefaults } from './state/footer.ts';
 import { Icon } from './ui/Icon.tsx';
 import { blankProject, type Project } from '@klinth/core';
 
@@ -91,12 +92,15 @@ export function StartScreen({ onCreate, onOpen }: StartScreenProps) {
                 <TemplateCard
                   template={template}
                   disabled={busy}
-                  onPick={() => void run(() => onCreate(template.create()))}
+                  onPick={() => void run(() => onCreate(newProjectDefaults(template.create())))}
                 />
               </motion.li>
             ))}
             <motion.li {...rise(4 + templates.length)}>
-              <BlankCard disabled={busy} onPick={() => void run(() => onCreate(blankProject()))} />
+              <BlankCard
+                disabled={busy}
+                onPick={() => void run(() => onCreate(newProjectDefaults(blankProject())))}
+              />
             </motion.li>
           </ul>
         </section>
@@ -183,7 +187,7 @@ function TemplateCard({
   onPick: () => void;
 }) {
   // A still picture of the real template: no scripts run in this frame.
-  const project = useMemo(() => template.create(), [template]);
+  const project = useMemo(() => newProjectDefaults(template.create()), [template]);
   const fontUrls = useFontUrls(project.theme);
   const doc = useMemo(
     () => buildPreviewDocument(project, 0, { origin: '', interactive: false, fontUrls }),

@@ -16,6 +16,7 @@ import { AnimationPanel } from './AnimationPanel.tsx';
 import { Field } from './Fields.tsx';
 import { blockFields } from './fields.ts';
 import { FreePanel } from './FreePanel.tsx';
+import { FooterPanel } from './FooterPanel.tsx';
 import { ThemePanel } from './ThemePanel.tsx';
 
 /** The right panel: the selected section's settings, or the site style. */
@@ -161,6 +162,11 @@ function SectionSettings({ section }: { section: Section }) {
           {fields}
         </>
       )}
+      {section.type === 'footer' ? (
+        <section aria-label="Back to top" className="border-t border-line pt-4">
+          <FooterPanel inFooter />
+        </section>
+      ) : null}
       <AnimationPanel key={section.id} section={section} />
       <div className="flex gap-2 border-t border-line pt-4">
         <button type="button" className="btn btn-line flex-1" onClick={() => duplicate(section.id)}>

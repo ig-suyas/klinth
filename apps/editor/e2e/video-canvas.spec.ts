@@ -30,7 +30,9 @@ test('a video carousel and a blank canvas: build, try in the preview, export', a
   await page.goto('/');
   await page.getByRole('button', { name: /Start blank/ }).click();
   await page.getByRole('button', { name: 'Skip tour' }).click();
-  const preview = page.frameLocator('iframe[title="Preview of your site"]').frameLocator('iframe');
+  const preview = page
+    .frameLocator('iframe[title="Preview of your site"]')
+    .frameLocator('iframe[title="Your site"]');
   const settings = page.getByRole('complementary', { name: 'Settings' });
   const addSection = async (name: RegExp) => {
     await page.getByRole('button', { name: 'Add a section' }).click();

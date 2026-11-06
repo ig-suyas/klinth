@@ -281,7 +281,10 @@ function renderPage(
         split: headingSplit(section.animation),
       };
       const bg = sectionBackground(section);
-      const marker = editable ? ` data-k-section="${esc(section.id)}"` : '';
+      // Preview only: the stable id lets the editor swap this one section in place.
+      const marker = editable
+        ? ` data-k-section="${esc(section.id)}" data-section-id="${esc(section.id)}"`
+        : '';
       const anim = sectionAnimationMarkup(section.animation, i === 0);
       const canvas = freeCanvas(section);
       const layout = canvas ? ' block-free' : '';

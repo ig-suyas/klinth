@@ -10,6 +10,7 @@ import { useEditor, type Device } from '../state/store.ts';
 import { PREVIEW_PATH } from '../security/headers.ts';
 import { buildPreviewDocument, previewMessageSchema } from './document.ts';
 import { handleFreeMessage, isFreeMessage } from './free-messages.ts';
+import { planUpdate, splitPreview, type PreviewSplit } from './patch.ts';
 
 /** Frame widths per device, in CSS pixels of the previewed site. */
 export const DEVICE_WIDTH: Record<Device, number> = {
@@ -19,8 +20,8 @@ export const DEVICE_WIDTH: Record<Device, number> = {
   phone: 390,
 };
 
-/** How long the preview waits after a change before it redraws. */
-const PREVIEW_DELAY_MS = 120;
+/** How long the preview waits after the last change before it updates (typing stays smooth). */
+export const PREVIEW_DELAY_MS = 300;
 
 /** The window of the shown page: the inner frame of the preview.html shell. */
 export function siteWindow(el: HTMLIFrameElement | null): Window | null {
@@ -34,6 +35,30 @@ export function siteWindow(el: HTMLIFrameElement | null): Window | null {
   }
 }
 
+/**
+ * True when `source` is one of the shell's inner frames: the page shown, or the
+ * next one being built under it during a full redraw.
+ */
+function innerFrame(el: HTMLIFrameElement | null, source: MessageEventSource | null): boolean {
+  try {
+    const frames = el?.contentWindow?.frames;
+    if (!frames || !source) return false;
+    for (let i = 0; i < frames.length; i++) if (frames[i] === source) return true;
+  } catch {
+    // Not loaded yet (see siteWindow).
+  }
+  return false;
+}
+
+/** Where the reader is in the preview, kept across full redraws. */
+interface Place {
+  y: number;
+  anchor: string | null;
+  offset: number;
+  bottom: boolean;
+}
+const TOP: Place = { y: 0, anchor: null, offset: 0, bottom: false };
+
 /** How long the preview shell may take to say it is ready before the user is told. */
 export const PREVIEW_LOAD_TIMEOUT_MS = 10_000;
 
@@ -44,14 +69,27 @@ export const PREVIEW_LOAD_TIMEOUT_MS = 10_000;
  * It loads the `preview.html` shell once (its own, looser security policy, so
  * pasted custom code can run) and then gets each redraw by message, which needs
  * no network. The shown page lives in the shell's inner frame.
+ *
+ * Most changes never redraw the page: the new document is compared with the
+ * shown one (patch.ts) and only the changed sections, or the new style text,
+ * are swapped in place, so the scroll place, focus and selection stay. A full
+ * redraw (header, footer, page scripts, sections added or removed, another
+ * page) is built under the shown page and keeps the reader's place.
  */
 export function Preview() {
   const project = useEditor((s) => s.project);
   const pageIndex = useEditor((s) => s.pageIndex);
   const device = useEditor((s) => s.device);
   const frame = useRef<HTMLIFrameElement>(null);
-  const scrollY = useRef(0);
+  const place = useRef<Place>(TOP);
+  /** Full redraws sent; the page answers `ready` with its number. */
   const loads = useRef(0);
+  /** The number of the last full redraw that said it is ready. */
+  const readyLoad = useRef(0);
+  /** What the frame shows, split into sections and styles (null: unknown, redraw). */
+  const shown = useRef<PreviewSplit | null>(null);
+  /** A swap did not fit the page: the next update redraws it whole. */
+  const forceFull = useRef(false);
   /** The latest page to show; handed over when the preview page says it is ready. */
   const pending = useRef('');
   /** The shell has loaded and listens for pages. */
@@ -83,6 +121,24 @@ export function Preview() {
       '*',
     );
 
+  /** Hands a page its pictures and videos (all, or those of some sections); it cannot read storage. */
+  const sendAssets = (target: Window, only?: readonly string[]) => {
+    const { projectId, project: current, pageIndex: index, notify } = useEditor.getState();
+    const page = current?.pages[index];
+    if (!projectId || !page) return;
+    const sections = only ? page.sections.filter((s) => only.includes(s.id)) : page.sections;
+    const ids = sectionAssetIds(sections);
+    if (!ids.size) return;
+    void assetBlobs(projectId, ids).then(
+      (items) => {
+        if (items.length && innerFrame(frame.current, target)) {
+          target.postMessage({ source: 'klinth-editor', type: 'assets', items }, '*');
+        }
+      },
+      () => notify('Some pictures could not be loaded from browser storage.'),
+    );
+  };
+
   useLayoutEffect(() => {
     const el = area.current;
     if (!el || typeof ResizeObserver === 'undefined') return;
@@ -93,36 +149,78 @@ export function Preview() {
     return () => observer.disconnect();
   }, []);
 
-  // Typing stays smooth: the frame reloads shortly after the last change.
+  // Typing stays smooth: the preview updates shortly after the last change. Undo and
+  // redo are changes like any other, so they take the same way.
   useEffect(() => {
     if (!project) return;
     if (project === live.current && !scheduled.current) {
+      // The frame changed itself (free layout); what it shows is no longer known here.
       live.current = null;
+      shown.current = null;
       return;
     }
     live.current = null;
     scheduled.current = true;
     const timer = setTimeout(() => {
       scheduled.current = false;
-      if (!frame.current) return;
-      if (shownPage.current !== pageIndex) scrollY.current = 0;
+      const el = frame.current;
+      if (!el) return;
+      const pageChanged = shownPage.current !== pageIndex;
       shownPage.current = pageIndex;
-      loads.current += 1;
       const play = shownReplay.current !== replay;
       shownReplay.current = replay;
-      pending.current = buildPreviewDocument(project, pageIndex, {
+      const base = {
         origin: window.location.origin,
         interactive: true,
-        calm: loads.current > 1 && !play,
-        scrollY: scrollY.current,
+        calm: loads.current > 0 && !play,
+        fontUrls,
+      };
+      // Compared without the per-redraw details (place, selection), which only a full redraw needs.
+      const next = splitPreview(buildPreviewDocument(project, pageIndex, base));
+      const target = siteWindow(el);
+      const settled = hostReady.current && loads.current > 0 && readyLoad.current === loads.current;
+      const plan =
+        target && settled && !pageChanged && !play && !forceFull.current && !scrollTo.current
+          ? planUpdate(shown.current, next)
+          : ({ kind: 'full' } as const);
+      if (plan.kind === 'patch' && target) {
+        shown.current = next;
+        if (plan.sections.length || plan.styles) {
+          target.postMessage(
+            {
+              source: 'klinth-editor',
+              type: 'patch',
+              sections: plan.sections,
+              styles: plan.styles,
+            },
+            '*',
+          );
+          if (plan.sections.length)
+            sendAssets(
+              target,
+              plan.sections.map((s) => s.id),
+            );
+        }
+        return;
+      }
+      forceFull.current = false;
+      if (pageChanged) place.current = TOP;
+      loads.current += 1;
+      pending.current = buildPreviewDocument(project, pageIndex, {
+        ...base,
+        load: loads.current,
+        scrollY: place.current.y,
+        anchor: place.current.anchor,
+        offset: place.current.offset,
+        bottom: place.current.bottom,
         scrollTo: scrollTo.current,
         selectedId: useEditor.getState().selectedId,
-        fontUrls,
         freeItem: useFreeUi.getState().item,
       });
+      shown.current = next;
       scrollTo.current = null;
-      if (hostReady.current) sendPage(frame.current);
-      else if (!frame.current.getAttribute('src')) frame.current.setAttribute('src', PREVIEW_PATH);
+      if (hostReady.current) sendPage(el);
+      else if (!el.getAttribute('src')) el.setAttribute('src', PREVIEW_PATH);
     }, PREVIEW_DELAY_MS);
     return () => clearTimeout(timer);
   }, [project, pageIndex, fontUrls, replay, redraws]);
@@ -147,7 +245,7 @@ export function Preview() {
     const onMessage = (event: MessageEvent) => {
       if (!frame.current || !event.source) return;
       const fromShell = event.source === frame.current.contentWindow;
-      if (!fromShell && event.source !== siteWindow(frame.current)) return;
+      if (!fromShell && !innerFrame(frame.current, event.source)) return;
       const parsed = previewMessageSchema.safeParse(event.data);
       if (!parsed.success) return;
       const message = parsed.data;
@@ -168,25 +266,22 @@ export function Preview() {
           hostReady.current = true;
           if (pending.current) sendPage(frame.current);
           break;
-        case 'ready': {
+        case 'ready':
+          if (message.load !== undefined) readyLoad.current = message.load;
           // Hand the page its pictures and videos; the frame cannot read browser storage.
-          const { projectId, project: current, pageIndex: index } = state;
-          const page = current?.pages[index];
-          if (!projectId || !current || !page) break;
-          const target = siteWindow(frame.current);
-          const ids = sectionAssetIds(page.sections);
-          void assetBlobs(projectId, ids).then(
-            (items) => {
-              if (items.length && target && siteWindow(frame.current) === target) {
-                target.postMessage({ source: 'klinth-editor', type: 'assets', items }, '*');
-              }
-            },
-            () => state.notify('Some pictures could not be loaded from browser storage.'),
-          );
+          sendAssets(event.source as Window);
           break;
-        }
         case 'scroll':
-          scrollY.current = message.y;
+          place.current = {
+            y: message.y,
+            anchor: message.anchor ?? null,
+            offset: message.offset ?? 0,
+            bottom: message.bottom === true,
+          };
+          break;
+        case 'patchFailed':
+          forceFull.current = true;
+          setRedraws((n) => n + 1);
           break;
         case 'select':
           state.select(message.id);

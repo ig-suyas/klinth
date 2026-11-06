@@ -27,7 +27,9 @@ test('three extras on a second page made from Blank: build, preview, export, use
   await page.goto('/');
   await page.getByRole('button', { name: /Start blank/ }).click();
   await page.getByRole('button', { name: 'Skip tour' }).click();
-  const preview = page.frameLocator('iframe[title="Preview of your site"]').frameLocator('iframe');
+  const preview = page
+    .frameLocator('iframe[title="Preview of your site"]')
+    .frameLocator('iframe[title="Your site"]');
   const settings = page.getByRole('complementary', { name: 'Settings' });
   const menu = page.getByRole('dialog', { name: 'Add a section' });
   const addSection = async (name: RegExp) => {
