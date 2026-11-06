@@ -45,6 +45,8 @@ export function Field(props: FieldProps) {
       return <TextField {...props} spec={spec} />;
     case 'choice':
       return <ChoiceField {...props} spec={spec} />;
+    case 'number':
+      return <NumberField {...props} spec={spec} />;
     case 'link':
       return isObjectProp(props.blockType, props.path) ? (
         <LinkObjectField {...props} spec={spec} />
@@ -148,6 +150,54 @@ function ChoiceField({
         ))}
       </div>
     </fieldset>
+  );
+}
+
+/** A slider for a bounded number, with the value shown and a way back to the default. */
+function NumberField({
+  spec,
+  value,
+  onChange,
+}: FieldProps & { spec: Extract<FieldSpec, { kind: 'number' }> }) {
+  const id = useId();
+  const set = typeof value === 'number' && Number.isFinite(value);
+  const current = set ? Math.min(Math.max(value, spec.min), spec.max) : spec.fallback;
+  return (
+    <div>
+      <div className="mb-1.5 flex items-baseline justify-between gap-2">
+        <label htmlFor={id} className="label mb-0">
+          {spec.label}
+        </label>
+        <output htmlFor={id} className="font-mono text-xs text-ink-soft">
+          {current}
+          {spec.unit}
+        </output>
+      </div>
+      <input
+        id={id}
+        type="range"
+        className="w-full accent-accent"
+        min={spec.min}
+        max={spec.max}
+        step={spec.step}
+        value={current}
+        aria-describedby={spec.help ? `${id}-help` : undefined}
+        onChange={(e) => {
+          const next = Number(e.target.value);
+          if (Number.isFinite(next)) onChange(Math.min(Math.max(next, spec.min), spec.max));
+        }}
+      />
+      <Help id={`${id}-help`} text={spec.help} />
+      {set ? (
+        <button
+          type="button"
+          className="btn btn-ghost mt-1 text-xs"
+          onClick={() => onChange(undefined)}
+        >
+          Reset
+        </button>
+      ) : null}
+    </div>
   );
 }
 

@@ -1,9 +1,16 @@
 import { escapeHtml as esc } from './html.ts';
-import { assetPath, renderBlock, renderFooter, type BlockCtx } from './render-blocks.ts';
+import {
+  assetPath,
+  footerPositioned,
+  renderBlock,
+  renderFooter,
+  type BlockCtx,
+} from './render-blocks.ts';
 import type { Asset, Page, Project, Section } from './schema.ts';
 import {
   HEADER_CSS,
   HEADER_JS,
+  FOOTER_CSS,
   SITE_CSS,
   SITE_CSS_BASE,
   SITE_JS,
@@ -12,7 +19,7 @@ import {
 import { fontFaceCss, fontLicense, fontPath, themeFonts } from './fonts.ts';
 import { themeToCss } from './tokens.ts';
 import { firstSectionBackground, headerCta, headerLayout, headerToCss } from './header.ts';
-import { headerShown, navLinkHref, sectionAnchor } from './nav.ts';
+import { backToTopShown, headerShown, navLinkHref, sectionAnchor } from './nav.ts';
 import {
   ANIM_CSS,
   ANIM_CSS_PATH,
@@ -253,7 +260,11 @@ function renderPage(
     })
     .join('\n');
   const footer = footers
-    .map((s) => (s.type === 'footer' ? renderFooter(s.props, editable ? s.id : undefined) : ''))
+    .map((s) =>
+      s.type === 'footer'
+        ? renderFooter(s.props, editable ? s.id : undefined, backToTopShown(project, page))
+        : '',
+    )
     .join('');
 
   return `<!doctype html>
@@ -277,6 +288,13 @@ ${footer ? `<footer class="site-footer">${footer}</footer>\n` : ''}${code.js ? `
 `;
 }
 
+/** True when a footer on any page uses alignment, offset or padding. */
+function siteHasPositionedFooter(project: Project): boolean {
+  return project.pages.some((page) =>
+    page.sections.some((s) => s.type === 'footer' && footerPositioned(s.props)),
+  );
+}
+
 /**
  * Renders the whole site as text files. Shared by the live preview and the
  * exporter, so what users see is exactly what they export. Asset binaries are
@@ -298,7 +316,8 @@ export function renderSite(project: Project, options: RenderOptions = {}): SiteF
       content:
         (options.preview ? '' : fontFaceCss(fonts)) +
         themeToCss(project.theme) +
-        (mode === 'all' ? headerToCss(project) + SITE_CSS : SITE_CSS_BASE),
+        (mode === 'all' ? headerToCss(project) + SITE_CSS : SITE_CSS_BASE) +
+        (siteHasPositionedFooter(project) ? FOOTER_CSS : ''),
     },
     { path: 'js/site.js', content: mode === 'all' ? SITE_JS : SITE_JS_BASE },
     ...(mode === 'some'

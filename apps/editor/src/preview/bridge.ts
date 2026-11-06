@@ -39,10 +39,14 @@ export const BRIDGE_JS = `(function () {
     markHeader(id === HEADER);
   }
 
-  // The header: click to select it; a small toolbar with "×" removes it (the editor can undo).
+  // The header: a click selects it. A double-click (or Enter on the focused header) shows a
+  // small toolbar with "×" that removes it (the editor can undo). Any other click, Esc,
+  // leaving the frame or selecting something else hides the toolbar again.
   var HEADER = '#header';
   var header = document.querySelector('[data-k-header]');
   var toolbar = null;
+  var toolbarOpen = false;
+  if (header) header.tabIndex = 0;
   function placeToolbar() {
     if (!toolbar || toolbar.hidden || !header) return;
     var box = header.getBoundingClientRect();
@@ -70,9 +74,18 @@ export const BRIDGE_JS = `(function () {
   function markHeader(on) {
     if (!header) return;
     header.classList.toggle('k-selected', on);
-    if (on && !toolbar) toolbar = makeToolbar();
-    if (toolbar) toolbar.hidden = !on;
+    if (!on) showToolbar(false);
+  }
+  function showToolbar(on) {
+    toolbarOpen = on && !!header;
+    if (toolbarOpen && !toolbar) toolbar = makeToolbar();
+    if (toolbar) toolbar.hidden = !toolbarOpen;
     placeToolbar();
+  }
+  function openHeaderToolbar(focusRemove) {
+    if (selected !== HEADER) { mark(HEADER, false); send({ type: 'header' }); }
+    showToolbar(true);
+    if (focusRemove) toolbar.querySelector('.k-remove').focus();
   }
 
   // Header links never leave the preview: same-page sections scroll, other pages switch.
@@ -157,6 +170,7 @@ ${FREE_BRIDGE_JS}
   document.addEventListener('click', function (e) {
     var target = e.target;
     if (toolbar && toolbar.contains(target)) return;
+    showToolbar(false);
     if (FREE.click(e)) return;
     var inHeader = header && header.contains(target);
     // The header's Menu button still opens its panel, so its links can be tried.
@@ -194,6 +208,11 @@ ${FREE_BRIDGE_JS}
   document.body.addEventListener('click', function () {});
 
   document.addEventListener('dblclick', function (e) {
+    var t = e.target;
+    if (header && header.contains(t) && !(t.closest && t.closest('a, summary'))) {
+      openHeaderToolbar(false);
+      return;
+    }
     // In a section that can be placed freely, a double-click starts moving the element.
     if (FREE.dblclick(e)) return;
     var fieldEl = e.target.closest('[data-k-field]');
@@ -204,6 +223,17 @@ ${FREE_BRIDGE_JS}
   document.addEventListener('submit', function (e) { e.preventDefault(); });
 
   document.addEventListener('keydown', function (e) {
+    if (toolbarOpen && e.key === 'Escape') {
+      e.preventDefault();
+      showToolbar(false);
+      header.focus();
+      return;
+    }
+    if (header && e.target === header && (e.key === 'Enter' || e.key === ' ')) {
+      e.preventDefault();
+      openHeaderToolbar(true);
+      return;
+    }
     if (FREE.keydown(e)) return;
     if (!editing) return;
     if (e.key === 'Escape') { e.preventDefault(); stopEditing(false); }
@@ -225,6 +255,8 @@ ${FREE_BRIDGE_JS}
     placeToolbar();
   }, { passive: true });
   window.addEventListener('resize', placeToolbar);
+  // A click in the editor around the preview takes focus away from this frame.
+  window.addEventListener('blur', function () { showToolbar(false); });
 
   function showAssets(items) {
     if (!items || !items.length) return;

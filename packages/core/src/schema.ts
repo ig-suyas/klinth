@@ -19,7 +19,7 @@ import {
   freeSectionProblem,
 } from './free.ts';
 
-export const SCHEMA_VERSION = 6;
+export const SCHEMA_VERSION = 7;
 
 export { HEADER_STYLES, type HeaderStyle } from './header.ts';
 
@@ -113,6 +113,8 @@ export const pageSchema = z
     title: singleLine(120, 1),
     /** Leaves the site header off this page only (for landing pages). */
     hideHeader: z.boolean().optional(),
+    /** Leaves the footer's "Back to top" link off this page only. */
+    hideBackToTop: z.boolean().optional(),
     sections: z
       .array(sectionSchema)
       .max(100)
@@ -183,6 +185,8 @@ export const projectSchema = z
         header: headerSchema.optional(),
         /** The site header is shown unless this is false (set to true by the version 3 upgrade). */
         headerEnabled: z.boolean().optional(),
+        /** The footer's "Back to top" link is shown unless this is false. */
+        backToTop: z.boolean().optional(),
         /**
          * Header links picked by the owner. Not set: pages, or the sections named
          * for the menu, as before. Links to a deleted page or section are kept,

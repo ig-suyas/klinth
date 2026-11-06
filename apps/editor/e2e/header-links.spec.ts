@@ -114,9 +114,28 @@ test('header links work in the preview and the export, then the header is remove
   await site.locator('header .nav-links').getByRole('link', { name: 'Home' }).click();
   await expect(site).toHaveURL(`${SITE}/index.html`);
 
-  // Remove the header from the preview toolbar; Undo brings it back.
-  await preview.locator('header.site-header').click({ position: { x: 4, y: 4 } });
+  // A single click only selects the header; a double-click shows the toolbar; a click
+  // elsewhere and Esc hide it again.
+  const siteHeader = preview.locator('header.site-header');
   const remove = preview.getByRole('button', { name: 'Remove header' });
+  await siteHeader.click({ position: { x: 4, y: 4 } });
+  await expect(siteHeader).toHaveClass(/k-selected/);
+  await page.waitForTimeout(400);
+  await expect(remove).toBeHidden();
+  await siteHeader.dblclick({ position: { x: 4, y: 4 } });
+  await expect(remove).toBeVisible();
+  await preview
+    .locator('main [data-k-section]')
+    .first()
+    .click({ position: { x: 4, y: 4 } });
+  await expect(remove).toBeHidden();
+  await siteHeader.dblclick({ position: { x: 4, y: 4 } });
+  await expect(remove).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(remove).toBeHidden();
+
+  // Remove the header from the preview toolbar; Undo brings it back.
+  await siteHeader.dblclick({ position: { x: 4, y: 4 } });
   await expect(remove).toBeVisible();
   await remove.click();
   await expect(preview.locator('header')).toHaveCount(0);
@@ -126,7 +145,7 @@ test('header links work in the preview and the export, then the header is remove
   await expect(preview.locator('header.site-header')).toHaveCount(1);
   await expect(preview.locator('header .nav-links').getByRole('link')).toHaveCount(4);
 
-  await preview.locator('header.site-header').click({ position: { x: 4, y: 4 } });
+  await siteHeader.dblclick({ position: { x: 4, y: 4 } });
   await preview.getByRole('button', { name: 'Remove header' }).click();
   await expect(preview.locator('header')).toHaveCount(0);
   await expect(header.getByRole('button', { name: 'Add header back' })).toBeVisible();
@@ -144,7 +163,7 @@ test('header links work in the preview and the export, then the header is remove
     schemaVersion: number;
     meta: { headerEnabled: boolean };
   };
-  expect(saved.schemaVersion).toBe(6);
+  expect(saved.schemaVersion).toBe(7);
   expect(saved.meta.headerEnabled).toBe(false);
   await site.close();
 });

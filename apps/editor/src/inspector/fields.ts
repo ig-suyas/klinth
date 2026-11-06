@@ -1,4 +1,10 @@
-import { blockPropSchemas, type BlockType } from '@klinth/core';
+import {
+  FOOTER_DEFAULT_PADDING,
+  FOOTER_MAX_OFFSET,
+  FOOTER_MAX_PADDING,
+  blockPropSchemas,
+  type BlockType,
+} from '@klinth/core';
 import { z } from 'zod';
 
 /**
@@ -19,6 +25,19 @@ export type FieldSpec =
       fallback?: string;
     }
   | { kind: 'link'; key: string; label: string; help?: string }
+  /** A number picked with a slider; the block schema checks the range again. */
+  | {
+      kind: 'number';
+      key: string;
+      label: string;
+      help?: string;
+      min: number;
+      max: number;
+      step: number;
+      unit: string;
+      /** What the site uses when nothing is set. */
+      fallback: number;
+    }
   /** An uploaded picture and its description (`altKey`), set together. */
   | { kind: 'image'; key: string; altKey: string; label: string }
   /** An uploaded video (`key`) or a YouTube/Vimeo link (`linkKey`). */
@@ -32,6 +51,15 @@ export type FieldSpec =
       fields: FieldSpec[];
       newItem: () => Record<string, unknown>;
     };
+
+const ALIGN_OPTIONS = { left: 'Left', center: 'Center', right: 'Right' };
+const footAlign = (key: string, label: string, fallback: string): FieldSpec => ({
+  kind: 'choice',
+  key,
+  label,
+  options: ALIGN_OPTIONS,
+  fallback,
+});
 
 const BACKGROUND_OPTIONS = { plain: 'Plain', tinted: 'Soft tint', bold: 'Bold color' };
 
@@ -240,6 +268,30 @@ export const blockFields: { readonly [T in BlockType]: readonly FieldSpec[] } = 
         { kind: 'link', key: 'href', label: 'Goes to' },
       ],
       newItem: linkItem,
+    },
+    footAlign('textAlign', 'Copyright text position', 'left'),
+    footAlign('linksAlign', 'Links position', 'left'),
+    footAlign('topAlign', '“Back to top” position', 'right'),
+    {
+      kind: 'number',
+      key: 'offset',
+      label: 'Move sideways',
+      help: 'In % of the content width. Negative moves left, positive moves right.',
+      min: -FOOTER_MAX_OFFSET,
+      max: FOOTER_MAX_OFFSET,
+      step: 0.5,
+      unit: '%',
+      fallback: 0,
+    },
+    {
+      kind: 'number',
+      key: 'padding',
+      label: 'Space above and below',
+      min: 0,
+      max: FOOTER_MAX_PADDING,
+      step: 0.25,
+      unit: ' rem',
+      fallback: FOOTER_DEFAULT_PADDING,
     },
   ],
   customCode: [{ kind: 'code', key: 'code', label: 'Your code' }],

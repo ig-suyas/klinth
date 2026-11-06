@@ -205,3 +205,7 @@ export function automaticNavLinks(project: Project): NavLink[] {
 /** True when this page shows the site header (on for the site, not hidden on the page). */
 export const headerShown = (project: Project, page: Page): boolean =>
   project.meta.headerEnabled !== false && page.hideHeader !== true;
+
+/** True when this page's footer shows "Back to top" (on for the site, not hidden on the page). */
+export const backToTopShown = (project: Project, page: Page): boolean =>
+  project.meta.backToTop !== false && page.hideBackToTop !== true;

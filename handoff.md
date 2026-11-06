@@ -23,8 +23,43 @@
 | 6F Free canvas, Part 1 of 2    | done (model, render, export; no UI)   |
 | 6F Free canvas, Part 2 of 2    | done (drag to free, warning, editing) |
 | Fix: free resize and sizing    | done (schema v6)                      |
+| Fix: footer, header pop-up     | done (schema v7, not pushed)          |
 
 ## 1. Current state
+
+**Fix: footer position, header pop-up, "Back to top" (schema version 7).** `MIGRATIONS[6]`
+changes nothing (all new fields optional; absent = the old footer, "Back to top" shown).
+**Footer** (`blocks.ts`): `textAlign` / `linksAlign` / `topAlign` (`FOOTER_ALIGNS` left|center|
+right), `offset` (finite, -20..20, % of the content width), `padding` (finite, 0..8 rem; default
+2.25). `renderFooter` keeps the exact old markup when none is set; otherwise
+`.wrap.foot.foot-set` with `style="--fpad;--fl;--fr"` (validated numbers, 3 decimals, clamped
+again) around `.foot-in` (`.foot-col` + `al-*` classes per group once any alignment is set;
+unset groups: text/links left, top right). The offset becomes a left or right margin of
+`.foot-in`, so the footer never leaves the content width (no sideways scroll). `FOOTER_CSS` is
+appended to `site.css` only when a footer uses these fields (template snapshots unchanged). The
+footer is not eligible for free layout (6F excludes footer/spacer/code by design), so the
+controls are in the footer section's settings: three choice groups and two sliders (new
+`number` field kind in `inspector/fields.ts` / `Fields.tsx`, with Reset).
+**Back to top**: `meta.backToTop` (false = off site-wide) and `page.hideBackToTop`;
+`backToTopShown` (`nav.ts`); a footer with nothing left renders no `<footer>`. Site style >
+Footer (`inspector/FooterPanel.tsx`, `state/footer.ts`): "Show “Back to top”" switch and "Hide
+“Back to top” on this page". **"Close"**: the renderer has no Close control (no "Close" text in
+any export, CSS or JS); the closest things are the phone header's "Menu" button (a `<details>`
+toggle needed to reach the links on phones; kept, not hideable) and the editor-only "×" header
+toolbar (never exported). Nothing added for it.
+**Header pop-up** (`preview/bridge.ts`): a click only selects the header (`header` message, no
+toolbar). Double-click (not on a link or the Menu button) shows the "×" toolbar; any other click,
+Esc (focus returns to the header), an editor `select`, or the frame losing focus hides it.
+Keyboard: the header gets `tabindex=0` in the preview; Enter/Space on it opens the toolbar and
+focuses "Remove header". The "Show header" switch in Site style is unchanged.
+Tests: core `footer.test.ts` (ranges, NaN/Infinity/strings refused, byte-identical default,
+export markup and CSS, negative offset, defaults, back-to-top site/page/empty footer, migration
+6 -> 7, round trip); editor `preview/header-bridge.test.ts` (single click, double-click, outside
+click, Esc, editor select, blur, keyboard), `state/footer.test.ts`, ThemePanel footer switch;
+e2e `footer.spec.ts` (controls, real offset/padding measured, no overflow, switch, ZIP) and
+`header-links.spec.ts` now double-clicks. Changed on purpose: version pins 6 -> 7, migration
+key lists, Site style section order (Footer after Header). Totals: 894 unit (core 545,
+templates 46, editor 247, api 56), 44 e2e (`--workers=1`, all pass); lint, format, types and build pass. Committed locally, **not pushed, not deployed**.
 
 **Fix: free-layout resize and sizing (schema version 6).** Symptoms (studio "Big intro"): corner
 drag changed the box but not the text, the heading wrapped to 5-6 lines and overflowed / overlapped
@@ -551,6 +586,12 @@ All phases done; only the push to `github.com/ig-suyas/klinth` (public) waits fo
 repos at ₹0.
 
 ## 3. Files
+
+- `packages/core/src/footer.test.ts` : footer position, back to top, migration 6 -> 7; footer
+  rendering in `render-blocks.ts` (`renderFooter`, `footerPositioned`), `FOOTER_CSS` in `site-assets.ts`
+- `apps/editor/src/inspector/FooterPanel.tsx`, `state/footer.ts` : Site style > Footer switches
+- `apps/editor/src/preview/header-bridge.test.ts` : header toolbar on double-click only
+- `apps/editor/e2e/footer.spec.ts` : footer controls and export
 
 - `apps/editor/src/preview/free-bridge.ts` : free layout gestures inside the preview frame;
   `free-geometry.ts` : box maths (also copied into the frame); `free-messages.ts` : editor side

@@ -35,7 +35,7 @@ export {
   type SectionAnimation,
   type SplitMode,
 } from './animation.ts';
-export { SITE_CSS } from './site-assets.ts';
+export { FOOTER_CSS, SITE_CSS } from './site-assets.ts';
 export {
   FREE_ALIGNS,
   FREE_BLOCKS,
@@ -74,9 +74,14 @@ export {
 export { FREE_CSS, FREE_CSS_PATH, pageHasFree } from './render-free.ts';
 export {
   BACKGROUNDS,
+  FOOTER_ALIGNS,
+  FOOTER_DEFAULT_PADDING,
+  FOOTER_MAX_OFFSET,
+  FOOTER_MAX_PADDING,
   MAX_CUSTOM_CODE,
   blockPropSchemas,
   type Background,
+  type FooterAlign,
   type BlockPropSchemas,
   type BlockProps,
   type BlockType,
@@ -202,6 +207,7 @@ export {
   anchorSchema,
   automaticNavLinks,
   ensureAnchor,
+  backToTopShown,
   headerShown,
   navLinkHref,
   navLinkProblems,

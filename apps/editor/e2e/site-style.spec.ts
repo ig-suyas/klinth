@@ -82,7 +82,7 @@ test('start blank, add a section and a page, pick a header and a look, add site-
     theme: { preset?: string };
     siteCode: { css: string };
   };
-  expect(saved.schemaVersion).toBe(6);
+  expect(saved.schemaVersion).toBe(7);
   expect(saved.meta.headerStyle).toBe('pill');
   expect(saved.theme.preset).toBe('midnight');
   expect(saved.siteCode.css).toContain('uppercase');

@@ -93,6 +93,7 @@ describe('header settings', () => {
     );
     expect(summaries).toEqual([
       'Header',
+      'Footer',
       'Details',
       'Ready-made looks',
       'Colors',
@@ -223,5 +224,21 @@ describe('show or remove the header', () => {
     const remove = within(region()).getAllByRole('button', { name: 'Remove link “About”' });
     fireEvent.click(must(remove[1]));
     expect(project()?.meta.navLinks?.map((l) => l.label)).toEqual(['Home', 'About']);
+  });
+});
+
+describe('footer settings', () => {
+  it('turns "Back to top" off for the site and hides it on one page', () => {
+    render(<ThemePanel />);
+    const region = screen.getByRole('region', { name: 'Footer' });
+    const toggle = within(region).getByRole('switch', { name: 'Show “Back to top”' });
+    expect(toggle).toBeChecked();
+    fireEvent.click(within(region).getByLabelText(/Hide “Back to top” on this page/));
+    expect(project()?.pages[0]?.hideBackToTop).toBe(true);
+    fireEvent.click(toggle);
+    expect(project()?.meta.backToTop).toBe(false);
+    expect(within(region).queryByLabelText(/on this page/)).toBeNull();
+    fireEvent.click(toggle);
+    expect(project()?.meta.backToTop).toBeUndefined();
   });
 });

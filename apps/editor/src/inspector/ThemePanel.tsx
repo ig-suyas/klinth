@@ -9,6 +9,7 @@ import {
 import { useId, useState, type ReactNode } from 'react';
 import { useEditor } from '../state/store.ts';
 import { Icon } from '../ui/Icon.tsx';
+import { FooterPanel } from './FooterPanel.tsx';
 import { HeaderPanel } from './HeaderPanel.tsx';
 import { SiteCodePanel } from './SiteCodePanel.tsx';
 
@@ -123,6 +124,10 @@ export function ThemePanel() {
 
       <Collapsible id="header" title="Header" defaultOpen>
         <HeaderPanel />
+      </Collapsible>
+
+      <Collapsible id="footer" title="Footer" defaultOpen={false}>
+        <FooterPanel />
       </Collapsible>
 
       <Collapsible id="details" title="Details" defaultOpen>

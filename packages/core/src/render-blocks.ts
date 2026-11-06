@@ -416,16 +416,65 @@ export function renderBlock(section: Section, ctx: BlockCtx): string {
   }
 }
 
-/** The site footer: text, links and a way back to the top. */
-export function renderFooter(p: BlockProps<'footer'>, editSectionId?: string): string {
-  const items = (p.links ?? [])
+/** True when the footer uses alignment, offset or padding (it then needs `FOOTER_CSS`). */
+export function footerPositioned(p: BlockProps<'footer'>): boolean {
+  return (
+    p.textAlign !== undefined ||
+    p.linksAlign !== undefined ||
+    p.topAlign !== undefined ||
+    p.offset !== undefined ||
+    p.padding !== undefined
+  );
+}
+
+/** A validated number as CSS text: at most 3 decimals, never an exponent. */
+function cssNum(n: number): string {
+  const r = Math.round(n * 1000) / 1000;
+  return Object.is(r, -0) ? '0' : String(r);
+}
+
+const ALIGN = new Set<string>(['left', 'center', 'right']);
+/** The class for a group's alignment; only values from the closed list reach the markup. */
+const alignClass = (value: string | undefined, fallback: string): string =>
+  ` al-${value !== undefined && ALIGN.has(value) ? value : fallback}`;
+
+/**
+ * The site footer: text, links and a way back to the top (unless `backToTop` is false).
+ * Without alignment, offset or padding the markup is the same as before. Returns ''
+ * when nothing would be shown.
+ */
+export function renderFooter(
+  p: BlockProps<'footer'>,
+  editSectionId?: string,
+  backToTop = true,
+): string {
+  const linkItems = (p.links ?? [])
     .map((l) => link(l, 'foot-link'))
     .filter(Boolean)
     .map((a) => `<li>${a}</li>`)
     .join('');
+  if (!p.text && !linkItems && !backToTop) return '';
   const edit = editSectionId === undefined ? {} : { editable: true };
   const marker = editSectionId === undefined ? '' : ` data-k-section="${esc(editSectionId)}"`;
-  return `<div class="wrap foot"${marker}>${p.text ? `<p class="foot-text"${field(edit, 'text')}>${esc(p.text)}</p>` : ''}${
-    items ? `<ul class="foot-links" role="list">${items}</ul>` : ''
-  }<a class="totop" href="#top">Back to top <span aria-hidden="true">↑</span></a></div>`;
+  const positioned = footerPositioned(p);
+  const column =
+    p.textAlign !== undefined || p.linksAlign !== undefined || p.topAlign !== undefined;
+  const al = (value: string | undefined, fallback: string) =>
+    column ? alignClass(value, fallback) : '';
+  const parts = `${p.text ? `<p class="foot-text${al(p.textAlign, 'left')}"${field(edit, 'text')}>${esc(p.text)}</p>` : ''}${
+    linkItems
+      ? `<ul class="foot-links${al(p.linksAlign, 'left')}" role="list">${linkItems}</ul>`
+      : ''
+  }${backToTop ? `<a class="totop${al(p.topAlign, 'right')}" href="#top">Back to top <span aria-hidden="true">↑</span></a>` : ''}`;
+  if (!positioned) return `<div class="wrap foot"${marker}>${parts}</div>`;
+  const vars: string[] = [];
+  if (p.padding !== undefined && Number.isFinite(p.padding)) {
+    vars.push(`--fpad:${cssNum(Math.min(Math.max(p.padding, 0), 8))};`);
+  }
+  if (p.offset !== undefined && Number.isFinite(p.offset)) {
+    const x = Math.min(Math.max(p.offset, -20), 20);
+    vars.push(`--fl:${cssNum(Math.max(x, 0))};--fr:${cssNum(Math.max(-x, 0))};`);
+  }
+  const style = vars.length ? ` style="${vars.join('')}"` : '';
+  return `<div class="wrap foot foot-set"${style}${marker}><div class="foot-in${column ? ' foot-col' : ''}">${parts}</div></div>`;
 }

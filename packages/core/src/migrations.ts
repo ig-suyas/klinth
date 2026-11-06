@@ -27,6 +27,10 @@ export const MIGRATIONS: Readonly<Record<number, Migration>> = {
   // free text become spaces; blank lines between free body paragraphs stay. Only
   // whitespace changes, and anything with an unexpected shape is left for validation.
   5: (data) => (Array.isArray(data.pages) ? { ...data, pages: data.pages.map(unbreakPage) } : data),
+  // 6 -> 7: footer alignment, offset and padding, and switches for "Back to top" (site-wide
+  // and per page). All optional; absent means the old footer, so nothing changes. The new
+  // version stops older editors from dropping the settings.
+  6: (data) => ({ ...data }),
 };
 
 /** Single line breaks (and the spaces around them) become one space. */

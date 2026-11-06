@@ -39,6 +39,14 @@ export const embedUrl = z
 
 const linkSchema = z.object({ label: singleLine(80), href }).strict();
 
+/** Footer group alignments, the largest sideways shift (%) and the most padding (rem). */
+export const FOOTER_ALIGNS = ['left', 'center', 'right'] as const;
+export type FooterAlign = (typeof FOOTER_ALIGNS)[number];
+export const FOOTER_MAX_OFFSET = 20;
+export const FOOTER_MAX_PADDING = 8;
+/** The footer's padding (rem) when none is set. */
+export const FOOTER_DEFAULT_PADDING = 2.25;
+
 const imageFields = {
   /** Asset id of an uploaded image. */
   image: id.optional(),
@@ -165,6 +173,14 @@ export const blockPropSchemas = {
     .object({
       text: optLine(300),
       links: z.array(linkSchema).max(8).optional(),
+      /** Where each group sits (copyright text, links, back to top). Not set: the old row. */
+      textAlign: z.enum(FOOTER_ALIGNS).optional(),
+      linksAlign: z.enum(FOOTER_ALIGNS).optional(),
+      topAlign: z.enum(FOOTER_ALIGNS).optional(),
+      /** Sideways shift in % of the content width (never past its edges). */
+      offset: z.number().finite().min(-FOOTER_MAX_OFFSET).max(FOOTER_MAX_OFFSET).optional(),
+      /** Space above and below, in rem. */
+      padding: z.number().finite().min(0).max(FOOTER_MAX_PADDING).optional(),
     })
     .strict(),
   /** Code the user pasted. Runs on the published site; the editor shows it in a sandbox. */

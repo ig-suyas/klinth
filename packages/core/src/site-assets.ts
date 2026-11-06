@@ -415,3 +415,19 @@ export const SITE_CSS_BASE = cut(
   cut(SITE_CSS.slice(0, headerStart) + SITE_CSS.slice(headerEnd), SCROLL_PAD),
   HEADER_MOTION,
 );
+
+/**
+ * Footer position rules, added to site.css only when a footer uses alignment, offset or
+ * padding (other sites stay byte-identical). Values arrive as validated numbers in
+ * `--fpad` (rem), `--fl`/`--fr` (% of the content width; one of them is 0), so the footer
+ * moves sideways without ever leaving the content width or making the page scroll.
+ */
+export const FOOTER_CSS = `.foot-set{display:block;padding-block:calc(var(--fpad,2.25)*1rem)}
+.foot-in{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:1rem 2rem;margin-left:calc(var(--fl,0)*1%);margin-right:calc(var(--fr,0)*1%)}
+.foot-col{flex-direction:column;align-items:stretch;gap:1rem}
+.foot-col>.al-left{align-self:flex-start;text-align:left}
+.foot-col>.al-center{align-self:center;text-align:center}
+.foot-col>.al-right{align-self:flex-end;text-align:right}
+.foot-col>.foot-links.al-center{justify-content:center}
+.foot-col>.foot-links.al-right{justify-content:flex-end}
+`;
