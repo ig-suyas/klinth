@@ -111,7 +111,17 @@ panel scroll is now recorded after focusing). `jsdom` has no `innerText`; the br
 Sections added or removed redraw fully. Inline typing in the preview is not swapped until editing
 ends (by design).
 
-**Push and deploy.** See section 1 end of this entry once done.
+**Push and deploy (2026-11-06).** Commit `cdd671b` pushed to `github.com/ig-suyas/klinth` `main`.
+Editor deployed with `npm run deploy:editor` (existing wrangler login), deployment `1e0f2ca2`,
+production `klinth.pages.dev`. Worker unchanged (no diff under `workers/`), not redeployed. No
+`.env`, `.dev.vars` or private skill tracked; no AI attribution in commit messages. Live check
+(Playwright, fresh context, empty storage, 2100 x 1100): editor loads, the portfolio template
+shows content, a new project has no "Back to top", typing in the Contact heading with the preview
+at the bottom: scroll 4269 -> 4269, section top 250.6 -> 250.6 px, shell loads 1 -> 1, no console
+errors. Note for scripted checks: Playwright ignores the preview's CSS `scale()` when it works out
+click positions inside the nested frame, so at widths where the preview is scaled down
+(for example 1440 px) clicks low in the page miss; use a wide window.
+Earlier: `e8b3985` (6I) pushed and deployed as `20a4ce97`.
 
 ## 1. Current state
 
