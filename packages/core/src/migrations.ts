@@ -40,6 +40,8 @@ export const MIGRATIONS: Readonly<Record<number, Migration>> = {
   // or optional; older files have none, so nothing changes. The new version stops older
   // editors from dropping them.
   8: (data) => ({ ...data }),
+  // 9 -> 10: background and section-transition animation presets (all optional).
+  9: (data) => ({ ...data }),
 };
 
 /** Single line breaks (and the spaces around them) become one space. */

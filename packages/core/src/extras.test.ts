@@ -509,9 +509,9 @@ describe('extras: everything on a second page made from Blank', () => {
 
 describe('schema version 9', () => {
   it('upgrades version 8 files without changing them', () => {
-    expect(SCHEMA_VERSION).toBe(9);
+    expect(SCHEMA_VERSION).toBe(10);
     expect(Object.keys(MIGRATIONS)).toContain('8');
     const v8 = { ...clone(), schemaVersion: 8 };
-    expect(migrateProject(v8)).toEqual({ ...clone(), schemaVersion: 9 });
+    expect(migrateProject(v8)).toEqual({ ...clone(), schemaVersion: SCHEMA_VERSION });
   });
 });

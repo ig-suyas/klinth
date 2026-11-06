@@ -276,8 +276,53 @@
   .anim-demo[data-preset='marquee'] > span {
     animation: demo-slide 1.6s linear infinite !important;
   }
+  .anim-demo[data-preset='rise'] > span,
+  .anim-demo[data-preset='swing'] > span {
+    animation-name: demo-up !important;
+  }
+  .anim-demo[data-preset='slideLeft'] > span {
+    animation-name: demo-from-right !important;
+  }
+  .anim-demo[data-preset='slideRight'] > span {
+    animation-name: demo-from-left !important;
+  }
+  .anim-demo[data-preset='gradient'] > span {
+    inset: -40%;
+    border-radius: 50%;
+    background: radial-gradient(circle at 30% 30%, var(--color-accent), transparent 60%);
+    animation: demo-drift 2.4s ease-in-out infinite alternate !important;
+  }
   .anim-demo[data-preset='none'] > span {
     animation: none !important;
+  }
+}
+@keyframes demo-from-right {
+  0%,
+  20% {
+    opacity: 0;
+    transform: translateX(70%);
+  }
+  60%,
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes demo-from-left {
+  0%,
+  20% {
+    opacity: 0;
+    transform: translateX(-70%);
+  }
+  60%,
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes demo-drift {
+  to {
+    transform: translate(25%, 20%) rotate(40deg);
   }
 }
 @keyframes demo-fade {

@@ -19,6 +19,8 @@ export {
   MAX_ANIMATED_SECTIONS,
   MAX_ANIMATION_DELAY,
   TEXT_PRESETS,
+  TRANSITION_PRESETS,
+  BACKGROUND_PRESETS,
   animationPresets,
   animationSchema,
   animationTargets,

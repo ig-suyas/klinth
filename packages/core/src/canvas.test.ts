@@ -291,9 +291,9 @@ describe('spacer height', () => {
 
 describe('schema version 8', () => {
   it('upgrades version 7 files without changing them', () => {
-    expect(SCHEMA_VERSION).toBe(9);
+    expect(SCHEMA_VERSION).toBe(10);
     expect(Object.keys(MIGRATIONS)).toContain('7');
     const v7 = { ...clone(), schemaVersion: 7 };
-    expect(migrateProject(v7)).toEqual({ ...clone(), schemaVersion: 9 });
+    expect(migrateProject(v7)).toEqual({ ...clone(), schemaVersion: SCHEMA_VERSION });
   });
 });

@@ -130,10 +130,10 @@ describe('animation settings schema', () => {
   });
 
   it('upgrades a version 3 project and keeps animations through a project file', () => {
-    expect(SCHEMA_VERSION).toBe(9);
-    expect(Object.keys(MIGRATIONS)).toEqual(['1', '2', '3', '4', '5', '6', '7', '8']);
+    expect(SCHEMA_VERSION).toBe(10);
+    expect(Object.keys(MIGRATIONS)).toEqual(['1', '2', '3', '4', '5', '6', '7', '8', '9']);
     const upgraded = migrateProject({ ...clone(), schemaVersion: 3 });
-    expect(upgraded.schemaVersion).toBe(9);
+    expect(upgraded.schemaVersion).toBe(10);
     expect(upgraded.pages).toEqual(clone().pages);
     const back = parseProjectFile(serializeProject(animated()));
     expect(must(must(back.pages[0]).sections[0]).animation).toEqual(
@@ -197,7 +197,7 @@ describe('animations in the export', () => {
     const files = exportOf(animated());
     expect(text(files, ANIM_CSS_PATH)).toBe(ANIM_CSS);
     expect(text(files, ANIM_JS_PATH)).toBe(ANIM_JS);
-    expect(ANIM_CSS.length).toBeLessThan(16_000);
+    expect(ANIM_CSS.length).toBeLessThan(18_000);
     expect(ANIM_JS.length).toBeLessThan(8_000);
     const home = text(files, 'index.html');
     expect(home).toMatch(

@@ -119,7 +119,7 @@ describe('schema version 2', () => {
   };
 
   it('has an upgrade step (version 5 is now current, see free.test.ts)', () => {
-    expect(SCHEMA_VERSION).toBe(9);
+    expect(SCHEMA_VERSION).toBe(10);
     expect(Object.keys(MIGRATIONS)).toContain('1');
   });
 

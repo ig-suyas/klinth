@@ -31,7 +31,7 @@ describe('animation panel', () => {
       within(part)
         .getAllByRole('option')
         .map((o) => o.textContent),
-    ).toEqual(['Whole section', 'Heading', 'Pictures', 'Buttons']);
+    ).toEqual(['Whole section', 'Background', 'Heading', 'Pictures', 'Buttons']);
     fireEvent.change(part, { target: { value: 'heading' } });
     rerender(<AnimationPanel section={hero()} />);
     const presets = within(panel).getByRole('radiogroup', { name: 'Animation' });

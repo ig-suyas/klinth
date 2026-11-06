@@ -227,7 +227,9 @@ export function freeSectionProblem(section: SectionLike): string | null {
   if (!free && section.canvas) return 'Only a free section has a canvas';
   if (free && !FREE_BLOCKS.has(section.type)) return 'This section cannot be placed freely';
   if (!free && section.type === 'canvas') return 'A blank canvas is always placed freely';
-  const parts = Object.keys(section.animation ?? {}).filter((k) => k !== 'section');
+  const parts = Object.keys(section.animation ?? {}).filter(
+    (k) => k !== 'section' && k !== 'background',
+  );
   if (free && parts.length > 0) return 'A free section can only animate as a whole';
   return null;
 }
@@ -457,7 +459,11 @@ export function flowToFree<S extends SectionLike>(
   }
   const canvas = freeCanvasSchema.parse({ aspect: ratio, items });
   const { animation, ...rest } = section;
-  const kept = animation?.section ? { animation: { section: animation.section } } : {};
+  const whole = {
+    ...(animation?.section ? { section: animation.section } : {}),
+    ...(animation?.background ? { background: animation.background } : {}),
+  };
+  const kept = Object.keys(whole).length ? { animation: whole } : {};
   return { section: { ...rest, ...kept, layout: 'free', canvas } as S, skipped };
 }
 

@@ -26,8 +26,44 @@
 | Fix: footer, header pop-up     | done (schema v7, not pushed)          |
 | 6G Video options, Blank canvas | done (schema v8, not pushed)          |
 | 6H Extras (7 new components)   | done (schema v9, not pushed)          |
+| 6I Animation presets (more)    | done (schema v10, not pushed)         |
 
 ## 1. Current state
+
+**6I: more animation presets on top of 6E (schema version 10).** `MIGRATIONS[9]` changes nothing
+(new enum values and one new optional part). 6E already had scroll fade/slide up/zoom/blur-in,
+word/letter/typewriter (accessible split), hover lift/tilt/glow, picture parallax, mask wipe and
+marquee; this phase reuses all of it unchanged and adds only the gaps. **New part `background`**
+(every block that has `section`: all but spacer and footer, incl. Blank canvas and free sections;
+`freeSectionProblem`/`flowToFree` now keep `section` and `background`) with presets
+`gradient` ("Moving gradient": `::before` layer of three accent/text radial gradients at low mix,
+`inset:-20%`, `z-index:-1` inside `isolation:isolate;overflow:clip`; `k-drift` keyframes move only
+transform; speed = loop length 30/18/10 s as `--k-background-dur`; still with reduced motion and at
+<= 37.5em) and `parallax` ("Parallax background": `anim.js` sets `--k-by` on the section and
+`k-bpx`, which moves the `::before` layer and a canvas `.canvas-fill` picture; off on small phones
+and with reduced motion). No extra markup: decorative, never read out. **New section transitions**
+(whole section only, entrances with speed/delay/repeat): `rise`, `slideLeft`, `slideRight`, `swing`
+(`k-rise-in`, `k-from-right`, `k-from-left`, `k-swing`; sideways/swing sections get
+`overflow-x:clip`). **Fix:** whole-section animations now also move folded sections (selector
+`>:is(.wrap,.xp)`; before, a folded section's `.wrap` sat inside `.xp` and never moved). Editor:
+"Background" in "What moves", plain labels/help (`presetLabel`/`presetHelp` name background
+parallax separately), live samples in `index.css` for each new preset, free sections offer Whole
+section + Background. `ANIM_CSS` budget raised 16 000 -> 18 000 chars on purpose (now ~16.5 k).
+Tests (unit tests written first and seen failing: 9/10 core, 3/5 editor; the e2e was written after
+the code): core `animation-presets.test.ts` (enums/parts, free sections, markup and timing, phone
+and reduced-motion CSS, sideways clip, fold selector, **every block x part x preset on a second
+page made from Blank** plus the same section twice, accessible split on every block with a heading,
+v10 migration); editor `inspector/AnimationPresets.test.tsx` (labels and a sample for every preset,
+gradient speed without wait, transitions with repeat, canvas parts, background parallax script and
+its reduced-motion path in jsdom); e2e `animation-presets.spec.ts` (Blank -> second page -> moving
+gradient on Big intro, Rise into place on Text and picture, Letter by letter on About -> export ->
+exported site: CLS < 0.02 and no sideways scroll at 375, gradient still on the phone and drifting at
+1280, everything shown with JS off and with reduced motion). New `npm run lighthouse:anim -w
+@klinth/editor` (portfolio with a new preset on every section, assigned by block type): mobile
+100 / 100 / 100 / 100, LCP 1.1 s, CLS 0, TBT 50 ms. Totals: 1019 unit (core 619, templates 47,
+editor 297, api 56), 47 e2e (`--workers=1`, all pass); lint, format, types pass. Changed on purpose: version pins
+9 -> 10 (core and 5 e2e specs), migration key lists, the panel's "What moves" list in
+`AnimationPanel.test.tsx`. Committed locally, **not pushed, not deployed**.
 
 **6H: extras inspired by a reference portfolio (schema version 9).** `MIGRATIONS[8]` changes
 nothing (new block types, all new props optional). Nothing is tied to a page, template or sample
@@ -723,6 +759,10 @@ All phases done; only the push to `github.com/ig-suyas/klinth` (public) waits fo
 repos at ₹0.
 
 ## 3. Files
+
+- `packages/core/src/animation.ts` : new `TRANSITION_PRESETS`, `BACKGROUND_PRESETS`, `background`
+  part; tests in `animation-presets.test.ts`; editor `inspector/AnimationPresets.test.tsx`,
+  `e2e/animation-presets.spec.ts`, `scripts/lighthouse-anim.ts`
 
 - `packages/core/src/extras.ts` (+ `extras.test.ts`) : `EXTRAS_CSS`, `EXTRAS_JS`, shapes, folding,
   page detection, `highlightPhrases`, `rotatorPhrase`; renderers in `render-blocks.ts`

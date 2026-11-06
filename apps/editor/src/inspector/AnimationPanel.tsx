@@ -12,16 +12,17 @@ import {
 } from '@klinth/core';
 import { useId, useState } from 'react';
 import {
-  PRESET_HELP,
-  PRESET_LABELS,
   SPEED_LABELS,
   TARGET_LABELS,
+  presetHelp,
+  presetLabel,
   setSectionAnimation,
 } from '../state/animation.ts';
 import { useEditor } from '../state/store.ts';
 
 /** Speed matters for animations that play, and for the scrolling row. */
-const hasSpeed = (preset: AnimationPreset): boolean => isEntrance(preset) || preset === 'marquee';
+const hasSpeed = (preset: AnimationPreset): boolean =>
+  isEntrance(preset) || preset === 'marquee' || preset === 'gradient';
 
 /**
  * Animation for the selected section: pick the part that moves, a preset (each
@@ -29,9 +30,11 @@ const hasSpeed = (preset: AnimationPreset): boolean => isEntrance(preset) || pre
  * replays the preview so the result is visible at once.
  */
 export function AnimationPanel({ section }: { section: Section }) {
-  // A free section only animates as a whole: its items have their own positions.
+  // A free section only animates as a whole (and its background): items have their own positions.
   const all = animationTargets(section.type);
-  const targets = freeCanvas(section) ? all.filter((t) => t === 'section') : all;
+  const targets = freeCanvas(section)
+    ? all.filter((t) => t === 'section' || t === 'background')
+    : all;
   const [target, setTarget] = useState<AnimationTarget | undefined>(
     () => targets.find((t) => section.animation?.[t]) ?? targets[0],
   );
@@ -116,10 +119,10 @@ export function AnimationPanel({ section }: { section: Section }) {
             </span>
             <span className="min-w-0">
               <span className="block text-[0.8125rem] font-semibold">
-                {preset ? PRESET_LABELS[preset] : 'None'}
+                {preset ? presetLabel(target, preset) : 'None'}
               </span>
               <span className="block text-[0.6875rem] leading-snug text-ink-soft">
-                {preset ? PRESET_HELP[preset] : 'Stays still.'}
+                {preset ? presetHelp(target, preset) : 'Stays still.'}
               </span>
             </span>
           </label>

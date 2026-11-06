@@ -21,6 +21,10 @@ export const ENTRANCE_PRESETS = ['fade', 'slideUp', 'zoom', 'blurIn'] as const;
 export const TEXT_PRESETS = ['words', 'letters', 'typewriter'] as const;
 /** Pictures, buttons and cards react to the pointer. */
 export const HOVER_PRESETS = ['lift', 'tilt', 'glow'] as const;
+/** Whole sections only: bigger scroll-triggered transitions. */
+export const TRANSITION_PRESETS = ['rise', 'slideLeft', 'slideRight', 'swing'] as const;
+/** A decorative layer behind the section: a slowly moving gradient, or one that scrolls slower. */
+export const BACKGROUND_PRESETS = ['gradient', 'parallax'] as const;
 
 export const ANIMATION_PRESETS = [
   ...ENTRANCE_PRESETS,
@@ -29,6 +33,8 @@ export const ANIMATION_PRESETS = [
   'parallax',
   'marquee',
   ...HOVER_PRESETS,
+  ...TRANSITION_PRESETS,
+  'gradient',
 ] as const;
 export type AnimationPreset = (typeof ANIMATION_PRESETS)[number];
 
@@ -40,6 +46,7 @@ export const ANIMATION_TARGETS = [
   'buttons',
   'cards',
   'video',
+  'background',
 ] as const;
 export type AnimationTarget = (typeof ANIMATION_TARGETS)[number];
 
@@ -71,6 +78,8 @@ export const sectionAnimationSchema = z
     buttons: animationSchema.optional(),
     cards: animationSchema.optional(),
     video: animationSchema.optional(),
+    /** A decorative layer behind the content (never the content itself). */
+    background: animationSchema.optional(),
   })
   .strict();
 
@@ -79,25 +88,25 @@ export type SectionAnimation = z.infer<typeof sectionAnimationSchema>;
 export type SplitMode = (typeof TEXT_PRESETS)[number];
 
 const TARGETS: Record<BlockType, readonly AnimationTarget[]> = {
-  hero: ['section', 'heading', 'media', 'buttons'],
-  about: ['section', 'heading', 'media'],
-  textImage: ['section', 'heading', 'media', 'buttons'],
-  gallery: ['section', 'heading', 'media'],
-  video: ['section', 'heading', 'video'],
-  projects: ['section', 'heading', 'media', 'cards'],
-  testimonials: ['section', 'heading', 'cards'],
-  links: ['section', 'heading', 'media', 'cards'],
-  contact: ['section', 'heading', 'buttons'],
-  customCode: ['section'],
+  hero: ['section', 'background', 'heading', 'media', 'buttons'],
+  about: ['section', 'background', 'heading', 'media'],
+  textImage: ['section', 'background', 'heading', 'media', 'buttons'],
+  gallery: ['section', 'background', 'heading', 'media'],
+  video: ['section', 'background', 'heading', 'video'],
+  projects: ['section', 'background', 'heading', 'media', 'cards'],
+  testimonials: ['section', 'background', 'heading', 'cards'],
+  links: ['section', 'background', 'heading', 'media', 'cards'],
+  contact: ['section', 'background', 'heading', 'buttons'],
+  customCode: ['section', 'background'],
   spacer: [],
   footer: [],
-  // Placed freely, so it only animates as a whole.
-  canvas: ['section'],
-  rotator: ['section'],
-  cardStack: ['section', 'heading'],
-  steps: ['section', 'heading'],
-  marquee: ['section', 'heading'],
-  giantText: ['section'],
+  // Placed freely, so it only animates as a whole (and its background).
+  canvas: ['section', 'background'],
+  rotator: ['section', 'background'],
+  cardStack: ['section', 'background', 'heading'],
+  steps: ['section', 'background', 'heading'],
+  marquee: ['section', 'background', 'heading'],
+  giantText: ['section', 'background'],
 };
 
 /** Blocks with one big picture, where parallax fits. */
@@ -116,7 +125,9 @@ export function animationPresets(
   if (!TARGETS[type].includes(target)) return [];
   switch (target) {
     case 'section':
-      return ENTRANCE_PRESETS;
+      return [...ENTRANCE_PRESETS, ...TRANSITION_PRESETS];
+    case 'background':
+      return BACKGROUND_PRESETS;
     case 'heading':
       return [...ENTRANCE_PRESETS, ...TEXT_PRESETS, 'marquee'];
     case 'media':
@@ -141,6 +152,7 @@ export function isEntrance(preset: AnimationPreset): boolean {
   return (
     (ENTRANCE_PRESETS as readonly string[]).includes(preset) ||
     (TEXT_PRESETS as readonly string[]).includes(preset) ||
+    (TRANSITION_PRESETS as readonly string[]).includes(preset) ||
     preset === 'maskWipe'
   );
 }
@@ -181,6 +193,8 @@ export function headingSplit(animation: SectionAnimation | undefined): SplitMode
 // ---- Markup ----
 
 const DURATION: Record<AnimationSpeed, string> = { slow: '1.1s', normal: '.7s', fast: '.45s' };
+/** One loop of the moving gradient. */
+const DRIFT: Record<AnimationSpeed, string> = { slow: '30s', normal: '18s', fast: '10s' };
 /** Time between two pieces of a split heading. */
 const STEP: Record<SplitMode, Record<AnimationSpeed, string>> = {
   words: { slow: '.08s', normal: '.06s', fast: '.04s' },
@@ -212,6 +226,7 @@ export function sectionAnimationMarkup(
   const vars = used.flatMap(([t, a]) => {
     const speed = a.speed ?? 'normal';
     if (a.preset === 'marquee') return [`--k-${t}-dur:${DURATION[speed]}`];
+    if (a.preset === 'gradient') return [`--k-${t}-dur:${DRIFT[speed]}`];
     if (!isEntrance(a.preset)) return [];
     const step = (TEXT_PRESETS as readonly string[]).includes(a.preset)
       ? [`--k-${t}-step:${STEP[a.preset as SplitMode][speed]}`]
@@ -293,19 +308,28 @@ export function splitAttrs(split: { label: string; count: number }): string {
 
 /** Where each part sits inside its section (selector suffixes after the section). */
 const SEL: Record<AnimationTarget, string> = {
-  section: '>.wrap',
+  // A folded section keeps its content inside `.xp`.
+  section: '>:is(.wrap,.xp)',
   heading: ' :is(.title,.display)',
   media: ' :is(.hero-media,.about-media,.split-media,.gallery figure,.cover,.avatar)',
   buttons: ' .button',
   cards: ' :is(.cards>li,.index>li,.quotes>figure,.linklist>li)',
   video: ' .video-facade',
+  background: '::before',
 };
 const EASE = 'cubic-bezier(.2,.7,.2,1)';
-const KEYFRAME: Record<(typeof ENTRANCE_PRESETS)[number], string> = {
+const KEYFRAME: Record<
+  (typeof ENTRANCE_PRESETS)[number] | (typeof TRANSITION_PRESETS)[number],
+  string
+> = {
   fade: 'k-fade',
   slideUp: 'k-up',
   zoom: 'k-zoom',
   blurIn: 'k-blur',
+  rise: 'k-rise-in',
+  slideLeft: 'k-from-right',
+  slideRight: 'k-from-left',
+  swing: 'k-swing',
 };
 
 const dur = (t: AnimationTarget): string => `var(--k-${t}-dur,.7s)`;
@@ -328,8 +352,9 @@ const WITH_HOVER: AnimationTarget[] = ['media', 'buttons', 'cards'];
 /** Each preset names its keyframes in a variable, so one rule per part plays them all. */
 function entranceRules(): string {
   return WITH_ENTRANCE.map((t) => {
-    const names = ENTRANCE_PRESETS.map((p) => `[data-anim-${t}=${p}]{--k-${t}-kf:${KEYFRAME[p]}}`);
-    const presets = is(t, ENTRANCE_PRESETS);
+    const list = t === 'section' ? [...ENTRANCE_PRESETS, ...TRANSITION_PRESETS] : ENTRANCE_PRESETS;
+    const names = list.map((p) => `[data-anim-${t}=${p}]{--k-${t}-kf:${KEYFRAME[p]}}`);
+    const presets = is(t, list);
     return `${names.join('')}
 .k-wait-${t}${presets}${SEL[t]}{opacity:0}
 .k-in-${t}${presets}${SEL[t]}{animation:var(--k-${t}-kf) ${dur(t)} ${EASE} ${start(t)} both}`;
@@ -386,6 +411,10 @@ export const ANIM_CSS = `/* Klinth motion presets. Nothing here hides content wi
 [data-k-split] .k-c{position:relative}
 [data-anim-heading=words] .k-w{overflow:hidden;vertical-align:top;padding-block:.04em .12em;margin-block:-.04em -.12em}
 [data-anim-media=maskWipe]${SEL.media}{position:relative;overflow:hidden}
+[data-anim-background]{position:relative;isolation:isolate;overflow:clip}
+[data-anim-background]::before{content:"";position:absolute;inset:-20%;z-index:-1;pointer-events:none;background:radial-gradient(38% 46% at 22% 30%,color-mix(in srgb,var(--color-accent) 24%,transparent),transparent 70%),radial-gradient(42% 50% at 78% 72%,color-mix(in srgb,var(--fg,var(--color-text)) 9%,transparent),transparent 70%),radial-gradient(30% 36% at 60% 18%,color-mix(in srgb,var(--color-accent) 14%,transparent),transparent 70%)}
+.block-canvas[data-anim-background]>.canvas-fill{top:-8%;height:116%}
+:is([data-anim-section=slideLeft],[data-anim-section=slideRight],[data-anim-section=swing]){overflow-x:clip}
 [data-anim-video=maskWipe] .video-facade{overflow:hidden}
 [data-anim-media=marquee] .gallery,[data-anim-heading=marquee] :is(.title,.display){overflow-x:auto;scrollbar-width:none}
 [data-anim-media=marquee] .gallery::-webkit-scrollbar,[data-anim-heading=marquee] :is(.title,.display)::-webkit-scrollbar{display:none}
@@ -408,6 +437,11 @@ span.k-mq>span{display:inline-block;padding-right:.6em}
 @keyframes k-wipe{from{transform:none}}
 @keyframes k-settle{from{transform:scale(1.08)}}
 @keyframes k-marquee{to{transform:translateX(-50%)}}
+@keyframes k-rise-in{from{opacity:0;transform:translateY(4rem) scale(.96)}}
+@keyframes k-from-right{from{opacity:0;transform:translateX(3rem)}}
+@keyframes k-from-left{from{opacity:0;transform:translateX(-3rem)}}
+@keyframes k-swing{from{opacity:0;transform:perspective(60rem) rotateX(14deg) translateY(2rem)}}
+@keyframes k-drift{0%{transform:translate3d(0,0,0)}50%{transform:translate3d(6%,-4%,0) rotate(8deg) scale(1.08)}100%{transform:translate3d(-5%,4%,0) rotate(-6deg)}}
 @media (prefers-reduced-motion:no-preference){
 ${ORDER}
 ${YIELD}
@@ -422,6 +456,9 @@ ${wipeRules()}
 [data-anim-media=parallax] .k-px{overflow:hidden;border-radius:var(--radius)}
 [data-anim-media=parallax] .k-px img{transform:translate3d(0,var(--k-py,0px),0) scale(1.12)}
 .k-mq{animation:k-marquee var(--k-mq-dur,40s) linear infinite}
+[data-anim-section=swing]>:is(.wrap,.xp){transform-origin:50% 100%}
+[data-anim-background=gradient]::before{animation:k-drift var(--k-background-dur,18s) ease-in-out infinite alternate}
+[data-anim-background=parallax].k-bpx::before,[data-anim-background=parallax].k-bpx>.canvas-fill{transform:translate3d(0,var(--k-by,0px),0)}
 .k-mq-box:is(:hover,:focus-within,.k-paused) .k-mq,.k-mq-wrap:is(:hover,:focus-within,.k-paused) .k-mq{animation-play-state:paused}
 }
 @media (prefers-reduced-motion:no-preference) and (hover:hover){
@@ -430,6 +467,7 @@ ${hoverRules()}
 @media (prefers-reduced-motion:no-preference) and (max-width:37.5em){
 ${WITH_ENTRANCE.map((t) => `[data-anim-${t}=blurIn]{--k-${t}-kf:k-fade}`).join('')}
 .k-in-media[data-anim-media=maskWipe]${SEL.media} img{animation:none}
+[data-anim-background=gradient]::before{animation:none}
 }
 `;
 
@@ -535,11 +573,15 @@ export const ANIM_JS = `(function () {
   });
 
   // Parallax: big pictures move a little slower than the page. Off on small phones.
+  // Background parallax moves the section's own background layer (the CSS reads --k-by).
   var layers = [];
   each(document.querySelectorAll('[data-anim-media=parallax]'), function (section) {
     each(section.querySelectorAll('.hero-media, .about-media, .split-media'), function (m) {
-      if (m.querySelector('img')) layers.push(m);
+      if (m.querySelector('img')) layers.push({ el: m, cls: 'k-px', prop: '--k-py', size: 0.05, rate: -0.12 });
     });
+  });
+  each(document.querySelectorAll('main > [data-anim-background=parallax]'), function (section) {
+    layers.push({ el: section, cls: 'k-bpx', prop: '--k-by', size: 0.08, rate: 0.15 });
   });
   if (!layers.length) return;
   var ticking = false;
@@ -547,16 +589,16 @@ export const ANIM_JS = `(function () {
     ticking = false;
     if (small.matches) return;
     var view = window.innerHeight;
-    layers.forEach(function (m) {
-      var box = m.getBoundingClientRect();
+    layers.forEach(function (l) {
+      var box = l.el.getBoundingClientRect();
       if (box.bottom < 0 || box.top > view) return;
-      var limit = box.height * 0.05;
-      var shift = (box.top + box.height / 2 - view / 2) * -0.12;
-      m.style.setProperty('--k-py', Math.max(-limit, Math.min(limit, shift)).toFixed(1) + 'px');
+      var limit = box.height * l.size;
+      var shift = (box.top + box.height / 2 - view / 2) * l.rate;
+      l.el.style.setProperty(l.prop, Math.max(-limit, Math.min(limit, shift)).toFixed(1) + 'px');
     });
   }
   function toggle() {
-    layers.forEach(function (m) { m.classList.toggle('k-px', !small.matches); });
+    layers.forEach(function (l) { l.el.classList.toggle(l.cls, !small.matches); });
     move();
   }
   window.addEventListener('scroll', function () {

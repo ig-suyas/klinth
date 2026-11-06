@@ -15,6 +15,7 @@ export const TARGET_LABELS: Record<AnimationTarget, string> = {
   buttons: 'Buttons',
   cards: 'Cards',
   video: 'Video thumbnail',
+  background: 'Background',
 };
 
 export const PRESET_LABELS: Record<AnimationPreset, string> = {
@@ -31,6 +32,11 @@ export const PRESET_LABELS: Record<AnimationPreset, string> = {
   lift: 'Lift on hover',
   tilt: 'Tilt on hover',
   glow: 'Glow on hover',
+  rise: 'Rise into place',
+  slideLeft: 'Slide in from the right',
+  slideRight: 'Slide in from the left',
+  swing: 'Swing up',
+  gradient: 'Moving gradient',
 };
 
 export const PRESET_HELP: Record<AnimationPreset, string> = {
@@ -47,7 +53,25 @@ export const PRESET_HELP: Record<AnimationPreset, string> = {
   lift: 'Rises when the pointer is on it.',
   tilt: 'Tilts towards the pointer.',
   glow: 'Gets a soft glow in your accent color.',
+  rise: 'The whole section rises and settles as you reach it.',
+  slideLeft: 'The whole section slides in from the right side.',
+  slideRight: 'The whole section slides in from the left side.',
+  swing: 'The whole section tips up into place.',
+  gradient: 'Soft colors drift slowly behind the content. Still on small phones.',
 };
+
+/** The preset's name for this part (parallax on a background reads differently). */
+export function presetLabel(target: AnimationTarget, preset: AnimationPreset): string {
+  return target === 'background' && preset === 'parallax'
+    ? 'Parallax background'
+    : PRESET_LABELS[preset];
+}
+
+export function presetHelp(target: AnimationTarget, preset: AnimationPreset): string {
+  return target === 'background' && preset === 'parallax'
+    ? 'Soft colors (or the canvas picture) scroll slower than the page. Off on small phones.'
+    : PRESET_HELP[preset];
+}
 
 export const SPEED_LABELS: Record<AnimationSpeed, string> = {
   slow: 'Slow',

@@ -104,7 +104,7 @@ test('three extras on a second page made from Blank: build, preview, export, use
   expect(read('index.html')).not.toContain('js/extras.js');
   expect(read('css/extras.css')).toContain('.xp-panel{');
   expect(read('js/extras.js')).toContain('[data-marquee]');
-  expect(JSON.parse(read('.klinth/project.json')).schemaVersion).toBe(9);
+  expect(JSON.parse(read('.klinth/project.json')).schemaVersion).toBe(10);
 
   // The exported page on its own.
   const context = page.context();
