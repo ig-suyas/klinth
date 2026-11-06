@@ -41,7 +41,8 @@ export const blockDefinitions: BlockDefinitions = {
   },
   video: {
     label: 'Video',
-    description: 'A video you upload or a YouTube or Vimeo link.',
+    description:
+      'One or more videos you upload or link from YouTube or Vimeo: pick the shape, size and frame, and show several as a grid, carousel or stacked deck.',
     defaults: () => ({ heading: 'Watch' }),
   },
   projects: {
@@ -83,7 +84,14 @@ export const blockDefinitions: BlockDefinitions = {
   },
   spacer: {
     label: 'Empty space',
-    description: 'Extra breathing room between sections.',
-    defaults: () => ({ size: 'medium' }),
+    description:
+      'A plain gap between two sections, from 24 to 320 px tall. Nothing goes inside it.',
+    defaults: () => ({ height: 96 }),
+  },
+  canvas: {
+    label: 'Blank canvas',
+    description:
+      'An empty area you design yourself: place text, pictures, buttons and videos anywhere. Pick its height and background.',
+    defaults: () => ({ height: 'half' }),
   },
 };

@@ -19,7 +19,7 @@ import {
   freeSectionProblem,
 } from './free.ts';
 
-export const SCHEMA_VERSION = 7;
+export const SCHEMA_VERSION = 8;
 
 export { HEADER_STYLES, type HeaderStyle } from './header.ts';
 
@@ -97,6 +97,7 @@ export const sectionSchema = z.discriminatedUnion('type', [
   sectionOf('footer'),
   sectionOf('customCode'),
   sectionOf('spacer'),
+  sectionOf('canvas'),
 ]);
 
 export const pageSchema = z

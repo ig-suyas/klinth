@@ -3,6 +3,7 @@ import { PROVIDER_NAME, embedPageUrl, embedPlayerUrl, parseVideoUrl } from './em
 import { escapeHtml as esc, safeUrl } from './html.ts';
 import type { Asset, Section } from './schema.ts';
 import { splitAttrs, splitLines, splitText, type SplitMode } from './animation.ts';
+import { videoLayout, videoMaxWidth, videoStyled } from './video.ts';
 
 /** Per-section render context. */
 export interface BlockCtx {
@@ -264,6 +265,8 @@ function videoFile(id: string | undefined, title: string, ctx: BlockCtx): string
 }
 
 function video(p: BlockProps<'video'>, ctx: BlockCtx): string {
+  // Any look or layout setting: the styled player (needs css/video.css). None: as before.
+  if (videoStyled(p)) return styledVideo(p, ctx);
   const title = (p.heading ?? '').replace(/\s+/g, ' ').trim();
   const embed = p.embedUrl ? videoEmbed(p.embedUrl, title) : '';
   // The player box is what the owner sees and drags, so it carries the marker.
@@ -273,6 +276,153 @@ function video(p: BlockProps<'video'>, ctx: BlockCtx): string {
   );
   const media = marked || videoFile(p.video, title, ctx);
   return `${head(p, ctx)}${media}${paras(p.caption, 'caption', field(ctx, 'caption'))}`;
+}
+
+interface VideoEntry {
+  embedUrl?: string | undefined;
+  video?: string | undefined;
+  poster?: string | undefined;
+  /** Text of the title bar ('' = no bar). */
+  bar: string;
+  /** Its name for screen readers. */
+  title: string;
+  /** Prop path prefix (`''` or `videos.2.`), for the editor's free-layout markers. */
+  path: string;
+}
+
+const oneLine = (text: string | undefined): string => (text ?? '').replace(/\s+/g, ' ').trim();
+
+/** The main video, then the list, as entries; ones with nothing to play are dropped. */
+function videoEntries(p: BlockProps<'video'>, ctx: BlockCtx): VideoEntry[] {
+  const heading = oneLine(p.heading);
+  const main: VideoEntry = {
+    embedUrl: p.embedUrl,
+    video: p.video,
+    poster: p.poster,
+    bar: oneLine(p.titleBar),
+    title: oneLine(p.titleBar) || heading,
+    path: '',
+  };
+  const more = (p.videos ?? []).map((v, i): VideoEntry => ({
+    embedUrl: v.embedUrl,
+    video: v.video,
+    poster: v.poster,
+    bar: oneLine(v.title),
+    title: oneLine(v.title) || (heading ? `${heading} ${i + 2}` : `Video ${i + 2}`),
+    path: `videos.${i}.`,
+  }));
+  return [main, ...more].filter(
+    (e) =>
+      (e.embedUrl !== undefined && parseVideoUrl(e.embedUrl) !== null) ||
+      ctx.assets.get(e.video ?? '')?.kind === 'video',
+  );
+}
+
+/** A picture used as a thumbnail or poster, or undefined. */
+function posterAsset(id: string | undefined, ctx: BlockCtx): Asset | undefined {
+  const asset = id ? ctx.assets.get(id) : undefined;
+  return asset?.kind === 'image' ? asset : undefined;
+}
+
+/** One player: the click-to-load facade (with its thumbnail) or the uploaded file. */
+function videoMedia(
+  e: VideoEntry,
+  p: BlockProps<'video'>,
+  ctx: BlockCtx,
+  first: boolean,
+  marked: boolean,
+): string {
+  const poster = posterAsset(e.poster, ctx);
+  const embed = e.embedUrl ? parseVideoUrl(e.embedUrl) : null;
+  if (embed) {
+    const provider = PROVIDER_NAME[embed.provider];
+    const label = `Play video${e.title ? `: ${e.title}` : ''} (loads the ${provider} player)`;
+    const thumb = poster
+      ? `<img class="video-poster"${source(poster, ctx)} alt=""${sizeAttrs(poster)}${first ? ' fetchpriority="high"' : ' loading="lazy"'} decoding="async">`
+      : '';
+    return `<div class="video-frame${poster ? ' has-poster' : ''}"${marked ? from(ctx, `${e.path}embedUrl`) : ''}><a class="video-facade" href="${esc(embedPageUrl(embed))}" data-embed="${esc(embedPlayerUrl(embed))}" data-title="${esc(e.title || 'Video')}" aria-label="${esc(label)}" rel="noopener noreferrer">${thumb}<span class="play" aria-hidden="true"></span><span class="video-note" aria-hidden="true">${provider} · loads when you press play</span></a></div>`;
+  }
+  const asset = e.video ? ctx.assets.get(e.video) : undefined;
+  if (!asset || asset.kind !== 'video') return '';
+  const posterAttr = poster
+    ? ctx.preview
+      ? ` data-k-poster="${esc(poster.id)}"`
+      : ` poster="${esc(assetPath(poster))}"`
+    : '';
+  // Controls can only be hidden on a silent loop; otherwise visitors could not start it.
+  const controls = p.autoplay === true && p.controls === false ? '' : ' controls';
+  // No `autoplay` attribute: js/video.js starts the loop on screen, never with reduced motion.
+  const loop = p.autoplay === true ? ' muted loop data-autoplay' : '';
+  return `<div class="video-file"${marked ? from(ctx, `${e.path}video`) : ''}><video${source(asset, ctx)}${posterAttr}${controls} playsinline preload="metadata"${loop}${sizeAttrs(asset)} aria-label="${esc(e.title || 'Video')}"></video></div>`;
+}
+
+/** A whole number for CSS, clamped again (the schema already checked it). */
+const cssInt = (n: number, min: number, max: number): number =>
+  Math.round(Math.min(Math.max(n, min), max));
+
+/**
+ * A video section with a look or several videos. Classes come from closed
+ * lists only; sizes are whole numbers in custom properties.
+ */
+function styledVideo(p: BlockProps<'video'>, ctx: BlockCtx): string {
+  const entries = videoEntries(p, ctx);
+  const layout = entries.length < 2 ? 'single' : videoLayout(p);
+  const ratio = p.ratio ?? 'landscape';
+  const classes = [
+    'vids',
+    `vids-${layout}`,
+    `vr-${ratio}`,
+    `vf-${p.frame ?? 'plain'}`,
+    `vs-${p.shadow ?? 'none'}`,
+    `pl-${p.play ?? 'circle'}`,
+    ...(p.ratio !== undefined ? ['has-ratio'] : []),
+    ...(p.radius !== undefined ? ['vid-r'] : []),
+    ...((p.border ?? 0) > 0 ? ['vid-b'] : []),
+  ];
+  const max = videoMaxWidth(p);
+  const style =
+    (max !== null ? `--vmax:${cssInt(max, 1, 100000)};` : '') +
+    (p.radius !== undefined ? `--vrad:${cssInt(p.radius, 0, 48)};` : '') +
+    ((p.border ?? 0) > 0 ? `--vbw:${cssInt(p.border ?? 0, 0, 8)};` : '');
+  // Players in a carousel or deck move around, so only the other layouts carry markers.
+  const marked = layout === 'single' || layout === 'grid';
+  const cards = entries.map((e, i) => {
+    const media = videoMedia(e, p, ctx, ctx.first && i === 0, marked);
+    const bar = e.bar ? `<p class="vid-bar"><span>${esc(e.bar)}</span></p>` : '';
+    return `<div class="vid">${bar}<div class="vid-media">${media}</div></div>`;
+  });
+  const attrs = ` class="${classes.join(' ')}"${style ? ` style="${style}"` : ''}`;
+  const n = cards.length;
+  const name = esc(oneLine(p.heading) || 'Videos');
+  let body: string;
+  if (n === 0) body = '';
+  else if (layout === 'grid') {
+    body = `<ul${attrs} role="list">${cards.map((c) => `<li>${c}</li>`).join('')}</ul>`;
+  } else if (layout === 'carousel') {
+    const slides = cards
+      .map(
+        (c, i) =>
+          `<div class="vc-slide" role="group" aria-roledescription="slide" aria-label="${i + 1} of ${n}">${c}</div>`,
+      )
+      .join('');
+    const dots = cards
+      .map(
+        (_, i) => `<button type="button" class="vc-dot" aria-label="Show video ${i + 1}"></button>`,
+      )
+      .join('');
+    body = `<div${attrs} data-carousel role="region" aria-roledescription="carousel" aria-label="${name}"><div class="vc-track" tabindex="0">${slides}</div><div class="vc-nav" hidden><button type="button" class="vc-btn vc-prev" aria-label="Previous video"><span aria-hidden="true">←</span></button><div class="vc-dots">${dots}</div><button type="button" class="vc-btn vc-next" aria-label="Next video"><span aria-hidden="true">→</span></button></div><p class="v-sr" aria-live="polite"></p></div>`;
+  } else if (layout === 'deck') {
+    const stack = cards
+      .map(
+        (c, i) =>
+          `<div class="vd-card" role="group" aria-roledescription="slide" aria-label="${i + 1} of ${n}">${c}</div>`,
+      )
+      .join('');
+    body = `<div${attrs} data-deck role="region" aria-roledescription="carousel" aria-label="${name}"><div class="vd-stack">${stack}</div><div class="vd-nav" hidden><button type="button" class="vc-btn vd-prev" aria-label="Previous video"><span aria-hidden="true">←</span></button><p class="vd-count" aria-live="polite">1 / ${n}</p><button type="button" class="vc-btn vd-next" aria-label="Next video"><span aria-hidden="true">→</span></button></div></div>`;
+  } else {
+    body = `<div${attrs}>${cards.join('')}</div>`;
+  }
+  return `${head(p, ctx)}${body}${paras(p.caption, 'caption', field(ctx, 'caption'))}`;
 }
 
 /**
@@ -383,6 +533,11 @@ function contact(p: BlockProps<'contact'>, ctx: BlockCtx): string {
 }
 
 function spacer(p: BlockProps<'spacer'>): string {
+  // A height in px (a checked whole number) wins over the named sizes.
+  if (p.height !== undefined && Number.isInteger(p.height)) {
+    const px = Math.min(Math.max(p.height, 8), 480);
+    return `<div class="spacer" style="height:${px}px" aria-hidden="true"></div>`;
+  }
   return `<div class="spacer spacer-${p.size ?? 'medium'}" aria-hidden="true"></div>`;
 }
 
@@ -411,7 +566,9 @@ export function renderBlock(section: Section, ctx: BlockCtx): string {
       return spacer(section.props);
     case 'customCode':
       return customCode(section.props, ctx);
+    // The page renders the footer, and a blank canvas's artboard (it is always free).
     case 'footer':
+    case 'canvas':
       return '';
   }
 }

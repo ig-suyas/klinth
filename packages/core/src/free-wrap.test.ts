@@ -159,7 +159,7 @@ describe('older projects with stored line breaks', () => {
   }
 
   it('migrates line breaks out of headings and free text', () => {
-    expect(SCHEMA_VERSION).toBe(7);
+    expect(SCHEMA_VERSION).toBe(8);
     expect(typeof MIGRATIONS[5]).toBe('function');
     const project = migrateProject(v5());
     const sections = must(project.pages[0]).sections;

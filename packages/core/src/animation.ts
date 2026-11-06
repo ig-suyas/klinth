@@ -91,6 +91,8 @@ const TARGETS: Record<BlockType, readonly AnimationTarget[]> = {
   customCode: ['section'],
   spacer: [],
   footer: [],
+  // Placed freely, so it only animates as a whole.
+  canvas: ['section'],
 };
 
 /** Blocks with one big picture, where parallax fits. */

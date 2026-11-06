@@ -68,6 +68,63 @@ const headFields = {
   navLabel: optLine(30),
 };
 
+// ---- Video look and layouts (all optional; none set = the original player) ----
+
+/** Video shapes: 16:9, 9:16, 1:1 and 4:5. */
+export const VIDEO_RATIOS = ['landscape', 'vertical', 'square', 'portrait'] as const;
+export type VideoRatio = (typeof VIDEO_RATIOS)[number];
+export const VIDEO_SIZES = ['small', 'medium', 'large', 'full'] as const;
+export type VideoSize = (typeof VIDEO_SIZES)[number];
+/** plain = just the video, card = on a soft card, glass = on frosted glass. */
+export const VIDEO_FRAMES = ['plain', 'card', 'glass'] as const;
+export const VIDEO_SHADOWS = ['none', 'soft', 'strong'] as const;
+export const PLAY_STYLES = ['circle', 'square', 'minimal'] as const;
+/** How several videos in one section are shown. */
+export const VIDEO_LAYOUTS = ['single', 'grid', 'carousel', 'deck'] as const;
+export type VideoLayout = (typeof VIDEO_LAYOUTS)[number];
+/** Most videos in one section (the main one plus the list). */
+export const MAX_VIDEOS = 12;
+/** Custom largest width, in px. */
+export const VIDEO_MIN_WIDTH = 160;
+export const VIDEO_MAX_WIDTH = 1600;
+export const VIDEO_MAX_RADIUS = 48;
+export const VIDEO_MAX_BORDER = 8;
+
+/** A whole number of px (or degrees, or %) in a range: never NaN, Infinity or text. */
+const whole = (min: number, max: number) => z.number().int().min(min).max(max);
+
+/** One more video in a section with several. */
+const videoItemSchema = z
+  .object({
+    /** Its name for screen readers, also shown in a title bar above it. */
+    title: optLine(120),
+    video: id.optional(),
+    embedUrl: embedUrl.optional(),
+    /** Asset id of its own thumbnail (embeds) or poster (uploads). */
+    poster: id.optional(),
+  })
+  .strict();
+
+// ---- Spacer and blank canvas ----
+
+/** Spacer heights offered in the editor, in px. */
+export const SPACER_PRESETS = [24, 48, 96, 160, 240, 320] as const;
+export const SPACER_MIN = 8;
+export const SPACER_MAX = 480;
+
+/** Blank canvas heights in % of the screen height; `custom` uses `heightVh` or `heightPx`. */
+export const CANVAS_HEIGHTS = ['quarter', 'half', 'threeQuarter', 'full', 'custom'] as const;
+export type CanvasHeight = (typeof CANVAS_HEIGHTS)[number];
+export const CANVAS_UNITS = ['vh', 'px'] as const;
+export const CANVAS_FILLS = ['none', 'color', 'gradient', 'image'] as const;
+export const CANVAS_VH = { min: 10, max: 200 } as const;
+export const CANVAS_PX = { min: 80, max: 3000 } as const;
+export const CANVAS_MAX_MIN_HEIGHT = 1200;
+export const CANVAS_MAX_DIM = 90;
+
+/** A color as `#rrggbb` (it reaches CSS only as three checked numbers). */
+export const hexColor = z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Use a color like #1f3fe0');
+
 /** Longest custom code, in characters (about 200 KB). */
 export const MAX_CUSTOM_CODE = 200_000;
 
@@ -120,6 +177,32 @@ export const blockPropSchemas = {
       video: id.optional(),
       /** A YouTube or Vimeo page link. Wins over an uploaded video when both are set. */
       embedUrl: embedUrl.optional(),
+      /** Shape of every video in the section (not set: 16:9 players, uploads keep their own). */
+      ratio: z.enum(VIDEO_RATIOS).optional(),
+      size: z.enum(VIDEO_SIZES).optional(),
+      /** Custom largest width in px; wins over `size`. */
+      maxWidth: whole(VIDEO_MIN_WIDTH, VIDEO_MAX_WIDTH).optional(),
+      /** Corner radius in px. */
+      radius: whole(0, VIDEO_MAX_RADIUS).optional(),
+      shadow: z.enum(VIDEO_SHADOWS).optional(),
+      /** Border width in px (0 = none). */
+      border: whole(0, VIDEO_MAX_BORDER).optional(),
+      frame: z.enum(VIDEO_FRAMES).optional(),
+      /** Asset id of a custom thumbnail (embeds) or poster image (uploads). */
+      poster: id.optional(),
+      play: z.enum(PLAY_STYLES).optional(),
+      /** Text in a bar above the main video. */
+      titleBar: optLine(120),
+      /** Uploaded videos: play silently on a loop (never with reduced motion). */
+      autoplay: z.boolean().optional(),
+      /** Uploaded videos: show the player controls (default on; always on unless autoplaying). */
+      controls: z.boolean().optional(),
+      layout: z.enum(VIDEO_LAYOUTS).optional(),
+      /** More videos after the main one. */
+      videos: z
+        .array(videoItemSchema)
+        .max(MAX_VIDEOS - 1)
+        .optional(),
     })
     .strict(),
   projects: z
@@ -185,7 +268,41 @@ export const blockPropSchemas = {
     .strict(),
   /** Code the user pasted. Runs on the published site; the editor shows it in a sandbox. */
   customCode: z.object({ code: text(MAX_CUSTOM_CODE).optional() }).strict(),
-  spacer: z.object({ size: z.enum(['small', 'medium', 'large']).optional() }).strict(),
+  spacer: z
+    .object({
+      size: z.enum(['small', 'medium', 'large']).optional(),
+      /** Height in px; wins over `size`. */
+      height: whole(SPACER_MIN, SPACER_MAX).optional(),
+    })
+    .strict(),
+  /**
+   * An empty area placed freely from the start (its content is the section's
+   * free canvas, see free.ts). These props set its height and background.
+   */
+  canvas: z
+    .object({
+      /** Not set: half the screen height. */
+      height: z.enum(CANVAS_HEIGHTS).optional(),
+      heightUnit: z.enum(CANVAS_UNITS).optional(),
+      /** Custom height in % of the screen height. */
+      heightVh: whole(CANVAS_VH.min, CANVAS_VH.max).optional(),
+      /** Custom height in px. */
+      heightPx: whole(CANVAS_PX.min, CANVAS_PX.max).optional(),
+      /** Never shorter than this, in px. */
+      minHeight: whole(0, CANVAS_MAX_MIN_HEIGHT).optional(),
+      fill: z.enum(CANVAS_FILLS).optional(),
+      /** The color, or where the gradient starts. */
+      color: hexColor.optional(),
+      /** Where the gradient ends. */
+      colorTo: hexColor.optional(),
+      /** Gradient direction in degrees. */
+      angle: whole(0, 360).optional(),
+      /** Asset id of the background picture (decorative). */
+      image: id.optional(),
+      /** Darkens the picture so text stays readable, in %. */
+      dim: whole(0, CANVAS_MAX_DIM).optional(),
+    })
+    .strict(),
 } as const;
 
 export type BlockPropSchemas = typeof blockPropSchemas;

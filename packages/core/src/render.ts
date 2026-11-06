@@ -4,6 +4,8 @@ import {
   footerPositioned,
   renderBlock,
   renderFooter,
+  sizeAttrs,
+  source,
   type BlockCtx,
 } from './render-blocks.ts';
 import type { Asset, Page, Project, Section } from './schema.ts';
@@ -31,6 +33,15 @@ import {
 } from './animation.ts';
 import { freeCanvas, freeTitle } from './free.ts';
 import { FREE_CSS, FREE_CSS_PATH, pageHasFree, renderFreeBoard } from './render-free.ts';
+import { CANVAS_CSS, canvasClasses, renderCanvasInner } from './canvas.ts';
+import {
+  VIDEO_CSS,
+  VIDEO_CSS_PATH,
+  VIDEO_JS,
+  VIDEO_JS_PATH,
+  pageVideoCss,
+  pageVideoJs,
+} from './video.ts';
 
 export { assetPath };
 
@@ -229,6 +240,8 @@ function renderPage(
   const code = siteCode(project);
   const animates = pageAnimates(page);
   const free = pageHasFree(page);
+  const videoCss = pageVideoCss(page);
+  const videoJs = pageVideoJs(page);
   const title = page.slug === '' ? meta.title : `${page.title} | ${meta.title}`;
   const favicon = faviconAsset(project, assets);
   const icon = favicon ? assetPath(favicon) : MONOGRAM_PATH;
@@ -256,7 +269,18 @@ function renderPage(
       const canvas = freeCanvas(section);
       const layout = canvas ? ' block-free' : '';
       const inner = canvas ? renderFreeBoard(canvas, ctx) : renderBlock(section, ctx);
-      return `<section id="${esc(sectionAnchor(section))}" class="block block-${section.type}${layout} bg-${bg}${anim.classes}"${marker}${anim.attrs}><div class="wrap">${inner}</div></section>`;
+      // A blank canvas brings its own background and sized area around the artboard.
+      const blank = section.type === 'canvas' ? section.props : null;
+      const content = blank
+        ? renderCanvasInner(blank, inner, {
+            assets,
+            first: ctx.first,
+            source: (asset) => source(asset, ctx),
+            sizeAttrs,
+          })
+        : `<div class="wrap">${inner}</div>`;
+      const extra = blank ? canvasClasses(blank) : '';
+      return `<section id="${esc(sectionAnchor(section))}" class="block block-${section.type}${layout}${extra} bg-${bg}${anim.classes}"${marker}${anim.attrs}>${content}</section>`;
     })
     .join('\n');
   const footer = footers
@@ -276,8 +300,8 @@ function renderPage(
 <link rel="icon" href="${esc(icon)}">
 <meta name="theme-color" content="${esc(project.theme.colors.background)}">
 ${preloadFonts(project, options)}<link rel="stylesheet" href="css/site.css">
-${animates ? `<link rel="stylesheet" href="${ANIM_CSS_PATH}">\n` : ''}${free ? `<link rel="stylesheet" href="${FREE_CSS_PATH}">\n` : ''}${split ? `<link rel="stylesheet" href="${HEADER_CSS_PATH}">\n` : ''}${code.css ? `<link rel="stylesheet" href="${CUSTOM_CSS_PATH}">\n` : ''}<script src="js/site.js" defer></script>
-${animates ? `<script src="${ANIM_JS_PATH}" defer></script>\n` : ''}${split ? `<script src="${HEADER_JS_PATH}" defer></script>\n` : ''}</head>
+${animates ? `<link rel="stylesheet" href="${ANIM_CSS_PATH}">\n` : ''}${free ? `<link rel="stylesheet" href="${FREE_CSS_PATH}">\n` : ''}${videoCss ? `<link rel="stylesheet" href="${VIDEO_CSS_PATH}">\n` : ''}${split ? `<link rel="stylesheet" href="${HEADER_CSS_PATH}">\n` : ''}${code.css ? `<link rel="stylesheet" href="${CUSTOM_CSS_PATH}">\n` : ''}<script src="js/site.js" defer></script>
+${animates ? `<script src="${ANIM_JS_PATH}" defer></script>\n` : ''}${videoJs ? `<script src="${VIDEO_JS_PATH}" defer></script>\n` : ''}${split ? `<script src="${HEADER_JS_PATH}" defer></script>\n` : ''}</head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
 ${shown ? `${renderHeader(project, page, { assets, preview: options.preview === true, editable })}\n` : ''}<main id="main">
@@ -293,6 +317,11 @@ function siteHasPositionedFooter(project: Project): boolean {
   return project.pages.some((page) =>
     page.sections.some((s) => s.type === 'footer' && footerPositioned(s.props)),
   );
+}
+
+/** True when any page has a blank canvas (its rules then join `css/free.css`). */
+function siteHasCanvas(project: Project): boolean {
+  return project.pages.some((page) => page.sections.some((s) => s.type === 'canvas'));
 }
 
 /**
@@ -332,7 +361,11 @@ export function renderSite(project: Project, options: RenderOptions = {}): SiteF
           { path: ANIM_JS_PATH, content: ANIM_JS },
         ]
       : []),
-    ...(project.pages.some(pageHasFree) ? [{ path: FREE_CSS_PATH, content: FREE_CSS }] : []),
+    ...(project.pages.some(pageHasFree)
+      ? [{ path: FREE_CSS_PATH, content: FREE_CSS + (siteHasCanvas(project) ? CANVAS_CSS : '') }]
+      : []),
+    ...(project.pages.some(pageVideoCss) ? [{ path: VIDEO_CSS_PATH, content: VIDEO_CSS }] : []),
+    ...(project.pages.some(pageVideoJs) ? [{ path: VIDEO_JS_PATH, content: VIDEO_JS }] : []),
     ...(code.css ? [{ path: CUSTOM_CSS_PATH, content: withNewline(code.css) }] : []),
     ...(code.js ? [{ path: CUSTOM_JS_PATH, content: withNewline(code.js) }] : []),
     ...(faviconAsset(project, assets) ? [] : [{ path: MONOGRAM_PATH, content: monogram(project) }]),

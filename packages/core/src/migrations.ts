@@ -31,6 +31,10 @@ export const MIGRATIONS: Readonly<Record<number, Migration>> = {
   // and per page). All optional; absent means the old footer, so nothing changes. The new
   // version stops older editors from dropping the settings.
   6: (data) => ({ ...data }),
+  // 7 -> 8: video look and layouts (several videos per section), the spacer's height in px
+  // and the blank canvas section. All optional or new; older files have none, so nothing
+  // changes. The new version stops older editors from dropping them.
+  7: (data) => ({ ...data }),
 };
 
 /** Single line breaks (and the spaces around them) become one space. */

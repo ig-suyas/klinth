@@ -1,4 +1,5 @@
 import {
+  canvasAspect,
   freeCanvas,
   freeTitle,
   type BlockType,
@@ -75,7 +76,18 @@ export function addSection(
 ): { project: unknown; id: string } {
   const sections = project.pages[pageIndex]?.sections ?? [];
   const id = newSectionId(type, new Set(sections.map((s) => s.id)));
-  const section = { id, type, props: blockDefinitions[type].defaults() };
+  const props = blockDefinitions[type].defaults();
+  // A blank canvas is placed freely from the start: an empty artboard as tall as its height.
+  const section =
+    type === 'canvas'
+      ? {
+          id,
+          type,
+          layout: 'free',
+          canvas: { aspect: canvasAspect(props as Props), items: [] },
+          props,
+        }
+      : { id, type, props };
   const after = sections.findIndex((s) => s.id === afterId);
   const footer = sections.findIndex((s) => s.type === 'footer');
   const at = after >= 0 ? after + 1 : footer >= 0 ? footer : sections.length;

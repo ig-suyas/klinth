@@ -101,7 +101,7 @@ test('apply three animations, try them in the preview and export', async ({ page
     schemaVersion: number;
     pages: { sections: { type: string; animation?: unknown }[] }[];
   };
-  expect(saved.schemaVersion).toBe(7);
+  expect(saved.schemaVersion).toBe(8);
   const byType = (type: string) => saved.pages[0]?.sections.find((s) => s.type === type);
   expect(byType('hero')?.animation).toEqual({ heading: { preset: 'words', speed: 'slow' } });
   expect(byType('projects')?.animation).toEqual({ cards: { preset: 'lift' } });

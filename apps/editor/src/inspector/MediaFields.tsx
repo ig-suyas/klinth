@@ -31,8 +31,10 @@ export function ImageField({
   const id = asText(item[spec.key]);
   const asset = useAsset(id);
   const url = useAssetUrl(asset ? id : undefined);
-  const alt = asText(item[spec.altKey]);
-  const altPath = [...path.slice(0, -1), spec.altKey];
+  // No description key: a decorative picture (a thumbnail, a background).
+  const altKey = spec.altKey ?? '';
+  const alt = altKey ? asText(item[altKey]) : '';
+  const altPath = [...path.slice(0, -1), altKey];
   const choose = () =>
     openLibrary({
       mode: 'pick',
@@ -60,7 +62,9 @@ export function ImageField({
               <button
                 type="button"
                 className="btn btn-quiet min-h-7 px-2 text-xs hover:text-danger"
-                onClick={() => onPatch({ [spec.key]: undefined, [spec.altKey]: undefined })}
+                onClick={() =>
+                  onPatch({ [spec.key]: undefined, ...(altKey ? { [altKey]: undefined } : {}) })
+                }
               >
                 Remove
               </button>
@@ -77,7 +81,8 @@ export function ImageField({
           Choose a picture
         </button>
       )}
-      {asset ? (
+      {spec.help ? <p className="help">{spec.help}</p> : null}
+      {asset && altKey ? (
         <div>
           <label className="label" htmlFor={altId}>
             Describe the picture
@@ -88,7 +93,7 @@ export function ImageField({
             value={alt}
             maxLength={maxLength(propSchema(blockType, altPath))}
             aria-describedby={`${altId}-help`}
-            onChange={(e) => onPatch({ [spec.altKey]: e.target.value.replace(/[\r\n]+/g, ' ') })}
+            onChange={(e) => onPatch({ [altKey]: e.target.value.replace(/[\r\n]+/g, ' ') })}
           />
           {alt.trim() ? (
             <p id={`${altId}-help`} className="help">

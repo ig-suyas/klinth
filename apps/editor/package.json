@@ -12,7 +12,8 @@
     "e2e": "playwright test",
     "build:deploy": "tsc --noEmit && vite build --mode deploy",
     "deploy": "npm run build:deploy && wrangler pages deploy dist --project-name klinth --branch main",
-    "lighthouse:free": "node scripts/lighthouse-free.ts"
+    "lighthouse:free": "node scripts/lighthouse-free.ts",
+    "lighthouse:video": "node scripts/lighthouse-video.ts"
   },
   "dependencies": {
     "@fontsource-variable/bricolage-grotesque": "^5.3.0",

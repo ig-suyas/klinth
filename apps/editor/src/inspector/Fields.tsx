@@ -39,6 +39,7 @@ export function Help({ id, text }: { id: string; text: string | undefined }) {
 /** One inspector control, picked from the field's kind. */
 export function Field(props: FieldProps) {
   const { spec } = props;
+  if (spec.when && !spec.when(props.item)) return null;
   switch (spec.kind) {
     case 'line':
     case 'text':
@@ -47,6 +48,12 @@ export function Field(props: FieldProps) {
       return <ChoiceField {...props} spec={spec} />;
     case 'number':
       return <NumberField {...props} spec={spec} />;
+    case 'toggle':
+      return <ToggleField {...props} spec={spec} />;
+    case 'color':
+      return <ColorField {...props} spec={spec} />;
+    case 'presets':
+      return <PresetsField {...props} spec={spec} />;
     case 'link':
       return isObjectProp(props.blockType, props.path) ? (
         <LinkObjectField {...props} spec={spec} />
@@ -198,6 +205,115 @@ function NumberField({
         </button>
       ) : null}
     </div>
+  );
+}
+
+/** On or off; stored only when it differs from what the site does anyway. */
+function ToggleField({
+  spec,
+  value,
+  onChange,
+}: FieldProps & { spec: Extract<FieldSpec, { kind: 'toggle' }> }) {
+  const id = useId();
+  const on = typeof value === 'boolean' ? value : spec.fallback;
+  return (
+    <div>
+      <label htmlFor={id} className="flex cursor-pointer items-center justify-between gap-3">
+        <span className="label mb-0">{spec.label}</span>
+        <input
+          id={id}
+          type="checkbox"
+          role="switch"
+          className="size-4 accent-accent"
+          checked={on}
+          aria-describedby={spec.help ? `${id}-help` : undefined}
+          onChange={(e) =>
+            onChange(e.target.checked === spec.fallback ? undefined : e.target.checked)
+          }
+        />
+      </label>
+      <Help id={`${id}-help`} text={spec.help} />
+    </div>
+  );
+}
+
+const HEX = /^#[0-9a-f]{6}$/i;
+
+/** A color picker with the #rrggbb value next to it (typed values are saved once complete). */
+function ColorField({
+  spec,
+  value,
+  onChange,
+}: FieldProps & { spec: Extract<FieldSpec, { kind: 'color' }> }) {
+  const id = useId();
+  const current = typeof value === 'string' && HEX.test(value) ? value : spec.fallback;
+  const [draft, setDraft] = useState(current);
+  const [seen, setSeen] = useState(current);
+  if (current !== seen) {
+    setSeen(current);
+    setDraft(current);
+  }
+  return (
+    <div>
+      <label className="label" htmlFor={id}>
+        {spec.label}
+      </label>
+      <div className="flex items-center gap-2">
+        <input
+          type="color"
+          aria-label={`${spec.label}: pick`}
+          className="h-9 w-12 shrink-0 cursor-pointer rounded-md border border-line bg-panel p-0.5"
+          value={current.toLowerCase()}
+          onChange={(e) => onChange(e.target.value.toLowerCase())}
+        />
+        <input
+          id={id}
+          className="input font-mono"
+          value={draft}
+          maxLength={7}
+          spellCheck={false}
+          aria-invalid={!HEX.test(draft)}
+          onChange={(e) => {
+            setDraft(e.target.value);
+            if (HEX.test(e.target.value)) onChange(e.target.value.toLowerCase());
+          }}
+        />
+      </div>
+    </div>
+  );
+}
+
+/** A row of fixed sizes, like 48 / 96 / 160 px. */
+function PresetsField({
+  spec,
+  value,
+  onChange,
+}: FieldProps & { spec: Extract<FieldSpec, { kind: 'presets' }> }) {
+  const id = useId();
+  const current = typeof value === 'number' ? value : spec.fallback;
+  return (
+    <fieldset aria-describedby={spec.help ? `${id}-help` : undefined}>
+      <legend className="label">{spec.label}</legend>
+      <div className="grid grid-cols-3 gap-1 rounded-lg bg-sunk p-1">
+        {spec.options.map((option) => (
+          <label
+            key={option}
+            className="relative flex min-h-8 cursor-pointer items-center justify-center rounded-md px-2 text-center text-[0.8125rem] font-medium text-ink-soft has-checked:bg-panel has-checked:text-ink has-checked:shadow-[0_1px_2px_rgba(29,27,24,.12)] has-focus-visible:outline-2 has-focus-visible:outline-accent"
+          >
+            <input
+              type="radio"
+              className="sr-only"
+              name={id}
+              value={option}
+              checked={current === option}
+              onChange={() => onChange(option)}
+            />
+            {option} {spec.unit}
+          </label>
+        ))}
+      </div>
+      <Help id={`${id}-help`} text={spec.help} />
+    </fieldset>
   );
 }
 

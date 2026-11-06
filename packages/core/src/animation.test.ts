@@ -130,10 +130,10 @@ describe('animation settings schema', () => {
   });
 
   it('upgrades a version 3 project and keeps animations through a project file', () => {
-    expect(SCHEMA_VERSION).toBe(7);
-    expect(Object.keys(MIGRATIONS)).toEqual(['1', '2', '3', '4', '5', '6']);
+    expect(SCHEMA_VERSION).toBe(8);
+    expect(Object.keys(MIGRATIONS)).toEqual(['1', '2', '3', '4', '5', '6', '7']);
     const upgraded = migrateProject({ ...clone(), schemaVersion: 3 });
-    expect(upgraded.schemaVersion).toBe(7);
+    expect(upgraded.schemaVersion).toBe(8);
     expect(upgraded.pages).toEqual(clone().pages);
     const back = parseProjectFile(serializeProject(animated()));
     expect(must(must(back.pages[0]).sections[0]).animation).toEqual(

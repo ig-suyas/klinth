@@ -1,7 +1,10 @@
 import {
   MAX_FREE_FONT,
+  MAX_FREE_ITEMS,
   MIN_FREE_FONT,
   freeCanvas,
+  parseVideoUrl,
+  type Asset,
   freeWarnings,
   readingOrder,
   type FreeItem,
@@ -19,6 +22,8 @@ import {
   updateFreeItem,
 } from '../state/free.ts';
 import { useFreeUi } from '../state/free-intent.ts';
+import { addFreeItem, type NewItem } from '../state/canvas.ts';
+import { useLibrary, withAsset } from '../media/files.ts';
 import { useEditor } from '../state/store.ts';
 import { ConfirmDialog } from '../ui/ConfirmDialog.tsx';
 
@@ -112,11 +117,16 @@ export function FreePanel({ section }: { section: Section }) {
 
       {current ? <ItemSettings key={current.id} section={section} item={current} /> : null}
 
-      <div className="border-t border-line pt-4">
-        <button type="button" className="btn btn-line w-full" onClick={() => setConfirming(true)}>
-          Return to optimized layout
-        </button>
-      </div>
+      <AddItems section={section} count={items.length} />
+
+      {/* A blank canvas has no optimized layout to return to. */}
+      {section.type === 'canvas' ? null : (
+        <div className="border-t border-line pt-4">
+          <button type="button" className="btn btn-line w-full" onClick={() => setConfirming(true)}>
+            Return to optimized layout
+          </button>
+        </div>
+      )}
       <AnimatePresence>
         {confirming ? (
           <ConfirmDialog
@@ -137,6 +147,118 @@ export function FreePanel({ section }: { section: Section }) {
           </ConfirmDialog>
         ) : null}
       </AnimatePresence>
+    </section>
+  );
+}
+
+const ADD_TEXT: { type: 'title' | 'subtitle' | 'body'; label: string }[] = [
+  { type: 'title', label: 'Heading' },
+  { type: 'subtitle', label: 'Smaller heading' },
+  { type: 'body', label: 'Text' },
+];
+
+/** Buttons that put a new text, button, picture or video on the canvas (then select it). */
+function AddItems({ section, count }: { section: Section; count: number }) {
+  const change = useEditor((s) => s.change);
+  const notify = useEditor((s) => s.notify);
+  const pageIndex = useEditor((s) => s.pageIndex);
+  const selectItem = useFreeUi((s) => s.selectItem);
+  const openLibrary = useLibrary((s) => s.open);
+  const [link, setLink] = useState('');
+  const id = useId();
+  const full = count >= MAX_FREE_ITEMS;
+  const linkOk = parseVideoUrl(link) !== null;
+  const add = (what: NewItem, newAsset?: Asset) => {
+    let added: string | null = null;
+    const problem = change((p) => {
+      const result = addFreeItem(withAsset(p, newAsset), pageIndex, section.id, what);
+      if ('problem' in result) return p;
+      added = result.item;
+      return result.project;
+    });
+    if (problem) notify(`That could not be added: ${problem}`);
+    else if (added) selectItem(added);
+  };
+  return (
+    <section aria-labelledby={`${id}-add`} className="space-y-2 border-t border-line pt-4">
+      <h3 id={`${id}-add`} className="label">
+        Add to the canvas
+      </h3>
+      {count === 0 ? (
+        <p className="help">The canvas is empty. Add something, then drag it into place.</p>
+      ) : null}
+      <div className="grid grid-cols-2 gap-1.5">
+        {ADD_TEXT.map((t) => (
+          <button
+            key={t.type}
+            type="button"
+            className="btn btn-line"
+            disabled={full}
+            onClick={() => add({ type: t.type })}
+          >
+            {t.label}
+          </button>
+        ))}
+        <button
+          type="button"
+          className="btn btn-line"
+          disabled={full}
+          onClick={() => add({ type: 'button' })}
+        >
+          Button
+        </button>
+        <button
+          type="button"
+          className="btn btn-line col-span-2"
+          disabled={full}
+          onClick={() =>
+            openLibrary({
+              mode: 'pick',
+              kind: 'image',
+              onPick: (picked, isNew) =>
+                add(
+                  { type: 'image', image: picked.id, width: picked.width, height: picked.height },
+                  isNew ? picked : undefined,
+                ),
+            })
+          }
+        >
+          Picture
+        </button>
+      </div>
+      <div className="flex items-end gap-1.5">
+        <div className="min-w-0 flex-1">
+          <label className="label" htmlFor={`${id}-video`}>
+            Video link
+          </label>
+          <input
+            id={`${id}-video`}
+            className="input"
+            inputMode="url"
+            placeholder="https://youtu.be/..."
+            spellCheck={false}
+            value={link}
+            onChange={(e) => setLink(e.target.value)}
+          />
+        </div>
+        <button
+          type="button"
+          className="btn btn-line shrink-0"
+          disabled={full || !linkOk}
+          onClick={() => {
+            add({ type: 'video', embedUrl: link });
+            setLink('');
+          }}
+        >
+          Add video
+        </button>
+      </div>
+      {link.trim() && !linkOk ? (
+        <p className="error-text" role="alert">
+          Use a YouTube or Vimeo link.
+        </p>
+      ) : null}
+      {full ? <p className="help">That is the most a canvas can hold ({MAX_FREE_ITEMS}).</p> : null}
     </section>
   );
 }

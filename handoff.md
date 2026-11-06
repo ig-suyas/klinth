@@ -24,8 +24,79 @@
 | 6F Free canvas, Part 2 of 2    | done (drag to free, warning, editing) |
 | Fix: free resize and sizing    | done (schema v6)                      |
 | Fix: footer, header pop-up     | done (schema v7, not pushed)          |
+| 6G Video options, Blank canvas | done (schema v8, not pushed)          |
 
 ## 1. Current state
+
+**6G: video options, several videos per section, Blank canvas, bigger Empty space (schema
+version 8).** `MIGRATIONS[7]` changes nothing (all new fields optional, new block type). Rules kept:
+no raw iframe HTML (links only, ids re-parsed, players rebuilt from the id), youtube-nocookie /
+player.vimeo.com only (also checked again in `video.js`), click-to-load facade, lazy loading, and
+only checked whole numbers in CSS (custom properties) or classes from closed lists.
+**Video** (`blocks.ts`, renderer in `render-blocks.ts` `styledVideo`, CSS/JS in new `video.ts`):
+optional `ratio` landscape|vertical|square|portrait (16:9, 9:16, 1:1, 4:5), `size`
+small|medium|large|full (px per shape in `VIDEO_WIDTHS`; unset = full for landscape, medium for the
+rest), `maxWidth` (int 160-1600, wins), `radius` (0-48), `border` (0-8), `shadow` none|soft|strong,
+`frame` plain|card|glass, `poster` (image asset: facade thumbnail, or `poster=` on uploads; counts
+in `assetUsage`, `poster` added to `ASSET_KEYS`), `play` circle|square|minimal, `titleBar` (one
+line), `autoplay` (uploads: `muted loop data-autoplay`, never the `autoplay` attribute; `video.js`
+plays it only on screen and never with reduced motion, then it gets controls), `controls` (can only
+be off on a silent loop), `layout` single|grid|carousel|deck and `videos` (up to 11 more:
+`{title, video|embedUrl, poster}`; total `MAX_VIDEOS` = 12). **No setting set = byte-identical old
+markup and no new files.** Otherwise the section links `css/video.css`; `js/video.js` is linked for
+styled sections **and for any page with two or more videos** (so "one at a time" also covers old
+pages; templates have no videos, snapshots unchanged). Layouts: grid = `<ul>` auto-fit; carousel =
+native scroll-snap row (`[data-carousel]`, works and swipes without JS), JS adds arrows, dots,
+ArrowLeft/Right/Home/End, mouse/pen swipe > 40 px (touch stays native scroll), `inert` on hidden
+slides, a live "Video n of N"; neighbours show beside the active slide, scaled (vertical/small
+sizes); deck (`[data-deck]`) = plain column without JS, JS stacks cards (`--d` depth, peeking
+above), prev/next arrows and keys cycle. Slide change pauses `<video>` and closes loaded players
+(the facade is put back). `video.js` loads facades itself (capture phase, before `site.js`), so a new
+player closes the others; a `<video>` play pauses other non-loop videos and closes players. Phones
+(<= 37.49rem): carousel slides 100% (one at a time), grid one column. Motion only inside
+`prefers-reduced-motion: no-preference`; reduced motion = instant scroll, no transitions, no loops.
+Free layout markers stay on single/grid players only (`videos.N.embedUrl` too).
+**Blank canvas** (new block `canvas`, `canvas.ts`): always `layout:'free'` (schema refuses it in
+flow; `FREE_BLOCKS` has it; no SEO warning since it never converts; no "Return to optimized
+layout"). Props: `height` quarter|half|threeQuarter|full|custom (25/50/75/100 vh), `heightUnit`
+vh|px, `heightVh` 10-200, `heightPx` 80-3000, `minHeight` 0-1200 px, `fill`
+none|color|gradient|image, `color`/`colorTo` (`#rrggbb`, rendered only as `--c1r/g/b` numbers),
+`angle` 0-360, `image` (decorative `<img alt="">` behind), `dim` 0-90. Section is
+`block-canvas canvas-vh|px [canvas-dark]` with the fill, then `.wrap.canvas-wrap` (`--ch`, `--cmin`,
+`min-height:max(min px, ch svh)`, vh fallback) around the normal free board. Maths: artboard aspect =
+content width / height on a reference screen (`CANVAS_REF` 1120 x 900), so there it fills the section;
+elsewhere the section keeps its height and the board sits centred (same scaling as every free
+layout). A height change (`resizeCanvas`, editor `state/canvas.ts setCanvasProps`) keeps items at the
+same px from the top and never cuts off the lowest item. White text (`canvas-dark`) when the fill is
+dark. `CANVAS_CSS` is appended to `css/free.css` only when the site has a canvas. Editor: canvas
+settings above the free panel; new **"Add to the canvas"** in every free panel (Heading, Smaller
+heading, Text, Button, Picture from the media library, Video link) via `addFreeItem` (one undo step,
+selects the new item, grows the board for tall text). Empty boards get a dashed outline in the preview.
+**Empty space**: `height` (int 8-480 px, wins over the old `size`; presets 24/48/96/160/240/320,
+new default 96); descriptions in "Add a section" updated (Blank canvas listed after Contact).
+Inspector: new field kinds `toggle`, `color`, `presets`, optional `when(props)` on any field, and
+`image` without `altKey` (decorative). Preview inlines `video.css`/`video.js`, fills
+`data-k-poster`. Tests (written first, seen failing): core `video.test.ts` (validation incl.
+NaN/Infinity/strings/odd ids/embed code, 12 cap, byte-identical default, each shape's export, widths,
+style classes and numbers, poster/loop/controls, asset usage, grid/carousel/deck markup, no-JS
+state, js for two plain videos, reduced-motion CSS, player hosts), `canvas.test.ts` (height maths,
+aspect, resize, validation, always free, export numbers, fill, dark text, free.css, spacer, v8
+migration); editor `preview/video-script.test.ts` (jsdom: keys, arrows, dots, swipe/cancel/vertical,
+smooth vs instant scroll, pause on slide change, deck cycling, one at a time, other host refused,
+loops kept, on-screen play, reduced motion, no IO), `state/canvas.test.ts`,
+`inspector/BlankCanvas.test.tsx`; e2e `video-canvas.spec.ts` (list descriptions, carousel in the
+preview with keys/arrows/dots and neighbours, canvas 3/4 height, add items, drag with no warning,
+export checks, then the exported site: mouse swipe, no iframe, no overflow at 1280 and 375, one
+slide per view on phones). Changed on purpose: version pins 7 -> 8, migration key lists, spacer
+`size` hidden in the inspector (`UNUSED_PROPS`), e2e version pins in `animations`, `header-links`,
+`site-style` specs. Exported markers are `data-carousel` / `data-deck` (no `data-k-*` in exports).
+Lighthouse 13.6 (`npm run lighthouse:video -w @klinth/editor`: portfolio + vertical carousel + deck +
+square grid + canvas, mobile, all four categories, fails < 95): 100 / 100 / 100 / 100, LCP 1.1 s,
+CLS 0, TBT 0. Totals: 966 unit (core 588, templates 46, editor 276, api 56), 46 e2e
+(`--workers=1`; `animations.spec` failed once in the full run, then passed 5/5 alone: the known
+lost-click timing flake). Lint, format, types and build pass. Committed locally, **not pushed, not
+deployed**. Not done: right-to-left pages do not mirror the carousel keys; carousel/deck players
+carry no free-layout markers (dragging them out of a carousel converts only the heading and text).
 
 **Fix: footer position, header pop-up, "Back to top" (schema version 7).** `MIGRATIONS[6]`
 changes nothing (all new fields optional; absent = the old footer, "Back to top" shown).
@@ -586,6 +657,14 @@ All phases done; only the push to `github.com/ig-suyas/klinth` (public) waits fo
 repos at ₹0.
 
 ## 3. Files
+
+- `packages/core/src/video.ts` (+ `video.test.ts`) : video widths, `videoStyled`, `pageVideoCss/Js`,
+  `VIDEO_CSS`, `VIDEO_JS`; styled markup in `render-blocks.ts` (`styledVideo`)
+- `packages/core/src/canvas.ts` (+ `canvas.test.ts`) : blank canvas height maths, `resizeCanvas`,
+  fill rendering, `CANVAS_CSS`
+- `apps/editor/src/state/canvas.ts` (+ test) : `setCanvasProps`, `newFreeItem`, `addFreeItem`
+- `apps/editor/src/inspector/BlankCanvas.test.tsx`, `preview/video-script.test.ts`
+- `apps/editor/e2e/video-canvas.spec.ts`, `scripts/lighthouse-video.ts`
 
 - `packages/core/src/footer.test.ts` : footer position, back to top, migration 6 -> 7; footer
   rendering in `render-blocks.ts` (`renderFooter`, `footerPositioned`), `FOOTER_CSS` in `site-assets.ts`

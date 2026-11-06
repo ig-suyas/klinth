@@ -7,6 +7,7 @@ import { useAi } from '../ai/store.ts';
 import { withAsset } from '../media/files.ts';
 import { canBeFree } from '../state/free.ts';
 import { freeChoice, rememberFreeChoice } from '../state/free-intent.ts';
+import { setCanvasProps } from '../state/canvas.ts';
 import { setSectionProps, type Props } from '../state/sections.ts';
 import { currentPage, useEditor } from '../state/store.ts';
 import { useSectionActions } from '../state/useSectionActions.ts';
@@ -100,12 +101,25 @@ function SectionSettings({ section }: { section: Section }) {
   // The AI helper writes the block's own fields, which a free layout does not show.
   const free = freeCanvas(section) !== null;
   const save = (next: Props, key: string, newAsset?: Asset) => {
-    const problem = change(
-      (p) => setSectionProps(withAsset(p, newAsset), pageIndex, section.id, next),
-      key,
-    );
+    // A blank canvas also reshapes its artboard when its height changes.
+    const edit = section.type === 'canvas' ? setCanvasProps : setSectionProps;
+    const problem = change((p) => edit(withAsset(p, newAsset), pageIndex, section.id, next), key);
     if (problem) notify(`That change could not be made: ${problem}`);
   };
+  const fields = blockFields[section.type].map((spec) => (
+    <Field
+      key={`${spec.key}:${spec.label}`}
+      spec={spec}
+      blockType={section.type}
+      path={[spec.key]}
+      value={props[spec.key]}
+      item={props}
+      onChange={(value) => save({ ...props, [spec.key]: value }, `${section.id}.${spec.key}`)}
+      onPatch={(patch, newAsset) =>
+        save({ ...props, ...patch }, `${section.id}.${spec.key}`, newAsset)
+      }
+    />
+  ));
 
   return (
     <div className="space-y-5 p-4">
@@ -129,29 +143,22 @@ function SectionSettings({ section }: { section: Section }) {
       </header>
       {aiOpen && !free ? <AiPanel section={section} /> : null}
       {free ? (
-        <FreePanel section={section} />
+        <>
+          {/* A blank canvas has its own height and background; other free sections have none. */}
+          {section.type === 'canvas' ? (
+            <section aria-label="Canvas size and background" className="space-y-5">
+              {fields}
+            </section>
+          ) : null}
+          <FreePanel section={section} />
+        </>
       ) : (
         <>
           <p className="rounded-lg bg-sunk px-3 py-2 text-xs leading-relaxed text-ink-soft">
             Tip: click any text in the preview to change it right there.
           </p>
           <FreeChoiceNote section={section} />
-          {blockFields[section.type].map((spec) => (
-            <Field
-              key={spec.key}
-              spec={spec}
-              blockType={section.type}
-              path={[spec.key]}
-              value={props[spec.key]}
-              item={props}
-              onChange={(value) =>
-                save({ ...props, [spec.key]: value }, `${section.id}.${spec.key}`)
-              }
-              onPatch={(patch, newAsset) =>
-                save({ ...props, ...patch }, `${section.id}.${spec.key}`, newAsset)
-              }
-            />
-          ))}
+          {fields}
         </>
       )}
       <AnimationPanel key={section.id} section={section} />

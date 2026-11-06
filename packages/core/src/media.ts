@@ -6,7 +6,7 @@ export const MAX_VIDEO_BYTES = 25 * 1024 * 1024;
 export const REPO_WARN_BYTES = 60 * 1024 * 1024;
 
 /** Props that point at an uploaded file. */
-const ASSET_KEYS = new Set(['image', 'video']);
+const ASSET_KEYS = new Set(['image', 'video', 'poster']);
 
 type Json = unknown;
 

@@ -268,6 +268,11 @@ ${FREE_BRIDGE_JS}
       for (var j = 0; j < els.length; j++) {
         if (els[j].getAttribute('data-k-asset') === item.id) els[j].src = url;
       }
+      // An uploaded video's poster picture.
+      var posters = document.querySelectorAll('video[data-k-poster]');
+      for (var k = 0; k < posters.length; k++) {
+        if (posters[k].getAttribute('data-k-poster') === item.id) posters[k].poster = url;
+      }
     }
   }
 
@@ -324,6 +329,7 @@ export const BRIDGE_CSS = `${FREE_BRIDGE_CSS}
 export const PREVIEW_CSS = `
 .code-note { margin: 0 0 .75rem; font: 600 12px/1.4 system-ui, sans-serif; letter-spacing: .02em; color: var(--muted); }
 .code-frame { display: block; width: 100%; height: 320px; border: 1px dashed var(--line); border-radius: min(var(--radius), 12px); background: transparent; }
+.block-canvas .free-board { outline: 1px dashed color-mix(in srgb, var(--fg) 30%, transparent); outline-offset: -1px; }
 .code-empty { padding: 2.5rem 1rem; text-align: center; border: 1px dashed var(--line); border-radius: min(var(--radius), 12px); font: 500 14px/1.4 system-ui, sans-serif; color: var(--muted); }
 `;
 

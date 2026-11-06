@@ -46,8 +46,12 @@ export type FreeItemType = (typeof FREE_ITEM_TYPES)[number];
 export const FREE_TEXT_STYLES = ['title', 'subtitle', 'body'] as const;
 export const FREE_ALIGNS = ['start', 'center', 'end'] as const;
 
-/** Blocks that can switch to a free layout. The footer, spacers and pasted code cannot. */
+/**
+ * Blocks that can be laid out freely. The footer, spacers and pasted code cannot;
+ * a blank canvas always is.
+ */
 export const FREE_BLOCKS: ReadonlySet<BlockType> = new Set<BlockType>([
+  'canvas',
   'hero',
   'about',
   'textImage',
@@ -222,6 +226,7 @@ export function freeSectionProblem(section: SectionLike): string | null {
   if (free && !section.canvas) return 'A free section needs its canvas';
   if (!free && section.canvas) return 'Only a free section has a canvas';
   if (free && !FREE_BLOCKS.has(section.type)) return 'This section cannot be placed freely';
+  if (!free && section.type === 'canvas') return 'A blank canvas is always placed freely';
   const parts = Object.keys(section.animation ?? {}).filter((k) => k !== 'section');
   if (free && parts.length > 0) return 'A free section can only animate as a whole';
   return null;
